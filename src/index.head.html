@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Тренажёр РТК паллетизации — конфигуратор, захват, безопасность, ПЛК</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{--bg:#EEF0F2;--panel:#FBFBFC;--ink:#1E2730;--muted:#5C6772;--line:#C9CFD5;--dim:#E1E5E9;--fence:#7B8794;--robot:#E0762C;--yellow:#F5B400;--green:#2A9D5C;--red:#D33B2F;--blue:#3A6EA5;--box:#C9A66B;--box2:#8DB3A0;--box3:#B39DDB;--box4:#E0A0A0;--sheet:#8FA3B5;--off:#B8C0C8;--okbg:#DDF3E5;--okfg:#1B6B3A;--warnbg:#FFF1C6;--warnfg:#7A5A00;--badbg:#FADBD8;--badfg:#8E251C}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171B20;--panel:#21262C;--ink:#E6E9EC;--muted:#9AA4AE;--line:#363C44;--dim:#2C3239;--fence:#8A97A5;--off:#4A525B;--okbg:#1E3A2A;--okfg:#8FDCAA;--warnbg:#3D3212;--warnfg:#F2CF6B;--badbg:#42211F;--badfg:#F0A39B}}
+:root[data-theme="dark"]{--bg:#171B20;--panel:#21262C;--ink:#E6E9EC;--muted:#9AA4AE;--line:#363C44;--dim:#2C3239;--fence:#8A97A5;--off:#4A525B;--okbg:#1E3A2A;--okfg:#8FDCAA;--warnbg:#3D3212;--warnfg:#F2CF6B;--badbg:#42211F;--badfg:#F0A39B}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans",system-ui,"Segoe UI",Roboto,sans-serif}
+header{padding:18px 22px 0;max-width:1400px;margin:0 auto}
+h1{font-size:22px;font-weight:600;margin:0 0 4px}
+header p{margin:0;color:var(--muted);max-width:90ch}
+.tabs{display:flex;gap:2px;margin-top:12px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.tabs button{background:transparent;border:0;border-bottom:2px solid transparent;border-radius:0;padding:8px 12px;color:var(--muted);margin-bottom:-1px}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--robot);font-weight:500}
+main{max-width:1400px;margin:0 auto;padding:14px 22px 40px}
+.tab{display:none}.tab.on{display:grid;gap:14px}
+#tab-sim{grid-template-columns:minmax(0,1.55fr) minmax(330px,1fr)}
+#tab-cfg{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}
+#tab-arch,#tab-help,#tab-algo,#tab-3d{grid-template-columns:1fr}
+#v3wrap{position:relative;width:100%;height:600px;background:linear-gradient(#dfe5ea,#f3f5f7);border-radius:6px;overflow:hidden;touch-action:none}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #v3wrap{background:linear-gradient(#1c2229,#2a313a)}}
+:root[data-theme="dark"] #v3wrap{background:linear-gradient(#1c2229,#2a313a)}
+#v3wrap canvas{display:block;width:100%!important;height:100%!important}
+#v3msg{position:absolute;left:12px;top:10px;font-size:13px;color:var(--muted);pointer-events:none}
+.row.box{grid-template-columns:1.2fr .7fr .7fr .7fr .6fr .8fr .6fr auto}
+@media (max-width:980px){#tab-sim{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;min-width:0}
+.panel h2{font-size:14px;font-weight:600;margin:0 0 8px;color:var(--muted)}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+svg{width:100%;height:auto;display:block}
+.svgwrap{overflow-x:auto}
+button{font:inherit;font-size:14px;padding:7px 11px;border-radius:5px;border:1px solid var(--line);background:var(--dim);color:var(--ink);cursor:pointer}
+button:hover:not(:disabled){filter:brightness(.96)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center}
+.btns.group{padding-top:8px;border-top:1px dashed var(--line)}
+.b-start{background:var(--green);color:#fff;border-color:var(--green)}
+.b-stop{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.b-reset{background:var(--blue);color:#fff;border-color:var(--blue)}
+.b-apply{background:var(--robot);color:#fff;border-color:var(--robot);font-weight:500}
+.b-estop{background:var(--red);color:#fff;border-color:var(--red);border-radius:50%;width:54px;height:54px;padding:0;font-weight:600;font-size:12px;line-height:1.05}
+.b-estop.pressed{box-shadow:inset 0 0 0 4px var(--yellow);transform:scale(.94)}
+.state{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.state .name{font-size:24px;font-weight:600}
+.state .why{color:var(--muted);font-size:13px}
+.lamps{display:flex;gap:6px;margin-left:auto}
+.lamp{width:16px;height:16px;border-radius:50%;background:var(--off);border:1px solid var(--line)}
+.lamp.r.on{background:var(--red)}.lamp.y.on{background:var(--yellow)}.lamp.g.on{background:var(--green)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+td,th{padding:3px 5px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}
+th{color:var(--muted);font-weight:500}
+td.tag{color:var(--muted);width:48px;font-weight:500;white-space:nowrap}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--off);vertical-align:middle;margin-right:6px}
+.dot.on{background:var(--green)}.dot.on.warn{background:var(--yellow)}.dot.on.alarm{background:var(--red)}
+.io{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+@media (max-width:520px){.io{grid-template-columns:1fr}}
+.vfd{display:grid;grid-template-columns:repeat(4,1fr);gap:4px 10px;font-size:12.5px;margin-bottom:8px}
+.vfd .v{font-size:17px;font-weight:600}
+.vfd .ttl{grid-column:1/-1;font-weight:500;font-size:13px}
+.bar{height:7px;background:var(--dim);border-radius:4px;overflow:hidden;grid-column:1/-1}
+.bar i{display:block;height:100%;background:var(--blue);width:0}
+.zones{display:flex;gap:3px;grid-column:1/-1}.zones i{flex:1;height:10px;background:var(--dim);border-radius:2px}.zones i.on{background:var(--box)}
+.vfd label,.slider{color:var(--muted);display:flex;align-items:center;gap:8px;grid-column:1/-1;font-size:13px}
+input[type=range]{flex:1}
+.steps{list-style:none;margin:0;padding:0;font-size:13px;columns:2;column-gap:14px}
+@media (max-width:520px){.steps{columns:1}}
+.steps li{padding:3px 6px;border-radius:4px;break-inside:avoid;color:var(--muted)}
+.steps li.on{background:var(--dim);color:var(--ink);font-weight:500}
+.steps li span{display:inline-block;width:20px;color:var(--muted)}
+.log{font-size:12.5px;max-height:240px;overflow:auto;margin:0;padding:0;list-style:none}
+.log li{padding:2px 0;border-bottom:1px solid var(--line)}
+.log li time{color:var(--muted);margin-right:8px;font-variant-numeric:tabular-nums}
+.log li.alarm{color:var(--red)}.log li.warn{color:var(--warnfg)}
+.tasks{list-style:none;margin:0;padding:0;font-size:13.5px}
+.tasks li{padding:6px 0;border-bottom:1px solid var(--line)}
+.tasks li b{font-weight:500}
+.tasks li .ok{color:var(--green);font-weight:600;margin-right:6px}
+.tasks li .todo{color:var(--muted);margin-right:6px}
+.tasks li p{margin:4px 0 0;color:var(--muted);display:none}
+.tasks li.done p{display:block}
+.note{font-size:13px;color:var(--muted);margin:6px 0 0}
+.legend{font-size:12.5px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;margin:0 4px 0 10px;vertical-align:middle;border-radius:2px}
+.field{display:grid;grid-template-columns:1fr 140px;gap:5px 10px;align-items:center;font-size:13.5px;margin-bottom:5px}
+.field label{color:var(--muted)}
+.field small{color:var(--muted);grid-column:1/-1;margin-top:-3px}
+input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);width:100%}
+.row{display:grid;gap:4px;align-items:center;margin-bottom:5px;font-size:13px}
+.row.box{grid-template-columns:1.3fr .8fr .8fr .8fr .8fr auto}
+.row.conv{grid-template-columns:1.6fr .7fr .7fr .9fr .9fr auto}
+.row.feed{grid-template-columns:1.2fr 1fr 1fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
+.row input,.row select{padding:3px 4px;font-size:13px}
+.row .h{color:var(--muted);font-size:12px}
+.badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:12.5px;font-weight:500;white-space:nowrap}
+.ok{background:var(--okbg);color:var(--okfg)}.warn{background:var(--warnbg);color:var(--warnfg)}.bad{background:var(--badbg);color:var(--badfg)}
+.check{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px;align-items:baseline}
+.check small{display:block;color:var(--muted)}
+.warnings li{font-size:13px;margin-bottom:4px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:12.5px;color:var(--muted)}
+.stats b{display:block;font-size:18px;color:var(--ink);font-weight:600}
+.prose{font-size:14px;max-width:90ch}
+.prose h3{font-size:15px;margin:16px 0 4px}
+.prose p{margin:0 0 8px}
+.prose ul,.prose ol{margin:0 0 8px;padding-left:22px}
+.prose li{margin-bottom:4px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:6px}
+.card{border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13px}
+.card b{display:block;font-size:16px;font-weight:600;margin:2px 0}
+.card span{color:var(--muted)}
+.gl dt{font-weight:500;margin-top:8px}.gl dd{margin:0;color:var(--muted);font-size:13.5px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:900px){.two{grid-template-columns:1fr}}
+.tsel{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-left:auto}
+.opt{font-size:13.5px}.opt b{font-weight:600}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+<h1>Тренажёр РТК паллетизации</h1>
+<p>Соберите ячейку в конфигураторе — роботы, захват, коробки, конвейеры, паллеты, тип защиты. Тренажёр рассчитает укладку с перевязкой, вакуумный захват, досягаемость и производительность, предложит оптимальный вариант, выдаст состав АСУ ТП и опишет алгоритм работы обычным языком, а затем даст управлять ячейкой с пульта.</p>
+<nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="help">Задания и справочник</button></nav>
+</header>
+<main>
+<!-- ================= СИМУЛЯЦИЯ ================= -->
+<section id="tab-sim" class="tab on">
+<div class="col">
+ <div class="panel">
+  <div class="svgwrap"><svg id="cell" viewBox="0 0 900 580" xmlns="http://www.w3.org/2000/svg" aria-label="Вид ячейки сверху"><g id="static"></g><g id="dyn"></g>
+   <g transform="translate(26,60)"><rect x="-8" y="0" width="16" height="66" rx="3" fill="none" stroke="var(--line)"/><circle id="lr" cy="12" r="6" fill="var(--off)"/><circle id="ly" cy="33" r="6" fill="var(--off)"/><circle id="lg" cy="54" r="6" fill="var(--off)"/><text x="-8" y="82" font-size="11" fill="var(--muted)">H1–H3</text></g>
+   <text id="msg" x="450" y="22" font-size="13" text-anchor="middle" fill="var(--ink)" font-weight="500"></text>
+  </svg></div>
+  <div class="legend" id="legend"></div>
+ </div>
+ <div class="panel"><h2>Последовательность робота (GRAFCET)</h2><ol class="steps" id="steps"></ol></div>
+ <div class="panel"><h2>Журнал событий ПЛК</h2><ul class="log" id="log"></ul></div>
+</div>
+<div class="col">
+ <div class="panel">
+  <div class="state"><div><div class="name" id="stName">Stopped</div><div class="why" id="stWhy"></div></div><div class="lamps"><div class="lamp r" id="pr"></div><div class="lamp y" id="py"></div><div class="lamp g" id="pg"></div></div></div>
+  <div class="btns"><button class="b-start" id="bStart">Пуск</button><button class="b-stop" id="bStop">Стоп</button><button class="b-reset" id="bReset">Сброс</button><button class="b-estop" id="bEstop" title="Аварийный стоп, категория 0">STOP</button>
+   <div class="tsel">Время <select id="tScale"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></div></div>
+  <div class="slider">Скорость робота (override) <input type="range" id="ovr" min="10" max="100" step="5" value="100"> <span id="ovrV">100 %</span></div>
+  <div class="btns group" id="evtBtns"></div>
+  <div class="btns group" id="safBtns"></div>
+  <div class="btns group" id="palBtns"></div>
+  <div class="btns group" id="faultBtns"></div>
+  <p class="note">Кнопка недоступна, когда переход запрещён машиной состояний PackML. Отказы попадают в Held (внутренняя причина), нехватка материала — в Suspended (внешняя).</p>
+ </div>
+ <div class="panel"><h2>Показатели</h2><div class="stats" id="stats"></div></div>
+ <div class="panel"><h2>Шкаф управления — живые входы и выходы</h2><div class="io"><table id="di"></table><table id="do"></table></div></div>
+ <div class="panel"><h2>Приводы конвейеров</h2><div id="drives"></div></div>
+</div>
+</section>
+<!-- ================= 3D ================= -->
+<section id="tab-3d" class="tab">
+ <div class="panel"><div class="btns"><span class="note" style="margin:0 8px 0 0">Вращение — левая кнопка, масштаб — колесо, панорама — правая кнопка или Shift.</span><button data-v3="iso">Изометрия</button><button data-v3="top">Сверху</button><button data-v3="op">От оператора</button><button data-v3="follow">Следить за роботом</button></div>
+ <div id="v3wrap"><div id="v3msg"></div></div>
+ <p class="note">3D-вид повторяет ту же симуляцию, что и план: пульт, отказы и обмен паллет остаются на вкладке «Симуляция», сцена обновляется живьём. Робот показан как трёхзвенный манипулятор с горизонтальным захватом.</p></div>
+</section>
+<!-- ================= КОНФИГУРАТОР ================= -->
+<section id="tab-cfg" class="tab">
+ <div class="panel"><h2>Роботы</h2><div id="cfgRobot"></div></div>
+ <div class="panel"><h2>Захват</h2><div id="cfgGrip"></div></div>
+ <div class="panel"><h2>Коробки, паллеты, схема укладки</h2><div id="cfgBoxes"></div></div>
+ <div class="panel"><h2>Конвейеры и подача</h2><div id="cfgConv"></div></div>
+ <div class="panel"><h2>Безопасность, сеть, компоновка</h2><div id="cfgSafety"></div></div>
+ <div class="panel"><h2>Прокладочные листы</h2><div id="cfgSheet"></div></div>
+ <div class="panel"><h2>Обмен паллет и пополнение</h2><div id="cfgExch"></div></div>
+ <div class="panel"><h2>Подбор оптимальной конфигурации</h2><div id="cfgOpt"></div></div>
+ <div class="panel" style="grid-column:1/-1"><h2>Планировщик артикулов — методика «циклов на паллету»</h2><div id="cfgPlan"></div></div>
+ <div class="panel" style="grid-column:1/-1"><h2>Проверка конфигурации</h2><div class="two"><div id="checks"></div><div><ul class="warnings" id="warnings"></ul><div class="btns"><button class="b-apply" id="bApply">Применить и перестроить ячейку</button><button id="bDefaults">Сбросить к типовой</button></div><p class="note">Проверки считаются на лету; ячейка, алгоритм и состав АСУ ТП перестраиваются по кнопке. Параметры роботов и присосок справочные — сверяйте с паспортом.</p></div></div></div>
+</section>
+<!-- ================= АЛГОРИТМ ================= -->
+<section id="tab-algo" class="tab"><div class="panel prose" id="algoText"></div></section>
+<!-- ================= АРХИТЕКТУРА ================= -->
+<section id="tab-arch" class="tab">
+ <div class="panel"><h2>Итог по конфигурации</h2><div class="cards" id="archCards"></div></div>
+ <div class="panel"><h2>Структурная схема системы управления</h2><div class="svgwrap"><svg id="net" viewBox="0 0 900 470" xmlns="http://www.w3.org/2000/svg"></svg></div><p class="note">Сплошные линии — сеть и сигнальные цепи 24 В, красный пунктир — двухканальные цепи безопасности. Схема генерируется из конфигурации.</p></div>
+ <div class="panel"><h2>Состав АСУ ТП (спецификация)</h2><div class="svgwrap"><table id="bom"></table></div></div>
+ <div class="panel"><h2>Сигналы и модули ввода-вывода</h2><div id="ioSummary"></div><div class="svgwrap"><table id="sig"></table></div></div>
+ <div class="panel prose" id="archText"></div>
+</section>
+<!-- ================= СПРАВОЧНИК ================= -->
+<section id="tab-help" class="tab">
+ <div class="two">
+ <div class="panel"><h2>Задания</h2><ul class="tasks" id="tasks"></ul></div>
+ <div class="panel"><h2>Что означают элементы</h2><dl class="gl" id="gloss"></dl></div>
+ </div>
+ <div class="panel prose" id="stdText"></div>
+</section>
+</main>
+<script>

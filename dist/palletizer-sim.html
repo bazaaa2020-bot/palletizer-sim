@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Тренажёр РТК паллетизации — конфигуратор, захват, безопасность, ПЛК</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{--bg:#EEF0F2;--panel:#FBFBFC;--ink:#1E2730;--muted:#5C6772;--line:#C9CFD5;--dim:#E1E5E9;--fence:#7B8794;--robot:#E0762C;--yellow:#F5B400;--green:#2A9D5C;--red:#D33B2F;--blue:#3A6EA5;--box:#C9A66B;--box2:#8DB3A0;--box3:#B39DDB;--box4:#E0A0A0;--sheet:#8FA3B5;--off:#B8C0C8;--okbg:#DDF3E5;--okfg:#1B6B3A;--warnbg:#FFF1C6;--warnfg:#7A5A00;--badbg:#FADBD8;--badfg:#8E251C}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171B20;--panel:#21262C;--ink:#E6E9EC;--muted:#9AA4AE;--line:#363C44;--dim:#2C3239;--fence:#8A97A5;--off:#4A525B;--okbg:#1E3A2A;--okfg:#8FDCAA;--warnbg:#3D3212;--warnfg:#F2CF6B;--badbg:#42211F;--badfg:#F0A39B}}
+:root[data-theme="dark"]{--bg:#171B20;--panel:#21262C;--ink:#E6E9EC;--muted:#9AA4AE;--line:#363C44;--dim:#2C3239;--fence:#8A97A5;--off:#4A525B;--okbg:#1E3A2A;--okfg:#8FDCAA;--warnbg:#3D3212;--warnfg:#F2CF6B;--badbg:#42211F;--badfg:#F0A39B}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans",system-ui,"Segoe UI",Roboto,sans-serif}
+header{padding:18px 22px 0;max-width:1400px;margin:0 auto}
+h1{font-size:22px;font-weight:600;margin:0 0 4px}
+header p{margin:0;color:var(--muted);max-width:90ch}
+.tabs{display:flex;gap:2px;margin-top:12px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.tabs button{background:transparent;border:0;border-bottom:2px solid transparent;border-radius:0;padding:8px 12px;color:var(--muted);margin-bottom:-1px}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--robot);font-weight:500}
+main{max-width:1400px;margin:0 auto;padding:14px 22px 40px}
+.tab{display:none}.tab.on{display:grid;gap:14px}
+#tab-sim{grid-template-columns:minmax(0,1.55fr) minmax(330px,1fr)}
+#tab-cfg{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}
+#tab-arch,#tab-help,#tab-algo,#tab-3d{grid-template-columns:1fr}
+#v3wrap{position:relative;width:100%;height:600px;background:linear-gradient(#dfe5ea,#f3f5f7);border-radius:6px;overflow:hidden;touch-action:none}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #v3wrap{background:linear-gradient(#1c2229,#2a313a)}}
+:root[data-theme="dark"] #v3wrap{background:linear-gradient(#1c2229,#2a313a)}
+#v3wrap canvas{display:block;width:100%!important;height:100%!important}
+#v3msg{position:absolute;left:12px;top:10px;font-size:13px;color:var(--muted);pointer-events:none}
+.row.box{grid-template-columns:1.2fr .7fr .7fr .7fr .6fr .8fr .6fr auto}
+@media (max-width:980px){#tab-sim{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;min-width:0}
+.panel h2{font-size:14px;font-weight:600;margin:0 0 8px;color:var(--muted)}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+svg{width:100%;height:auto;display:block}
+.svgwrap{overflow-x:auto}
+button{font:inherit;font-size:14px;padding:7px 11px;border-radius:5px;border:1px solid var(--line);background:var(--dim);color:var(--ink);cursor:pointer}
+button:hover:not(:disabled){filter:brightness(.96)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center}
+.btns.group{padding-top:8px;border-top:1px dashed var(--line)}
+.b-start{background:var(--green);color:#fff;border-color:var(--green)}
+.b-stop{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.b-reset{background:var(--blue);color:#fff;border-color:var(--blue)}
+.b-apply{background:var(--robot);color:#fff;border-color:var(--robot);font-weight:500}
+.b-estop{background:var(--red);color:#fff;border-color:var(--red);border-radius:50%;width:54px;height:54px;padding:0;font-weight:600;font-size:12px;line-height:1.05}
+.b-estop.pressed{box-shadow:inset 0 0 0 4px var(--yellow);transform:scale(.94)}
+.state{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.state .name{font-size:24px;font-weight:600}
+.state .why{color:var(--muted);font-size:13px}
+.lamps{display:flex;gap:6px;margin-left:auto}
+.lamp{width:16px;height:16px;border-radius:50%;background:var(--off);border:1px solid var(--line)}
+.lamp.r.on{background:var(--red)}.lamp.y.on{background:var(--yellow)}.lamp.g.on{background:var(--green)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+td,th{padding:3px 5px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}
+th{color:var(--muted);font-weight:500}
+td.tag{color:var(--muted);width:48px;font-weight:500;white-space:nowrap}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--off);vertical-align:middle;margin-right:6px}
+.dot.on{background:var(--green)}.dot.on.warn{background:var(--yellow)}.dot.on.alarm{background:var(--red)}
+.io{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+@media (max-width:520px){.io{grid-template-columns:1fr}}
+.vfd{display:grid;grid-template-columns:repeat(4,1fr);gap:4px 10px;font-size:12.5px;margin-bottom:8px}
+.vfd .v{font-size:17px;font-weight:600}
+.vfd .ttl{grid-column:1/-1;font-weight:500;font-size:13px}
+.bar{height:7px;background:var(--dim);border-radius:4px;overflow:hidden;grid-column:1/-1}
+.bar i{display:block;height:100%;background:var(--blue);width:0}
+.zones{display:flex;gap:3px;grid-column:1/-1}.zones i{flex:1;height:10px;background:var(--dim);border-radius:2px}.zones i.on{background:var(--box)}
+.vfd label,.slider{color:var(--muted);display:flex;align-items:center;gap:8px;grid-column:1/-1;font-size:13px}
+input[type=range]{flex:1}
+.steps{list-style:none;margin:0;padding:0;font-size:13px;columns:2;column-gap:14px}
+@media (max-width:520px){.steps{columns:1}}
+.steps li{padding:3px 6px;border-radius:4px;break-inside:avoid;color:var(--muted)}
+.steps li.on{background:var(--dim);color:var(--ink);font-weight:500}
+.steps li span{display:inline-block;width:20px;color:var(--muted)}
+.log{font-size:12.5px;max-height:240px;overflow:auto;margin:0;padding:0;list-style:none}
+.log li{padding:2px 0;border-bottom:1px solid var(--line)}
+.log li time{color:var(--muted);margin-right:8px;font-variant-numeric:tabular-nums}
+.log li.alarm{color:var(--red)}.log li.warn{color:var(--warnfg)}
+.tasks{list-style:none;margin:0;padding:0;font-size:13.5px}
+.tasks li{padding:6px 0;border-bottom:1px solid var(--line)}
+.tasks li b{font-weight:500}
+.tasks li .ok{color:var(--green);font-weight:600;margin-right:6px}
+.tasks li .todo{color:var(--muted);margin-right:6px}
+.tasks li p{margin:4px 0 0;color:var(--muted);display:none}
+.tasks li.done p{display:block}
+.note{font-size:13px;color:var(--muted);margin:6px 0 0}
+.legend{font-size:12.5px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;margin:0 4px 0 10px;vertical-align:middle;border-radius:2px}
+.field{display:grid;grid-template-columns:1fr 140px;gap:5px 10px;align-items:center;font-size:13.5px;margin-bottom:5px}
+.field label{color:var(--muted)}
+.field small{color:var(--muted);grid-column:1/-1;margin-top:-3px}
+input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);width:100%}
+.row{display:grid;gap:4px;align-items:center;margin-bottom:5px;font-size:13px}
+.row.box{grid-template-columns:1.3fr .8fr .8fr .8fr .8fr auto}
+.row.conv{grid-template-columns:1.6fr .7fr .7fr .9fr .9fr auto}
+.row.feed{grid-template-columns:1.2fr 1fr 1fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
+.row input,.row select{padding:3px 4px;font-size:13px}
+.row .h{color:var(--muted);font-size:12px}
+.badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:12.5px;font-weight:500;white-space:nowrap}
+.ok{background:var(--okbg);color:var(--okfg)}.warn{background:var(--warnbg);color:var(--warnfg)}.bad{background:var(--badbg);color:var(--badfg)}
+.check{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px;align-items:baseline}
+.check small{display:block;color:var(--muted)}
+.warnings li{font-size:13px;margin-bottom:4px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:12.5px;color:var(--muted)}
+.stats b{display:block;font-size:18px;color:var(--ink);font-weight:600}
+.prose{font-size:14px;max-width:90ch}
+.prose h3{font-size:15px;margin:16px 0 4px}
+.prose p{margin:0 0 8px}
+.prose ul,.prose ol{margin:0 0 8px;padding-left:22px}
+.prose li{margin-bottom:4px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:6px}
+.card{border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13px}
+.card b{display:block;font-size:16px;font-weight:600;margin:2px 0}
+.card span{color:var(--muted)}
+.gl dt{font-weight:500;margin-top:8px}.gl dd{margin:0;color:var(--muted);font-size:13.5px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:900px){.two{grid-template-columns:1fr}}
+.tsel{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-left:auto}
+.opt{font-size:13.5px}.opt b{font-weight:600}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+<h1>Тренажёр РТК паллетизации</h1>
+<p>Соберите ячейку в конфигураторе — роботы, захват, коробки, конвейеры, паллеты, тип защиты. Тренажёр рассчитает укладку с перевязкой, вакуумный захват, досягаемость и производительность, предложит оптимальный вариант, выдаст состав АСУ ТП и опишет алгоритм работы обычным языком, а затем даст управлять ячейкой с пульта.</p>
+<nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="help">Задания и справочник</button></nav>
+</header>
+<main>
+<!-- ================= СИМУЛЯЦИЯ ================= -->
+<section id="tab-sim" class="tab on">
+<div class="col">
+ <div class="panel">
+  <div class="svgwrap"><svg id="cell" viewBox="0 0 900 580" xmlns="http://www.w3.org/2000/svg" aria-label="Вид ячейки сверху"><g id="static"></g><g id="dyn"></g>
+   <g transform="translate(26,60)"><rect x="-8" y="0" width="16" height="66" rx="3" fill="none" stroke="var(--line)"/><circle id="lr" cy="12" r="6" fill="var(--off)"/><circle id="ly" cy="33" r="6" fill="var(--off)"/><circle id="lg" cy="54" r="6" fill="var(--off)"/><text x="-8" y="82" font-size="11" fill="var(--muted)">H1–H3</text></g>
+   <text id="msg" x="450" y="22" font-size="13" text-anchor="middle" fill="var(--ink)" font-weight="500"></text>
+  </svg></div>
+  <div class="legend" id="legend"></div>
+ </div>
+ <div class="panel"><h2>Последовательность робота (GRAFCET)</h2><ol class="steps" id="steps"></ol></div>
+ <div class="panel"><h2>Журнал событий ПЛК</h2><ul class="log" id="log"></ul></div>
+</div>
+<div class="col">
+ <div class="panel">
+  <div class="state"><div><div class="name" id="stName">Stopped</div><div class="why" id="stWhy"></div></div><div class="lamps"><div class="lamp r" id="pr"></div><div class="lamp y" id="py"></div><div class="lamp g" id="pg"></div></div></div>
+  <div class="btns"><button class="b-start" id="bStart">Пуск</button><button class="b-stop" id="bStop">Стоп</button><button class="b-reset" id="bReset">Сброс</button><button class="b-estop" id="bEstop" title="Аварийный стоп, категория 0">STOP</button>
+   <div class="tsel">Время <select id="tScale"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></div></div>
+  <div class="slider">Скорость робота (override) <input type="range" id="ovr" min="10" max="100" step="5" value="100"> <span id="ovrV">100 %</span></div>
+  <div class="btns group" id="evtBtns"></div>
+  <div class="btns group" id="safBtns"></div>
+  <div class="btns group" id="palBtns"></div>
+  <div class="btns group" id="faultBtns"></div>
+  <p class="note">Кнопка недоступна, когда переход запрещён машиной состояний PackML. Отказы попадают в Held (внутренняя причина), нехватка материала — в Suspended (внешняя).</p>
+ </div>
+ <div class="panel"><h2>Показатели</h2><div class="stats" id="stats"></div></div>
+ <div class="panel"><h2>Шкаф управления — живые входы и выходы</h2><div class="io"><table id="di"></table><table id="do"></table></div></div>
+ <div class="panel"><h2>Приводы конвейеров</h2><div id="drives"></div></div>
+</div>
+</section>
+<!-- ================= 3D ================= -->
+<section id="tab-3d" class="tab">
+ <div class="panel"><div class="btns"><span class="note" style="margin:0 8px 0 0">Вращение — левая кнопка, масштаб — колесо, панорама — правая кнопка или Shift.</span><button data-v3="iso">Изометрия</button><button data-v3="top">Сверху</button><button data-v3="op">От оператора</button><button data-v3="follow">Следить за роботом</button></div>
+ <div id="v3wrap"><div id="v3msg"></div></div>
+ <p class="note">3D-вид повторяет ту же симуляцию, что и план: пульт, отказы и обмен паллет остаются на вкладке «Симуляция», сцена обновляется живьём. Робот показан как трёхзвенный манипулятор с горизонтальным захватом.</p></div>
+</section>
+<!-- ================= КОНФИГУРАТОР ================= -->
+<section id="tab-cfg" class="tab">
+ <div class="panel"><h2>Роботы</h2><div id="cfgRobot"></div></div>
+ <div class="panel"><h2>Захват</h2><div id="cfgGrip"></div></div>
+ <div class="panel"><h2>Коробки, паллеты, схема укладки</h2><div id="cfgBoxes"></div></div>
+ <div class="panel"><h2>Конвейеры и подача</h2><div id="cfgConv"></div></div>
+ <div class="panel"><h2>Безопасность, сеть, компоновка</h2><div id="cfgSafety"></div></div>
+ <div class="panel"><h2>Прокладочные листы</h2><div id="cfgSheet"></div></div>
+ <div class="panel"><h2>Обмен паллет и пополнение</h2><div id="cfgExch"></div></div>
+ <div class="panel"><h2>Подбор оптимальной конфигурации</h2><div id="cfgOpt"></div></div>
+ <div class="panel" style="grid-column:1/-1"><h2>Планировщик артикулов — методика «циклов на паллету»</h2><div id="cfgPlan"></div></div>
+ <div class="panel" style="grid-column:1/-1"><h2>Проверка конфигурации</h2><div class="two"><div id="checks"></div><div><ul class="warnings" id="warnings"></ul><div class="btns"><button class="b-apply" id="bApply">Применить и перестроить ячейку</button><button id="bDefaults">Сбросить к типовой</button></div><p class="note">Проверки считаются на лету; ячейка, алгоритм и состав АСУ ТП перестраиваются по кнопке. Параметры роботов и присосок справочные — сверяйте с паспортом.</p></div></div></div>
+</section>
+<!-- ================= АЛГОРИТМ ================= -->
+<section id="tab-algo" class="tab"><div class="panel prose" id="algoText"></div></section>
+<!-- ================= АРХИТЕКТУРА ================= -->
+<section id="tab-arch" class="tab">
+ <div class="panel"><h2>Итог по конфигурации</h2><div class="cards" id="archCards"></div></div>
+ <div class="panel"><h2>Структурная схема системы управления</h2><div class="svgwrap"><svg id="net" viewBox="0 0 900 470" xmlns="http://www.w3.org/2000/svg"></svg></div><p class="note">Сплошные линии — сеть и сигнальные цепи 24 В, красный пунктир — двухканальные цепи безопасности. Схема генерируется из конфигурации.</p></div>
+ <div class="panel"><h2>Состав АСУ ТП (спецификация)</h2><div class="svgwrap"><table id="bom"></table></div></div>
+ <div class="panel"><h2>Сигналы и модули ввода-вывода</h2><div id="ioSummary"></div><div class="svgwrap"><table id="sig"></table></div></div>
+ <div class="panel prose" id="archText"></div>
+</section>
+<!-- ================= СПРАВОЧНИК ================= -->
+<section id="tab-help" class="tab">
+ <div class="two">
+ <div class="panel"><h2>Задания</h2><ul class="tasks" id="tasks"></ul></div>
+ <div class="panel"><h2>Что означают элементы</h2><dl class="gl" id="gloss"></dl></div>
+ </div>
+ <div class="panel prose" id="stdText"></div>
+</section>
+</main>
+<script>
+// ======================= СПРАВОЧНИКИ =======================
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const f0=v=>Math.round(v).toLocaleString('ru-RU');
+const f1=v=>(Math.round(v*10)/10).toLocaleString('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1});
+const f2=v=>(Math.round(v*100)/100).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
+const deep=o=>JSON.parse(JSON.stringify(o));
+const ROBOTS=[
+ {id:'cb5',name:'Кобот 5 кг · 850 мм',cls:'cobot',payload:5,reach:850,v:1.0,cpm:8,cost:1.0,ex:'класс UR5e, Dobot CR5, Elite EC66'},
+ {id:'cb10l',name:'Кобот 10 кг · 1420 мм',cls:'cobot',payload:10,reach:1418,v:1.0,cpm:8,cost:1.4,ex:'класс FANUC CRX-10iA/L'},
+ {id:'cb12',name:'Кобот 12,5 кг · 1300 мм',cls:'cobot',payload:12.5,reach:1300,v:1.0,cpm:8,cost:1.5,ex:'класс UR10e, Doosan M1013'},
+ {id:'cb20',name:'Кобот 20 кг · 1750 мм',cls:'cobot',payload:20,reach:1750,v:1.0,cpm:7,cost:2.1,ex:'класс UR20, Doosan H2017 (1700 мм)'},
+ {id:'cb25',name:'Кобот 25 кг · 1890 мм',cls:'cobot',payload:25,reach:1889,v:1.0,cpm:7,cost:2.4,ex:'класс FANUC CRX-25iA, Doosan H2515 (1500 мм)'},
+ {id:'cb30',name:'Кобот 30 кг · 1300 мм',cls:'cobot',payload:30,reach:1300,v:1.0,cpm:7,cost:2.3,ex:'класс UR30'},
+ {id:'ir50',name:'Промышленный 50 кг · 2050 мм',cls:'industrial',payload:50,reach:2050,v:2.0,cpm:12,cost:3.2,ex:'класс FANUC M-710iC/50, KUKA KR 50 R2100'},
+ {id:'pl110',name:'Паллетайзер 110 кг · 2400 мм',cls:'industrial',payload:110,reach:2403,v:2.0,cpm:15,cost:4.2,ex:'класс FANUC M-410iC/110'},
+ {id:'pl130',name:'Паллетайзер 130 кг · 2400 мм, 6 циклов/мин',cls:'industrial',payload:130,reach:2400,v:2.0,cpm:6,cost:4.4,ex:'по методике оценки REDCARGO PRO130 — 6 циклов укладки в минуту; досягаемость уточнить по паспорту'},
+ {id:'pl185',name:'Паллетайзер 185 кг · 3140 мм',cls:'industrial',payload:185,reach:3143,v:2.0,cpm:15,cost:5.0,ex:'класс FANUC M-410iC/185, KUKA KR 180 R3200 PA'},
+ {id:'custom',name:'Свой робот — ввести параметры',cls:'custom',payload:10,reach:1300,v:1.0,cpm:8,cost:2.0,ex:''}];
+const BOX_PRESETS=[{name:'Малая',l:300,w:200,h:150,m:3,rate:0,layers:0},{name:'Средняя',l:400,w:300,h:250,m:8,rate:0,layers:0},{name:'Крупная',l:600,w:400,h:300,m:15,rate:0,layers:0},{name:'Тяжёлая',l:500,w:350,h:200,m:22,rate:0,layers:0},
+ {name:'М5П',l:300,w:200,h:105,m:5,rate:900,layers:11},{name:'М12_УП',l:334,w:215,h:196,m:12,rate:458,layers:7},{name:'С180',l:381,w:206,h:145,m:9,rate:400,layers:7},{name:'М180',l:306,w:246,h:143,m:9,rate:400,layers:4},{name:'С450',l:326,w:264,h:123,m:8.1,rate:379,layers:4},{name:'М20П',l:377,w:250,h:242,m:20,rate:275,layers:4},{name:'М8',l:335,w:204,h:150,m:7.5,rate:267,layers:7},{name:'Б380',l:357,w:258,h:136,m:6.08,rate:263,layers:9},{name:'МС2',l:392,w:294,h:109,m:10,rate:140,layers:10},{name:'МС10',l:314,w:152,h:243,m:10,rate:240,layers:5}];
+const PALLETS={'EUR 1200×800':{L:1200,W:800,h:144,m:25},'FIN 1200×1000':{L:1200,W:1000,h:144,m:30},'1000×1000':{L:1000,W:1000,h:150,m:28},'1100×1100':{L:1100,W:1100,h:150,m:30}};
+const CONV_TYPES={belt:{name:'Ленточный (гладкое полотно, один привод)',mu:.30,mBelt:8,vfd:true},roller:{name:'Рольганг приводной (цепной/ремённый, один привод)',mu:.06,mBelt:0,vfd:true},mdr:{name:'Рольганг на мотор-роликах 24 В (ZPA, привод в каждой зоне)',mu:.06,mBelt:0,vfd:false}};
+const FIELDBUS=['PROFINET','EtherNet/IP','Modbus TCP','Дискретные сигналы'];
+const GRIPPERS={cups:{name:'Вакуумный на присосках',vac:true,base:3.5,perBox:0.8},foam:{name:'Вакуумная пенная рамка (площадной)',vac:true,base:5,perBox:2.5},clamp:{name:'Клещевой (пневмозажим с боков)',vac:false,base:10,perBox:4},fork:{name:'Вилочный (подхват снизу + прижим)',vac:false,base:12,perBox:5}};
+const CUPS={bellows:{name:'Сильфонная, 1,5 складки',mu:.5,vacMax:60,note:'компенсирует неровности и наклон картона'},flat:{name:'Плоская',mu:.5,vacMax:80,note:'гладкие жёсткие поверхности; на картоне течёт'},flatrib:{name:'Плоская с рёбрами (высокое трение)',mu:.7,vacMax:80,note:'горизонтальные ускорения при быстрых переносах'},oval:{name:'Овальная',mu:.5,vacMax:60,note:'узкие рёбра жёсткости, длинные коробки'}};
+const FEEDS={manual:'Ручная (оператор кладёт)',interval:'Автомат: коробка каждые N секунд',rate:'Автомат: N коробок в минуту'};
+const SHEET_MODES={none:'Без листов',bottom:'Один лист на поддоне (снизу)',between:'Лист между каждым слоем',everyN:'Лист через каждые N слоёв'};
+const EXCH_OUT={jack:'Человек с рохлей (ручная гидравлическая тележка)',forklift:'Погрузчик (кар)',amr:'Роботизированная тележка (AMR/AGV)',conveyor:'Цепной конвейер паллет + диспенсер'};
+const EXCH_IN={vehicle:'Та же тележка привозит пустую паллету',robot:'Робот берёт пустую паллету из стопки (магазин паллет)',dispenser:'Диспенсер на конвейере паллет'};
+const SHEETS_BY={person:'Человек докладывает листы в магазин',amr:'AMR привозит паллету с листами (замена магазина целиком)'};
+const AGENT={person:{v:1.0,lift:2,name:'человек'},jack:{v:0.8,lift:4,name:'человек с рохлей'},forklift:{v:1.5,lift:3,name:'погрузчик'},amr:{v:1.0,lift:5,name:'AMR'}};
+const CUP_D=[30,40,50,60,80,100,125];
+const SLOT_ANGLES={1:[0],2:[-90,90],3:[-90,0,90],4:[-90,-30,30,90],5:[-90,-45,0,45,90],6:[-90,-54,-18,18,54,90]};
+const STN='ABCDEFGH';
+const DEF={robots:1,robot:'cb20',custom:{payload:10,reach:1300,cls:'cobot',cpm:8},speedPct:100,
+ grip:{type:'cups',cup:'bellows',cupD:0,vac:60,pressure:5,pick:1,mass:0},gripH:250,baseH:800,
+ pallet:'EUR 1200×800',maxStack:1300,stations:2,magazines:1,patternMode:'interlock',slotR:950,pickDist:850,convH:700,convGap:900,
+ sheet:{mode:'between',everyN:2,cap:20,low:3,speedPct:60,tGrip:1.0},
+ exch:{out:'jack',in:'vehicle',sheetsBy:'person',auto:true,reaction:20,stack:8},
+ boxes:[{name:'Средняя',l:400,w:300,h:250,m:8,rate:0,layers:0}],
+ conveyors:[{type:'roller',len:3,speed:12,accum:true,box:0,feed:'manual',interval:10,rate:6}],
+ palletHandling:'forklift',safety:'fence',fieldbus:'PROFINET',tStop:0.5,opt:{target:400,allowCobot:true,maxRobots:2}};
+let CFG=deep(DEF);
+try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
+function saveCfg(){try{localStorage.setItem('pal-sim-cfg4',JSON.stringify(CFG));}catch(e){}}
+function robotOf(c){const r=ROBOTS.find(x=>x.id===c.robot)||ROBOTS[3];if(r.id==='custom')return{id:'custom',name:'Свой робот',cls:c.custom.cls,payload:+c.custom.payload,reach:+c.custom.reach,v:c.custom.cls==='cobot'?1:2,cpm:+c.custom.cpm||8,cost:2,ex:''};return r;}
+function safetyMode(c,rob){if(rob.cls!=='cobot')return'fence';return c.safety==='auto'?'cobot':c.safety;}
+function boxOf(c,i){return c.boxes[i]||c.boxes[0];}
+function boxColor(i){return['var(--box)','var(--box2)','var(--box3)','var(--box4)'][i%4];}
+function normalize(c){if(c.exch.out==='conveyor')c.exch.in='dispenser';else if(c.exch.in==='dispenser')c.exch.in='vehicle';c.palletHandling=c.exch.out==='conveyor'?'conveyor':'forklift';
+ const extra=(c.exch.in==='robot'?1:0);if(c.stations+c.magazines+extra>6)c.magazines=Math.max(0,6-c.stations-extra);if(c.sheet.mode==='none')c.magazines=0;if(c.sheet.mode!=='none'&&c.magazines===0)c.magazines=1;
+ if(!GRIPPERS[c.grip.type].vac)c.grip.pick=1;while(c.conveyors.length<c.robots)c.conveyors.push(deep(c.conveyors[0]));return c;}
+function sheetsPerPallet(mode,layers,N){return mode==='none'?0:mode==='bottom'?1:mode==='between'?Math.max(0,layers-1):Math.floor((layers-1)/Math.max(1,N));}
+// ======================= СХЕМЫ УКЛАДКИ =======================
+function genPatterns(b,pal){
+ const l=b.l,w=b.w,W=pal.W,L=pal.L,C=[];
+ const grid=(x0,y0,rw,rh,rot)=>{const bx=rot?w:l,by=rot?l:w,cols=Math.floor(rw/bx+1e-9),rows=Math.floor(rh/by+1e-9),o=[];for(let j=0;j<rows;j++)for(let i=0;i<cols;i++)o.push({x:x0+bx*(i+.5),y:y0+by*(j+.5),rot});return o;};
+ const add=(name,cells)=>{if(!cells.length)return;const xs=cells.map(c=>c.x+(c.rot?w:l)/2),xm=cells.map(c=>c.x-(c.rot?w:l)/2),ys=cells.map(c=>c.y+(c.rot?l:w)/2),ym=cells.map(c=>c.y-(c.rot?l:w)/2);
+  const cx=(Math.max(...xs)+Math.min(...xm))/2,cy=(Math.max(...ys)+Math.min(...ym))/2;const cc=cells.map(c=>({x:Math.round(c.x-cx),y:Math.round(c.y-cy),rot:c.rot}));
+  const key=cc.map(c=>`${c.x},${c.y},${c.rot}`).sort().join('|'),keyR=cc.map(c=>`${-c.x},${-c.y},${c.rot}`).sort().join('|');C.push({name,cells:cc,n:cc.length,interlock:key!==keyR});};
+ add('Сетка: длина коробки вдоль длины паллеты',grid(0,0,W,L,1));add('Сетка: длина коробки вдоль ширины паллеты',grid(0,0,W,L,0));
+ for(const r1 of[0,1]){const r2=1-r1,bx1=r1?w:l,by1=r1?l:w;
+  for(let i=1;i*bx1<W;i++){const xs=i*bx1;add(`Две зоны по ширине паллеты: ${i} продольн. + поперечные`,grid(0,0,xs,L,r1).concat(grid(xs,0,W-xs,L,r2)));}
+  for(let j=1;j*by1<L;j++){const ys=j*by1;add(`Две зоны по длине паллеты: ${j} ряд. + поперечные`,grid(0,0,W,ys,r1).concat(grid(0,ys,W,L-ys,r2)));}}
+ for(let a=1;a<=4;a++)for(let bb=1;bb<=4;bb++){if(a*l+bb*w>Math.min(W,L))continue;add(`Пинвил (колодец) ${a}×${bb}`,grid(0,0,a*l,bb*w,0).concat(grid(W-bb*w,0,bb*w,a*l,1),grid(W-a*l,L-bb*w,a*l,bb*w,0),grid(0,L-a*l,bb*w,a*l,1)));}
+ return C;}
+function makeGroups(cells,k,l){
+ const along=c=>c.rot?c.y:c.x,perp=c=>c.rot?c.x:c.y;const idx=cells.map((c,i)=>i).sort((a,b)=>cells[a].rot-cells[b].rot||perp(cells[a])-perp(cells[b])||along(cells[a])-along(cells[b]));
+ const groups=[];let run=[];const flush=()=>{for(let i=0;i<run.length;i+=k)groups.push(run.slice(i,i+k));run=[];};
+ for(const i of idx){const c=cells[i];if(run.length){const p=cells[run[run.length-1]];if(!(c.rot===p.rot&&Math.abs(perp(c)-perp(p))<1&&Math.abs(along(c)-along(p)-l)<2))flush();}run.push(i);}flush();return groups;}
+function choosePattern(b,pal,mode,maxStack,k,sheet){
+ const C=genPatterns(b,pal);const byN=(x,y)=>y.n-x.n||(y.interlock-x.interlock);const best=Math.max(...C.map(c=>c.n));let pick;
+ if(mode==='column')pick=C.filter(c=>c.name.startsWith('Сетка')).sort(byN)[0];
+ else if(mode==='interlock'){pick=C.filter(c=>c.interlock).sort(byN)[0]||C.slice().sort(byN)[0];}
+ else pick=C.slice().sort(byN)[0];
+ const p={...pick};const auto=Math.max(1,Math.floor((maxStack-pal.h)/b.h));p.layers=b.layers>0?b.layers:auto;p.layersAuto=auto;p.total=p.n*p.layers;p.stackH=pal.h+p.layers*b.h;p.mass=p.total*b.m+pal.m;p.fill=p.n*b.l*b.w/(pal.W*pal.L);p.bestN=best;p.loss=best-p.n;
+ p.cellsB=p.interlock?p.cells.map(c=>({x:-c.x,y:-c.y,rot:c.rot})):p.cells;p.groupsA=makeGroups(p.cells,k,b.l);p.groupsB=makeGroups(p.cellsB,k,b.l);
+ p.kEff=p.n/p.groupsA.length;let g=0;for(let j=0;j<p.layers;j++)g+=(p.interlock&&j%2?p.groupsB:p.groupsA).length;p.groupsPerPallet=g;
+ p.sheets=sheet?sheetsPerPallet(sheet.mode,p.layers,sheet.everyN):0;
+ p.stability=p.interlock?'высокая: слои перевязаны поворотом на 180°':(p.n>1?'низкая: колонны без перевязки — нужны уголки, стрейч или прокладки':'—');return p;}
+function sheetAfterLayer(sheet,layer,layers){if(layer>=layers)return false;if(sheet.mode==='between')return true;if(sheet.mode==='everyN')return layer%Math.max(1,sheet.everyN)===0;return false;}
+// ======================= ЗАХВАТ =======================
+function gripCalc(c,rob,box){
+ const g=c.grip,k=g.pick,G=GRIPPERS[g.type],m=box.m*k,vEff=rob.v*c.speedPct/100,a=Math.min(8,vEff/0.25),S=2.0,notes=[];
+ const R={type:g.type,k,a,S,vEff,status:'ok',tGrip:.5,tRel:.3,air:0,notes};
+ R.mass=g.mass>0?g.mass:G.base+k*G.perBox;
+ if(G.vac){const cup=CUPS[g.cup];const mu=g.type==='foam'?.6:cup.mu;
+  R.F1=m*(9.81+a)*S;R.F2=m*(9.81+a/mu)*S;R.Fth=Math.max(R.F1,R.F2);R.case=R.F2>R.F1?'горизонтальный перенос (трение)':'вертикальный подъём';
+  const vac=Math.min(g.vac,g.type==='foam'?50:cup.vacMax);R.vac=vac;if(g.vac>vac)notes.push(`Уровень вакуума ограничен ${vac} кПа для этого типа: выше картон расслаивается, присоска «проваливается»`);
+  if(g.type==='foam'){R.A=0.55*box.l*box.w*k/100;R.Fcap=vac*1000*R.A/1e4;R.qLeak=R.A*0.15;R.Q=Math.max(200,Math.ceil(R.qLeak*1.8/50)*50);R.tGrip=0.25+0.15*k;R.tRel=0.25;R.air=0;R.pump='вакуумный насос/нагнетатель '+f0(R.Q)+' л/мин';
+   if(R.Fcap<R.Fth){R.status='bad';notes.push(`Пенной рамке не хватает силы: ${f0(R.Fcap)} Н при площади ${f0(R.A)} см² против ${f0(R.Fth)} Н — снизьте скорость робота, уменьшите число коробок за захват или перейдите на присоски`);}
+   else if(R.Fcap<R.Fth*1.2){R.status='warn';notes.push('Запас пенной рамки меньше 20 %: при ослабленном картоне возможны потери');}
+   R.mass=g.mass>0?g.mass:G.base+k*G.perBox+R.A*0.004;}
+  else{const Fbox=R.Fth/k;let sel=null;const nMin=box.l*box.w>60000?4:2;
+   for(const d of(g.cupD>0?[g.cupD]:CUP_D)){const Fcup=vac*1000*Math.PI*Math.pow(d/2000,2);const n=Math.max(nMin,Math.ceil(Fbox*1.1/Fcup));const grid=Math.floor(box.l/(d+25))*Math.floor(box.w/(d+25));const okFit=n<=grid;if(okFit&&(!sel||n<=6&&sel.n>6)){sel={d,Fcup,n,grid};if(n<=6)break;}if(!sel&&g.cupD>0)sel={d,Fcup,n,grid};}
+   if(!sel){const d=CUP_D[CUP_D.length-1],Fcup=vac*1000*Math.PI*Math.pow(d/2000,2);sel={d,Fcup,n:Math.max(nMin,Math.ceil(Fbox*1.1/Fcup)),grid:0};}
+   R.cupD=sel.d;R.Fcup=sel.Fcup;R.nPerBox=sel.n;R.nCups=sel.n*k;R.Fcap=R.nCups*sel.Fcup;R.cupA=Math.PI*Math.pow(sel.d/20,2);
+   if(sel.n>sel.grid){R.status='bad';notes.push(`На крышке ${box.l}×${box.w} не помещается ${sel.n} присосок Ø${sel.d}: нужна пенная рамка или больший диаметр с меньшим числом`);}
+   R.qLeak=R.nCups*R.cupA*0.25;R.Q=[15,30,60,100,150,200,300,500].find(q=>q>=R.qLeak*2+10)||500;R.pump='эжектор '+R.Q+' л/мин';R.air=Math.round(R.Q*0.6);
+   const V=R.nCups*Math.PI*Math.pow(sel.d/2,2)*sel.d/3/1e6+0.3;const Qeff=Math.max(5,R.Q-R.qLeak);R.tGrip=0.15+V/(Qeff/60)*Math.log(101/(101-vac))*1.3;R.tRel=0.15;
+   if(g.pressure<4)notes.push('Давление ниже 4 бар: эжектор не выходит на паспортный вакуум, время захвата растёт');
+   R.mass=g.mass>0?g.mass:G.base+k*G.perBox+R.nCups*0.12;}
+  if(box.m*k>40&&g.type==='cups')notes.push('Тяжёлые коробки на присосках: рассмотрите вилочный/клещевой захват или пенную рамку с прижимом');}
+ else if(g.type==='clamp'){const mu=.4;R.Fth=m*(9.81+a)*S/(2*mu);R.case='зажим с боков, удержание трением';R.cylD=[32,40,50,63,80,100,125].find(d=>g.pressure*1e5*Math.PI*Math.pow(d/2000,2)>=R.Fth)||125;R.Fcap=g.pressure*1e5*Math.PI*Math.pow(R.cylD/2000,2);R.tGrip=.4;R.tRel=.3;R.air=Math.round(2*Math.PI*Math.pow(R.cylD/2000,2)*0.1*(g.pressure+1)*1000*8);R.pump='пневмоцилиндр Ø'+R.cylD;
+  notes.push('Зажим с боков требует зазора между коробками на паллете ≈ 20–30 мм и не подходит для мягких коробок');}
+ else{R.Fth=m*(9.81+a);R.case='подхват снизу';R.Fcap=R.Fth*3;R.tGrip=.6;R.tRel=.5;R.pump='пневмоцилиндры вилок и прижима';R.air=60;notes.push('Вилочный захват требует конвейера с провалом под коробкой (зона вил) и зазора при укладке');}
+ if(c.exch.in==='robot')notes.push('Робот берёт паллеты из стопки: на захвате нужны откидные крюки/вилки под паллету (+6 кг) и вакуумная зона под лист');
+ R.util=R.Fth/(R.Fcap||1);if(R.status==='ok'&&R.util>.95)R.status='warn';if(c.exch.in==='robot'&&g.mass===0)R.mass+=6;return R;}
+// ======================= КОНВЕЙЕР =======================
+function convCalc(cv,b,k){
+ const T=CONV_TYPES[cv.type],zoneLen=b.l+150,zones=Math.max(1,Math.floor(cv.len*1000/zoneLen)),v=cv.speed/60;
+ const mLoad=zones*b.m,rollers=cv.len/0.075;
+ const F=T.mu*(mLoad+T.mBelt*cv.len)*9.81+(cv.type!=='belt'?0.02*rollers*2.5*9.81:0);
+ const P=F*v/0.8,Pm=P*1.5/1000,std=[0.12,0.18,0.25,0.37,0.55,0.75,1.1,1.5,2.2,3,4,5.5];const Pstd=std.find(x=>x>=Pm)||Pm;
+ const I=Pstd*1000/(1.732*400*0.8*0.85);const mdrW=zones*50,psuA=Math.ceil(mdrW/24/0.8),psuStd=[5,10,20,40].find(x=>x>=psuA)||psuA;
+ const feed=cv.feed==='manual'?cv.rate:cv.feed==='interval'?60/cv.interval:cv.rate;
+ return{zones,zoneLen,mLoad,F,P,Pm,Pstd,I,transit:cv.len*1000/(cv.speed*1000/60),capPerMin:cv.speed*1000/zoneLen,feedPerMin:feed,mdrW,psuStd,sensors:(cv.type==='mdr'?zones:(cv.accum?zones+1:2))+(cv.feed!=='manual'?1:0),rollers:Math.round(rollers),kZone:k>1};}
+// ======================= КОМПОНОВКА =======================
+function layout(c,D){
+ const pal=D.pal,nR=c.robots,nPS=c.exch.in==='robot'?1:0,K=c.stations+c.magazines+nPS,ang=SLOT_ANGLES[Math.min(K,6)].slice();
+ const ord=ang.slice().sort((a,b)=>Math.abs(b)-Math.abs(a));const stAng=ord.slice(0,c.stations).sort((a,b)=>a-b),rest=ord.slice(c.stations,K);const mgAng=rest.slice(0,c.magazines),psAng=rest.slice(c.magazines);
+ let dmin=180;if(K>1){const s=ang.slice().sort((a,b)=>a-b);for(let i=1;i<s.length;i++)dmin=Math.min(dmin,s[i]-s[i-1]);}
+ const Rmin=K>1?(pal.L+150)/(2*Math.sin(dmin/2*Math.PI/180)):0;const R=Math.max(c.slotR,Math.ceil(Rmin/10)*10);
+ const half=Math.hypot(pal.W,pal.L)/2;const pitch=2*(R+half)+500;const parkD=half+700+1000;
+ const robots=[];for(let i=0;i<nR;i++){const base={x:0,y:i*pitch};const slots=[];
+  const mk=(kind,idx,id,a)=>{const t=a*Math.PI/180,cs=Math.cos(t),sn=Math.sin(t);slots.push({kind,idx,id,ang:a,cx:base.x+R*cs,cy:base.y+R*sn,cos:cs,sin:sn,robot:i,park:{x:base.x+(R+parkD)*cs,y:base.y+(R+parkD)*sn},gate:{x:base.x+(R+pal.W/2+350)*cs,y:base.y+(R+pal.W/2+350)*sn}});};
+  stAng.forEach((a,j)=>mk('st',j,STN[i*c.stations+j],a));mgAng.forEach((a,j)=>mk('mg',j,'M'+(i*c.magazines+j+1),a));psAng.forEach((a,j)=>mk('ps',j,'П'+(i+1),a));
+  robots.push({i,base,home:{x:-350,y:base.y},slots,convs:[]});}
+ c.conveyors.forEach((cv,i)=>{robots[i%nR].convs.push(i);});
+ const convs=c.conveyors.map((cv,i)=>{const r=robots[i%nR],j=r.convs.indexOf(i),m=r.convs.length,b=boxOf(c,cv.box);const y=r.base.y+(m===1?0:(j-(m-1)/2)*c.convGap);return{robot:i%nR,y,w:b.w+120,x1:-c.pickDist+b.l/2,x0:-c.pickDist+b.l/2-cv.len*1000,len:cv.len*1000,b,bi:cv.box};});
+ const cw=(s,p)=>({x:s.cx+s.cos*p.x-s.sin*p.y,y:s.cy+s.sin*p.x+s.cos*p.y});
+ return{R,Rmin,pitch,robots,convs,cw,half,parkD};}
+// ======================= РАСЧЁТ КОНФИГУРАЦИИ =======================
+function derive(c,light){
+ normalize(c);const rob=robotOf(c),pal=PALLETS[c.pallet]||PALLETS['EUR 1200×800'],safety=safetyMode(c,rob),n=c.conveyors.length,nR=c.robots,k=c.grip.pick;
+ const D={rob,pal,safety,n,nR,k};const LY=layout(c,D);D.LY=LY;
+ const stBoxIdx=[],pats={};LY.robots.forEach(r=>r.slots.filter(s=>s.kind==='st').forEach(s=>{const ci=r.convs.length?r.convs[s.idx%r.convs.length]:0;s.conv=ci;s.bi=c.conveyors[ci]?c.conveyors[ci].box:0;stBoxIdx.push(s.bi);if(!pats[s.bi])pats[s.bi]=choosePattern(boxOf(c,s.bi),pal,c.patternMode,c.maxStack,k,c.sheet);s.pat=pats[s.bi];}));
+ D.pats=pats;D.stations=LY.robots.flatMap(r=>r.slots.filter(s=>s.kind==='st'));D.mags=LY.robots.flatMap(r=>r.slots.filter(s=>s.kind==='mg'));D.stacks=LY.robots.flatMap(r=>r.slots.filter(s=>s.kind==='ps'));
+ const usedBoxes=[...new Set(stBoxIdx)].map(i=>boxOf(c,i));const heaviest=usedBoxes.reduce((a,b)=>b.m>a.m?b:a,usedBoxes[0]);
+ D.grip=gripCalc(c,rob,heaviest);const gripM=D.grip.mass;
+ let rReq=0,rWhere='';const upd=(d,tag)=>{if(d>rReq){rReq=d;rWhere=tag;}};
+ const r0=LY.robots[0];r0.slots.forEach(s=>{if(s.kind==='st'){const p=s.pat,b=boxOf(c,s.bi),zTop=pal.h+p.layers*b.h+c.gripH,zBot=pal.h+b.h+c.gripH;[p.cells,p.cellsB].forEach(cs=>cs.forEach(cell=>{const w=LY.cw(s,cell),dh=Math.hypot(w.x-r0.base.x,w.y-r0.base.y);upd(Math.hypot(dh,zTop-c.baseH),`верхний слой станции ${s.id}`);upd(Math.hypot(dh,zBot-c.baseH),`нижний слой станции ${s.id}`);}));}
+  else if(s.kind==='mg')upd(Math.hypot(Math.hypot(s.cx-r0.base.x,s.cy-r0.base.y),pal.h+400+c.gripH-c.baseH),`магазин ${s.id}`);
+  else upd(Math.hypot(Math.hypot(s.cx-r0.base.x,s.cy-r0.base.y)+200,pal.h*c.exch.stack+c.gripH-c.baseH),`стопка паллет ${s.id} (верх)`);});
+ r0.convs.forEach(ci=>{const cv=LY.convs[ci];upd(Math.hypot(Math.hypot(c.pickDist+(k-1)*(cv.b.l+120)/2,cv.y-r0.base.y),c.convH+cv.b.h+c.gripH-c.baseH),`точка захвата конвейера ${ci+1}${k>1?' (группа '+k+')':''}`);});
+ Object.assign(D,{rReq,rWhere,reachMargin:1-rReq/rob.reach});D.reachStatus=D.reachMargin>=.1?'ok':D.reachMargin>=0?'warn':'bad';
+ D.mReq=Math.max(heaviest.m*k+gripM,c.exch.in==='robot'?pal.m+gripM:0);D.util=D.mReq/rob.payload;D.payStatus=D.util<=.8?'ok':D.util<=1?'warn':'bad';D.gripM=gripM;D.heaviest=heaviest;
+ // такт: план + вертикаль + норматив циклов
+ const vEff=rob.v*c.speedPct/100;D.vEff=vEff;const sts0=r0.slots.filter(s=>s.kind==='st');
+ const pick0=LY.convs[r0.convs[0]]||{x1:-c.pickDist,y:0};const dAvg=(sts0.map(s=>Math.hypot(s.cx-(-c.pickDist),s.cy-pick0.y)).reduce((a,b)=>a+b,0)/Math.max(1,sts0.length))/1000;
+ const pat0=sts0.length?sts0[0].pat:null;const kEff=pat0?pat0.kEff:1;
+ D.tCycleModel=2*(dAvg/vEff+0.4)+2*(0.4/vEff)+D.grip.tGrip+D.grip.tRel+0.6;D.tCycleNorm=60/(rob.cpm*c.speedPct/100);D.tCycle=Math.max(D.tCycleModel,D.tCycleNorm);D.cpm=60/D.tCycle;
+ const vSheet=vEff*c.sheet.speedPct/100;D.tSheet=c.magazines>0&&c.sheet.mode!=='none'?Math.max(2*(LY.R/1000/vSheet+0.4)+c.sheet.tGrip+0.5+0.6,D.tCycleNorm):0;
+ D.tPallet=c.exch.in==='robot'?Math.max(2*(LY.R/1000/(vEff*0.6)+0.5)+2+1+0.6,D.tCycleNorm):0;
+ const tEx=c.exch.out==='conveyor'?40:c.exch.out==='amr'?60:90;D.tEx=tEx;
+ const cyc=pat0?pat0.groupsPerPallet:1,nSh=pat0?pat0.sheets:0,total=pat0?pat0.total:1;
+ D.cyclesPerPallet=cyc+nSh+(c.exch.in==='robot'?1:0);D.tPerPallet=cyc*D.tCycle+nSh*D.tSheet+D.tPallet+(c.stations===1?tEx:0);
+ D.exLoss=c.stations===1?tEx/D.tPerPallet:0;D.tPerBox=D.tPerPallet/total;D.capRobot=3600/D.tPerBox*nR;D.kEff=kEff;D.palPerHour=D.capRobot/total;
+ D.convs=c.conveyors.map(cv=>convCalc(cv,boxOf(c,cv.box),k));
+ D.capFeed=D.convs.reduce((a,x)=>a+x.feedPerMin,0)*60;D.capConv=Math.min(...D.convs.map(x=>x.capPerMin))*60*Math.min(n,nR*Math.ceil(n/nR));
+ D.bottleneck=Math.min(D.capRobot,D.capFeed,D.capConv);D.bnName=D.bottleneck===D.capRobot?(nR>1?'роботы':'робот'):D.bottleneck===D.capFeed?(c.conveyors.every(x=>x.feed==='manual')?'подача (ручная загрузка)':'подача коробок'):'конвейер';
+ // расходники: листы, паллеты, обмены в час
+ D.palletsPerHour=D.bottleneck/total;D.sheetsPerHour=D.palletsPerHour*nSh;D.refillsPerHour=c.magazines>0&&nSh>0?D.sheetsPerHour/(c.sheet.cap*Math.max(1,c.magazines*nR)):0;D.stackHours=c.exch.in==='robot'?c.exch.stack/Math.max(0.01,D.palletsPerHour):0;
+ // безопасность
+ const Tlc=c.tStop+0.03;let Slc=2000*Tlc+8*(30-14);if(Slc>500)Slc=Math.max(500,1600*Tlc+128);D.Slc=Slc;const Tsc=c.tStop+0.1;D.Ssc=1600*Tsc+(1200-0.4*300);
+ D.halfDiag=Math.hypot(heaviest.l*k,heaviest.w)/2;D.rSlow=rob.reach+D.halfDiag+D.Ssc;D.rStop=rob.reach+D.halfDiag+300;
+ let xs=[],ys=[];LY.robots.forEach(r=>r.slots.forEach(s=>{xs.push(s.cx-LY.half,s.cx+LY.half);ys.push(s.cy-LY.half,s.cy+LY.half);}));LY.convs.forEach(cv=>{ys.push(cv.y-cv.w/2,cv.y+cv.w/2);});
+ D.F={x0:-(c.pickDist+400),x1:Math.max(...xs)+700,y0:Math.min(...ys)-700,y1:Math.max(...ys)+700};D.fencePerim=2*((D.F.x1-D.F.x0)+(D.F.y1-D.F.y0));
+ D.warnings=[];const w=D.warnings;
+ if(LY.R>c.slotR)w.push(`Радиус расстановки увеличен до ${f0(LY.R)} мм: при ${c.stations+c.magazines+D.stacks.length/nR} позициях вокруг робота паллеты иначе перекрывались бы.`);
+ if(D.reachStatus==='bad')w.push(`Робот не достаёт: ${rWhere} — нужно ${f0(rReq)} мм при досягаемости ${f0(rob.reach)} мм. Уменьшите число позиций или радиус, высоту стопы, либо возьмите робота с большей досягаемостью.`);
+ else if(D.reachStatus==='warn')w.push(`Запас по досягаемости меньше 10 % (${rWhere}): на краю зоны кисть теряет ориентацию.`);
+ if(D.payStatus==='bad')w.push(`Перегрузка: ${f1(D.mReq)} кг > ${rob.payload} кг${c.exch.in==='robot'&&pal.m+gripM>heaviest.m*k+gripM?' (пустая паллета '+pal.m+' кг + захват)':''}.`);
+ else if(D.payStatus==='warn')w.push('Нагрузка выше 80 % грузоподъёмности: проверьте момент инерции захвата и снижение скорости по паспорту.');
+ if(D.grip.status==='bad')w.push('Захват не удерживает груз: '+D.grip.notes[0]);
+ if(rob.cls==='cobot'&&heaviest.m*k>10)w.push('Коллаборативный перенос груза тяжелее 10 кг: по ISO/TS 15066 контакт допустим только на низкой скорости; практически — сканер со снижением скорости и частичное ограждение.');
+ if(rob.cls!=='cobot'&&c.safety==='cobot')w.push('Промышленный робот без ограждения не допускается — режим переключён на ограждение со световыми завесами.');
+ if(D.tCycleNorm>D.tCycleModel*1.15)w.push(`Такт ограничен нормативом робота ${f1(rob.cpm*c.speedPct/100)} циклов/мин (${f1(D.tCycleNorm)} с), геометрический расчёт даёт ${f1(D.tCycleModel)} с — норматив учитывает подходы, отходы и снижение скорости у паллеты.`);
+ Object.values(pats).forEach(p=>{if(p.fill<0.7)w.push(`Слой заполнен на ${f0(p.fill*100)} % (${p.name}) — попробуйте другую паллету или размер коробки.`);if(!p.interlock&&c.patternMode!=='column'&&p.n>1)w.push(`Для этой коробки перевязка невозможна на ${c.pallet}: слои будут колоннами (${p.name}). Стопу держат уголки и стрейч.`);if(p.loss>0)w.push(`Перевязка стоит ${p.loss} коробок в слое (${p.n} вместо ${p.bestN}) — плата за устойчивость.`);if(p.stackH>1800)w.push(`Высота стопы ${f0(p.stackH)} мм > 1800 мм — проверьте устойчивость и ворота склада.`);if(k>1&&p.kEff<k*0.75)w.push(`Групповой захват по ${k}: в схеме укладки только ${f1(p.kEff)} коробки за цикл в среднем — часть ходов будет с неполной группой.`);if(p.layers!==p.layersAuto&&p.stackH>c.maxStack)w.push(`Заданное число слоёв (${p.layers}) даёт стопу ${f0(p.stackH)} мм — выше лимита ${c.maxStack} мм.`);});
+ if(D.capFeed<D.capRobot*0.6)w.push(`Узкое место — подача (${f0(D.capFeed)} кор/ч против ${f0(D.capRobot)} у ${nR>1?'роботов':'робота'}): автоматическая подача, второй конвейер или накопитель.`);
+ if(n<nR)w.push('Роботов больше, чем конвейеров: у второго робота нет подачи — добавьте конвейер.');
+ if(c.magazines===0&&c.sheet.mode!=='none')w.push('Листы заданы, но магазинов нет.');
+ if(D.refillsPerHour>2)w.push(`Магазин прокладок на ${c.sheet.cap} листов придётся пополнять ${f1(D.refillsPerHour)} раз в час — увеличьте ёмкость или переходите на замену магазина AMR.`);
+ if(c.exch.in==='robot'&&D.stackHours<1)w.push(`Стопки из ${c.exch.stack} паллет хватит на ${f0(D.stackHours*60)} мин — увеличьте стопку или число станций.`);
+ if(c.exch.out==='jack'&&D.palletsPerHour>8)w.push(`${f1(D.palletsPerHour)} паллет в час вручную рохлей — оператор будет занят обменом почти постоянно; рассмотрите погрузчик, AMR или конвейер паллет.`);
+ if(c.stations===1&&c.exch.out!=='conveyor')w.push(`Одна станция: на каждый обмен паллеты робот простаивает ${f0(tEx)} с (${f0(D.exLoss*100)} % времени). Вторая станция снимает простой.`);
+ if(safety==='cobot'&&c.exch.out!=='conveyor')w.push('Обмен паллет в зоне сканеров: при освобождении станции контроллер безопасности переключает набор полей, исключая её сектор — иначе каждая тележка будет останавливать робота.');
+ if(light)return D;
+ D.sig=signals(c,D);const cnt=x=>D.sig.filter(s=>s.k===x).length;D.io={DI:cnt('DI'),DO:cnt('DO'),SI:cnt('SI'),SO:cnt('SO'),BUS:cnt('BUS')};D.io.diMod=Math.ceil(D.io.DI*1.2/16);D.io.doMod=Math.ceil(D.io.DO*1.2/16);D.bom=bom(c,D);D.plan=planSKU(c,D);return D;}
+// ======================= ПЛАНИРОВЩИК АРТИКУЛОВ =======================
+function planSKU(c,D){
+ const rows=c.boxes.map((b,i)=>{const p=choosePattern(b,D.pal,c.patternMode,c.maxStack,c.grip.pick,c.sheet);const cyc=p.groupsPerPallet+p.sheets+(c.exch.in==='robot'?1:0);const tPal=b.rate>0?p.total/(b.rate/60):0;
+  return{i,b,p,cyc,tPal,reqCpm:b.rate>0?cyc/tPal:0,reqBph:b.rate};});
+ const capCpm=D.cpm*c.robots;const pairs=[];const R=rows.filter(r=>r.b.rate>0);
+ for(let i=0;i<R.length;i++)for(let j=i+1;j<R.length;j++){const s=R[i].reqCpm+R[j].reqCpm;pairs.push({a:R[i],b:R[j],sum:s,util:s/capCpm});}
+ pairs.sort((x,y)=>y.util-x.util);return{rows,capCpm,pairs:pairs.filter(p=>p.util<=1).slice(0,8),bad:pairs.filter(p=>p.util>1).length,sumAll:R.reduce((a,r)=>a+r.reqCpm,0)};}
+// ======================= СИГНАЛЫ И СПЕЦИФИКАЦИЯ =======================
+function signals(c,D){
+ const L=[];const a=(k,t,nm,src,how)=>L.push({k,t,nm,src,how});const disc=c.fieldbus==='Дискретные сигналы',fb=c.fieldbus,safety=D.safety,k=c.grip.pick,ex=c.exch;
+ c.conveyors.forEach((cv,i)=>{const n=i+1,cc=D.convs[i];
+  a('DI',`B${n}5`,`Коробка на входе конвейера ${n}`,'Фотодатчик рефлекторный, PNP NO','3-пров. 24 В → DI ПЛК');
+  a('DI',`B${n}1`,`Коробка в позиции захвата ${n}`,'Фотодатчик рефлекторный, PNP NO','3-пров. → DI; в робот передаётся через ПЛК');
+  if(k>1)a('DI',`B${n}2`,`Группа из ${k} коробок собрана в зоне захвата ${n}`,'Фотодатчик на дальней границе зоны','3-пров. → DI');
+  if(cv.feed!=='manual'){a('DI',`UP${n}.RQ`,`Подающая машина ${n}: коробка отправлена`,'Сухой контакт упаковщика/накопителя','→ DI');a('DO',`UP${n}.OK`,`Разрешение подачи на конвейер ${n}`,'DO → вход упаковщика','реле развязки');}
+  if(cv.type==='mdr')a('BUS',`ZC${n}.1…${cc.zones}`,`Зоны мотор-роликов ${n}: датчик, мотор, ошибка`,'Контроллеры зон','Шина зон → шлюз → '+(disc?'Ethernet':fb));
+  else{if(cv.accum)for(let z=1;z<=cc.zones;z++)a('DI',`B${n}${10+z}`,`Конвейер ${n}: зона ${z} занята`,'Фотодатчик диффузный','3-пров. → DI');
+   if(disc){a('DO',`K${n}1`,`ЧП${n}: пуск вперёд`,'DO → DI1 ЧП','через реле развязки');a('DO',`K${n}2`,`ЧП${n}: фиксированная скорость`,'DO → DI2 ЧП','');a('DI',`ЧП${n}.RDY`,`ЧП${n}: готов / нет аварии`,'Релейный выход ЧП','сухой контакт → DI');}
+   else a('BUS',`ЧП${n}`,`ЧП${n}: слово управления/состояния, задание, ток`,`Плата ${fb} в ЧП`,'Ethernet → коммутатор');
+   a('SO',`STO${n}`,`ЧП${n}: безопасное отключение момента`,'Клеммы STO A/B','2 канала 24 В от КБ');}});
+ D.stations.forEach(s=>{a('DI',`B${s.id}`,`Паллета на станции ${s.id}`,'Фотодатчик диффузный / индуктивный','3-пров. → DI');
+  if(ex.out==='conveyor'){a('DI',`B${s.id}x`,`Паллета на выходе станции ${s.id}`,'Фотодатчик','→ DI');a('DI',`B${s.id}m`,`Паллета в диспенсере ${s.id}`,'Фотодатчик','→ DI');a(disc?'DO':'BUS',`ЧП-П${s.id}`,`Конвейер паллет ${s.id}: пуск / состояние`,'ЧП цепного конвейера',disc?'DO → DI ЧП':'Ethernet');a('SO',`STO-П${s.id}`,`ЧП конвейера паллет ${s.id}: STO`,'Клеммы STO','2 канала');}
+  else{a('DO',`H${s.id}`,`Лампа «станция ${s.id} освобождена — можно забирать»`,'Сигнальная лампа у проёма','DO → лампа 24 В');a('DI',`SB${s.id}`,`Кнопка «станция ${s.id} освобождена» (готово к работе)`,'Кнопка у проёма','НО контакт → DI');
+   if(ex.out==='amr'){a('BUS',`AMR.${s.id}`,`AMR: запрос стыковки / «на позиции» / «убыл» для станции ${s.id}`,'Флот-менеджер AMR (REST/OPC UA/Modbus)','Ethernet → ПЛК');a('DO',`AMR.OK${s.id}`,`Разрешение стыковки AMR к станции ${s.id}`,'DO или слово по шине','→ флот-менеджер');}}});
+ D.mags.forEach(m=>{a('DI',`B4.${m.id}`,`Прокладки в магазине ${m.id}`,'Фотодатчик диффузный','→ DI');a('DI',`B4L.${m.id}`,`Мало прокладок в ${m.id} (≤ ${c.sheet.low})`,'Фотодатчик / счётчик ПЛК','предупреждение на HMI, вызов пополнения');a('DO',`H4.${m.id}`,`Лампа «магазин ${m.id} освобождён — можно загружать»`,'Сигнальная лампа у проёма','DO → лампа');
+  if(ex.sheetsBy==='person')a('DI',`SB4.${m.id}`,`Кнопка «магазин ${m.id} загружен»`,'Кнопка у проёма магазина','НО → DI');});
+ D.stacks.forEach(p=>{a('DI',`B5.${p.id}`,`Стопка паллет ${p.id}: есть паллеты`,'Фотодатчик','→ DI');a('DI',`B5L.${p.id}`,`Стопка паллет ${p.id}: мало (≤ 2)`,'Фотодатчик','→ HMI, вызов пополнения');});
+ for(let r=1;r<=c.robots;r++){const p=c.robots>1?`R${r}.`:'';
+  if(GRIPPERS[c.grip.type].vac){for(let z=1;z<=k;z++){a('DI',`${p}PS${z}`,`Вакуум достигнут, зона ${z}${k>1?' (коробка '+z+')':''}`,'Вакуумный датчик на эжекторе','PNP → DI ПЛК и DI робота');a('DO',`${p}Y${z}`,`Вакуум ВКЛ, зона ${z}`,'Пневмораспределитель','DO робота или ПЛК → катушка');}a('DO',`${p}YB`,'Сдув (быстрый сброс)','Пневмораспределитель','DO → катушка');}
+  else{a('DI',`${p}S_GR1`,'Захват закрыт','Индуктивный датчик цилиндра','→ DI');a('DI',`${p}S_GR2`,'Захват открыт','Индуктивный датчик','→ DI');a('DO',`${p}Y1`,'Захват закрыть/открыть','Пневмораспределитель 5/2','DO → катушка');}
+  if(ex.in==='robot'){a('DO',`${p}YH`,'Крюки паллеты: выпустить/убрать','Пневмораспределитель','DO → катушка');a('DI',`${p}S_H1`,'Крюки паллеты выпущены','Индуктивный датчик','→ DI');}
+  a('DI',`${p}PA`,'Давление воздуха в норме','Реле давления на пневмоподготовке','→ DI');
+  if(disc){for(let i=1;i<=8;i++)a('DO',`${p}R.DI${i}`,`Робот ${r} DI${i}: ${['пуск программы','стоп','сброс ошибки','№ программы бит 0','№ программы бит 1','группа коробок готова','паллета готова','разрешение движения'][i-1]}`,'Контроллер робота, вход','DO ПЛК → DI робота');
+   for(let i=1;i<=8;i++)a('DI',`${p}R.DO${i}`,`Робот ${r} DO${i}: ${['в исходной','программа выполняется','ошибка','захват занят','запрос коробки','слой завершён','паллета завершена','ручной режим'][i-1]}`,'Контроллер робота, выход','DO робота → DI ПЛК');}
+  else a('BUS',`${p}ROB`,`Робот ${r}: слова команд/состояния, № программы, счётчики`,`Опция ${fb} в контроллере`,'Ethernet → коммутатор; безопасность — отдельными цепями');
+  a('SI',`${p}R.ES`,`Аварийный стоп с пульта обучения робота ${r}`,'Безопасный выход контроллера','2 канала → КБ');
+  a('SO',`${p}R.PS`,`Защитная остановка робота ${r}`,'Безопасный вход контроллера','2 канала от КБ');a('SO',`${p}R.EM`,`Аварийный стоп робота ${r}`,'Безопасный вход','2 канала от КБ');
+  if(safety==='cobot')a('SO',`${p}R.RS`,`Робот ${r}: снижение скорости (Reduced Mode)`,'Безопасный вход','2 канала от КБ');}
+ ['Пуск','Стоп','Сброс','Запрос доступа','Режим Авто','Режим Ручной','Тест ламп'].forEach((b,i)=>a('DI',`SB${i+1}`,`Кнопка «${b}»`,'Пульт оператора',b==='Стоп'?'НЗ контакт → DI':'НО контакт → DI'));
+ [['H1','красная'],['H2','жёлтая'],['H3','зелёная'],['HA','звуковой сигнал']].forEach(x=>a('DO',x[0],`Колонна: ${x[1]}`,'Светосигнальная колонна','DO → лампа 24 В'));
+ const est=safety==='fence'?3:2;['пульт','шкаф/ввод','зона обмена паллет'].slice(0,est).forEach((w,i)=>a('SI',`S1.${i+1}`,`Аварийный стоп — ${w}`,'Грибок, 2 НЗ контакта','2 канала → КБ, тест-импульсы'));
+ if(safety==='fence'){a('SI','S2','Дверь закрыта (положение)','Замок безопасности, RFID','2 канала → КБ');a('SI','S3','Замок заблокирован','Замок безопасности','2 канала → КБ');a('SO','Q1','Питание замка (удержание)','Катушка замка','24 В от КБ; снимается при остановке');
+  c.conveyors.forEach((cv,i)=>{a('SI',`S4.${i+1}`,`Световая завеса входа ${i+1}, OSSD1/2`,'Завеса тип 4, 30 мм','2 канала → КБ');a('SI',`M${i+1}.1/.2`,`Датчики мьютинга завесы ${i+1}`,'2 фотодатчика, T-мьютинг','→ входы мьютинга КБ');});
+  D.stations.forEach(s=>{a('SI',`S6${s.id}`,`Световая завеса обмена паллет ${s.id}`,'Завеса тип 4'+(ex.out==='conveyor'?' + мьютинг на выезд':''),'2 канала → КБ');if(ex.out!=='conveyor')a('SO',`MUTE${s.id}`,`Мьютинг/байпас S6${s.id} при освобождённой станции`,'Безопасный выход КБ → вход мьютинга',`логика: станция ${s.id} освобождена И робот не в секторе`);});
+  D.mags.forEach(m=>a('SI',`S7.${m.id}`,`Световая завеса проёма магазина ${m.id}`,'Завеса тип 4 (мьютинг при освобождении)','2 канала → КБ'));
+  D.stacks.forEach(p=>a('SI',`S8.${p.id}`,`Световая завеса проёма стопки паллет ${p.id}`,'Завеса тип 4','2 канала → КБ'));}
+ else{for(let r=1;r<=c.robots;r++){a('SI',`LS${r}.1`,`Сканер ${r}.1: защитное поле (OSSD)`,'Лазерный сканер 275°','2 канала → КБ');a('SI',`LS${r}.2`,`Сканер ${r}.2: защитное поле`,'Лазерный сканер','2 канала → КБ');a('SO',`LS${r}.SET`,`Сканеры ${r}: выбор набора полей (сектор освобождённой станции исключён)`,'Безопасные выходы КБ → входы сканера','2×2 канала');}a('SI','LS.W','Сканеры: поле снижения скорости','Выходы предупреждения','→ КБ → Reduced Mode роботов');}
+ a('SI','SB3s','Кнопка сброса цепи безопасности','Пульт вне опасной зоны','1 канал, контроль фронта');
+ a('SO','KM1','Главный контактор питания приводов','Контактор с зеркальным контактом','катушка от КБ; обратная связь → КБ');
+ return L;}
+function bom(c,D){
+ const B=[];const a=(g,n,q,p)=>B.push({g,n,q,p});const fence=D.safety==='fence',disc=c.fieldbus==='Дискретные сигналы',nR=c.robots,k=c.grip.pick,G=D.grip,gt=c.grip.type,ex=c.exch;
+ const nVfd=D.convs.filter((x,i)=>c.conveyors[i].type!=='mdr').length+(ex.out==='conveyor'?D.stations.length:0);
+ const di=D.io.DI,dout=D.io.DO;
+ a('Шкаф','Шкаф управления IP54, '+(nVfd>2||nR>1?'800×2000×500':'600×1800×400')+' мм',1,'Все компоненты ниже. Тепловой расчёт: потери ЧП ≈ 3 % мощности + ПЛК/БП');
+ a('Шкаф','Вводной выключатель-разъединитель + вводной автомат',1,'Отключение всей ячейки, блокировка замком при ремонте');
+ a('Шкаф','УЗИП + сетевой фильтр ЭМС',1,'Защита от перенапряжений; фильтр при длинных кабелях к двигателям');
+ a('Шкаф','Контактор главный KM1 с зеркальным контактом',1,'Снятие силового питания приводов от контроллера безопасности');
+ a('Шкаф','Блок питания 24 В DC '+(di+dout>60?'20 А':'10 А')+(D.convs.some((x,i)=>c.conveyors[i].type==='mdr')?' + блок 24/48 В для мотор-роликов':''),1,'Логика, датчики, замки, завесы; отдельные группы автоматов');
+ a('Шкаф','Автоматы защиты цепей 24 В (ПЛК, датчики, выходы, безопасность)',4,'Локализация КЗ без остановки всей ячейки');
+ a('Шкаф','Реле развязки для выходов (лампы, замки, катушки)',Math.ceil(dout*.6),'DO ПЛК не коммутируют индуктивную нагрузку напрямую');
+ a('Шкаф','Вентилятор с фильтром + термостат / кондиционер при ЧП ≥ 2,2 кВт',1,'Температура в шкафу ≤ 40 °C');
+ a('ПЛК','ПЛК: CPU с портом '+(disc?'Ethernet (для HMI)':c.fieldbus),1,'PackML, счётчики, выбор заданий, обмен с роботами и ЧП'+(ex.out==='amr'?', интерфейс флот-менеджера AMR':''));
+ a('ПЛК','Модули дискретных входов 24 В DC, 16 каналов',D.io.diMod,`Всего ${di} DI + 20 % резерв`);
+ a('ПЛК','Модули дискретных выходов 24 В DC 0,5 А, 16 каналов',D.io.doMod,`Всего ${dout} DO + 20 % резерв`);
+ a('ПЛК','Панель оператора HMI 10", Ethernet',1,'Рецепты укладки, счётчики, аварии, ручной режим');
+ a('Безопасность','Контроллер безопасности конфигурируемый, ≥ '+(D.io.SI*2+2)+' безопасных входов, ≥ '+(D.io.SO+1)+' выходов (PL e)',1,'Стопы, завесы/сканеры, замки, STO, защитные стопы роботов, мьютинг/выбор полей по станциям');
+ a('Безопасность','Кнопка аварийного стопа грибковая, 2 НЗ',fence?3:2,'Пульт, шкаф, зона обмена паллет');
+ a('Безопасность','Кнопка сброса цепи безопасности + пуска',1,'Вне опасной зоны, с обзором ячейки');
+ if(fence){a('Безопасность','Ограждение сетчатое h = 2000 мм, периметр ≈ '+f0(D.fencePerim/1000)+' м',1,'ISO 14120 / 13857');
+  a('Безопасность','Дверь сервисная с замком безопасности с удержанием (RFID, PL e)',1,'Открыть можно только после остановки: Q1 снимает КБ');
+  a('Безопасность','Световая завеса тип 4, 30 мм, высота 900–1200 мм + 2 датчика мьютинга',c.conveyors.length,`Проём конвейера. S ≥ ${f0(D.Slc)} мм до опасной зоны (ISO 13855)`);
+  a('Безопасность','Световая завеса тип 4 проёма обмена паллет'+(ex.out==='conveyor'?' с мьютингом на выезд':' + лампа «освобождено» + кнопка «готово»'),D.stations.length,ex.out==='conveyor'?'Паллета выезжает через тоннель':'Проём открыт только для освобождённой станции; робот в это время работает на другой');
+  if(D.mags.length)a('Безопасность','Световая завеса тип 4 проёма магазина прокладок + лампа/кнопка',D.mags.length,'Загрузка листов снаружи без входа в ячейку');
+  if(D.stacks.length)a('Безопасность','Световая завеса тип 4 проёма стопки паллет',D.stacks.length,'Пополнение стопки погрузчиком');}
+ else{a('Безопасность','Лазерный сканер безопасности 275°, 2 поля, ≥ 4 набора полей',2*nR,`Поле снижения скорости ≥ ${f0(D.Ssc)} мм от границы досягаемости (ISO 13855, ISO/TS 15066); переключение наборов по освобождённой станции`);a('Безопасность','Ограждение частичное со стороны склада/проезда',1,'Исключить неконтролируемый подход с тыла');}
+ a('Безопасность','Светосигнальная колонна 3 цвета + зуммер',1,'Индикация состояний PackML');
+ c.conveyors.forEach((cv,i)=>{const cc=D.convs[i],n=i+1,b=boxOf(c,cv.box);
+  if(cv.type==='mdr'){a('Привод',`Конвейер ${n}: мотор-ролики 24 В (${cc.zones} зон по ${f0(cc.zoneLen)} мм)`,cc.zones,'Каждая зона — свой привод; ZPA');a('Привод',`Контроллеры зон конвейера ${n}`,Math.ceil(cc.zones/2),'Логика зон в контроллере, ПЛК видит состояние по шине');a('Привод',`Блок питания 24 В ${cc.psuStd} А для конвейера ${n}`,1,`${cc.zones} × 50 Вт с запасом`);}
+  else{a('Привод',`Конвейер ${n}: мотор-редуктор ${cc.Pstd} кВт, 3~400 В`,1,`F = ${f0(cc.F)} Н при ${cc.zones} коробках по ${b.m} кг, v = ${cv.speed} м/мин`);a('Привод',`ЧП ${cc.Pstd} кВт с STO, плата ${disc?'— (дискретно)':c.fieldbus}`,1,`Ток ≈ ${f1(cc.I)} А; U/f, рампы 1–3 с`);if(cv.accum)a('Привод',`Конвейер ${n}: упоры-отсекатели + датчики зон`,cc.zones,'Накопление на одноприводном рольганге');}
+  if(k>1)a('Механика',`Конвейер ${n}: зона сбора группы из ${k} коробок с торцевым упором`,1,`Длина зоны ${f0(k*(b.l+20))} мм; коробки собираются вплотную для группового захвата`);
+  if(cv.feed!=='manual')a('Механика',`Интерфейс подачи от упаковочной машины / накопителя, конвейер ${n}`,1,`Автоподача: ${cv.feed==='interval'?'каждые '+cv.interval+' с':cv.rate+' кор/мин'}; сигналы «готов принять» / «коробка отправлена»`);
+  a('Датчики',`Фотоэлектрические датчики конвейера ${n}`,cc.sensors,'PNP NO; рефлекторные на проходе, диффузные на зонах');
+  a('Механика',`${CONV_TYPES[cv.type].name}, L = ${cv.len} м, ширина ${b.w+120} мм`,1,`Шаг роликов 75 мм (${cc.rollers} шт.), концевой упор в зоне захвата`);});
+ if(ex.out==='conveyor')a('Привод','Цепной конвейер паллет с диспенсером (магазин 15 паллет), 0,75 кВт + ЧП с STO',D.stations.length,'Автоматический обмен паллет');
+ else{a('Механика','Стол/направляющие паллеты с центрирующими упорами'+(ex.out==='jack'?' и заездными пандусами под рохлю':''),D.stations.length,'Повторяемость позиции ±10 мм');
+  if(ex.out==='amr')a('Логистика','AMR грузоподъёмностью ≥ '+f0(Math.max(...Object.values(D.pats).map(p=>p.mass))*1.1)+' кг с подъёмной платформой или вилами + флот-менеджер, зарядная станция',1,`${f1(D.palletsPerHour)} паллет/ч; маршрут станция → склад → стопка пустых паллет`);
+  if(ex.out==='forklift')a('Логистика','Погрузчик/штабелёр (существующий парк), разметка проезда, отбойники у проёмов',1,`${f1(D.palletsPerHour)} паллет/ч — загрузка водителя ${f0(D.palletsPerHour*4)} мин/ч`);}
+ a('Датчики','Датчик наличия паллеты на станции',D.stations.length,'Диффузный ФЭ или индуктивный на упоре');
+ if(D.mags.length){a('Механика',`Магазин прокладочных листов на ${c.sheet.cap} листов (стол/рама с направляющими, датчики наличия и уровня)`,D.mags.length,ex.sheetsBy==='amr'?'Магазин на паллете — заменяется AMR целиком':'Загрузка снаружи через проём; лист берётся тем же захватом');a('Датчики','Датчики магазина прокладок: наличие + нижний уровень',2*D.mags.length,'Вызов пополнения при ≤ '+c.sheet.low+' листах, Suspended при пустом');}
+ if(D.stacks.length)a('Механика',`Стопка пустых паллет на ${c.exch.stack} шт. с направляющими и датчиками`,D.stacks.length,`Хватает на ${f1(D.stackHours)} ч; пополняется погрузчиком через проём`);
+ a('Робот',`${D.rob.name} (${D.rob.ex||'параметры пользователя'}) с контроллером и пультом`,nR,`Требуемая досягаемость ${f0(D.rReq)} мм из ${f0(D.rob.reach)}; нагрузка ${f1(D.mReq)} из ${D.rob.payload} кг; ${f1(D.cpm)} циклов/мин`);
+ a('Робот',`Постамент h = ${c.baseH} мм с анкерами`,nR,'По верхнему и нижнему слою стопы');
+ if(GRIPPERS[gt].vac){if(gt==='cups')a('Робот',`Захват на присосках ${f1(G.mass)} кг: ${G.nCups} × Ø${G.cupD} ${CUPS[c.grip.cup].name.toLowerCase()}, ${k} вакуумных зон${ex.in==='robot'?' + крюки под паллету':''}`,nR,`F требуемая ${f0(G.Fth)} Н (${G.case}), F захвата ${f0(G.Fcap)} Н при −${G.vac} кПа`);
+  else a('Робот',`Пенная вакуумная рамка ${f1(G.mass)} кг, площадь ${f0(G.A)} см², ${k} зон${ex.in==='robot'?' + крюки под паллету':''}`,nR,`F требуемая ${f0(G.Fth)} Н, F захвата ${f0(G.Fcap)} Н при −${G.vac} кПа`);
+  a('Робот',`Вакуумный источник: ${G.pump}, ${k} шт. + вакуумные датчики PS1…PS${k}, клапаны, сдув`,nR,`Утечка через картон ≈ ${f0(G.qLeak)} л/мин; расход воздуха ≈ ${f0(G.air)} л/мин при ${c.grip.pressure} бар; захват за ${f2(G.tGrip)} с`);}
+ else if(gt==='clamp')a('Робот',`Клещевой захват ${f1(G.mass)} кг: 2 × цилиндр Ø${G.cylD}, губки с резиной`,nR,`Усилие зажима ${f0(G.Fth)} Н при ${c.grip.pressure} бар, μ = 0,4`);
+ else a('Робот',`Вилочный захват ${f1(G.mass)} кг с прижимом сверху`,nR,'Подхват снизу — не зависит от состояния картона');
+ a('Робот','Пневмоподготовка: фильтр-регулятор, клапан мягкого пуска и сброса, реле давления',nR,'Сброс давления при аварийном стопе по оценке риска');
+ a('Сеть','Коммутатор промышленный Ethernet '+(nR>1||nVfd>3?'16':'8')+' портов',1,'ПЛК, HMI, роботы, ЧП, шлюзы'+(ex.out==='amr'?', флот-менеджер AMR (Wi-Fi через точку доступа)':''));
+ a('Сеть','Кабели: силовые экранированные, сигнальные 24 В, Ethernet',1,'Разделение трасс ≥ 100 мм, экран 360° на вводе');
+ return B;}
+// ======================= ОПТИМИЗАТОР =======================
+function optimize(c){
+ const base=deep(c),res=[];const robs=ROBOTS.filter(r=>r.id!=='custom'&&(c.opt.allowCobot||r.cls!=='cobot'));const vac=GRIPPERS[c.grip.type].vac;
+ for(const r of robs)for(let nR=1;nR<=c.opt.maxRobots;nR++)for(let k=1;k<=(vac?4:1);k++)for(let st=1;st<=Math.max(2,c.stations);st++){
+  const t=deep(base);t.robot=r.id;t.robots=nR;t.grip.pick=k;t.grip.mass=0;t.stations=st;t.safety='auto';while(t.conveyors.length<nR)t.conveyors.push(deep(t.conveyors[0]));
+  const D=derive(t,true);const feas=D.reachStatus!=='bad'&&D.payStatus!=='bad'&&D.grip.status!=='bad';const meets=D.bottleneck>=c.opt.target;
+  const cost=r.cost*nR+k*0.15+st*0.12*nR+(D.safety==='fence'?0.5:0.7)+t.conveyors.length*0.3;
+  res.push({t,D,feas,meets,cost,r,nR,k,st});}
+ const good=res.filter(x=>x.feas&&x.meets).sort((a,b)=>a.cost-b.cost||b.D.bottleneck-a.D.bottleneck);
+ if(good.length)return{ok:true,best:good[0],alts:good.slice(1,4)};
+ const f=res.filter(x=>x.feas).sort((a,b)=>b.D.bottleneck-a.D.bottleneck);return{ok:false,best:f[0]||null,alts:f.slice(1,4)};}
+// ======================= АЛГОРИТМ РАБОТЫ (ТЕКСТ) =======================
+function algoText(c,D){
+ const nR=c.robots,k=c.grip.pick,fence=D.safety==='fence',sts=D.stations,pat=sts[0].pat,b=D.heaviest,G=D.grip,vac=GRIPPERS[c.grip.type].vac,ex=c.exch,sh=c.sheet;
+ const feedTxt=c.conveyors.map((cv,i)=>cv.feed==='manual'?`на конвейер ${i+1} коробки кладёт оператор (в среднем ${cv.rate} в минуту)`:cv.feed==='interval'?`на конвейер ${i+1} коробки подаёт упаковочная машина каждые ${cv.interval} с`:`на конвейер ${i+1} коробки подаёт упаковочная машина, ${cv.rate} в минуту`).join('; ');
+ const stList=sts.map(s=>s.id).join(', ');
+ const gripTxt=vac?`${c.grip.type==='cups'?`${G.nCups} присосок Ø${G.cupD} мм`:`пенная рамка площадью ${f0(G.A)} см²`} создают разрежение ${G.vac} кПа. Датчик вакуума подтверждает, что коробка держится, только после этого робот поднимает её.`:c.grip.type==='clamp'?`губки сжимают коробку с боков с усилием ${f0(G.Fth)} Н, датчики на цилиндре подтверждают закрытие.`:`вилки заходят под коробку, прижим сверху фиксирует её.`;
+ const sheetTxt=sh.mode==='none'?'':sh.mode==='bottom'?'Перед первой коробкой робот кладёт на пустую паллету один прокладочный лист.':sh.mode==='between'?'Между каждым слоем робот кладёт прокладочный лист.':`Через каждые ${sh.everyN} слоя робот кладёт прокладочный лист.`;
+ const outTxt=ex.out==='conveyor'?'паллета уезжает по цепному конвейеру, диспенсер подаёт пустую':ex.out==='amr'?`ПЛК отправляет заявку флот-менеджеру, AMR подъезжает к проёму станции, ${fence?'завеса проёма переводится в мьютинг':'сектор станции исключается из поля сканера'}, тележка забирает паллету и увозит на склад${ex.in==='vehicle'?', затем привозит пустую':''}`:ex.out==='forklift'?`загорается лампа «освобождено», водитель погрузчика забирает паллету через проём${ex.in==='vehicle'?' и ставит пустую':''}, нажимает кнопку «готово»`:`загорается лампа «освобождено», оператор рохлей вывозит паллету через проём${ex.in==='vehicle'?' и закатывает пустую':''}, нажимает кнопку «готово»`;
+ const inTxt=ex.in==='robot'?` Пустую паллету робот сам берёт из стопки (${ex.stack} шт.) крюками на захвате и ставит на станцию — это отдельный цикл.`:'';
+ const sheetsBy=sh.mode==='none'?'':ex.sheetsBy==='amr'?`Когда листов остаётся ${sh.low}, ПЛК вызывает AMR: он привозит паллету с ${sh.cap} листами и меняет магазин целиком.`:`Когда листов остаётся ${sh.low}, загорается лампа у проёма магазина: оператор докладывает листы до ${sh.cap} снаружи, не заходя в ячейку; робот в это время к магазину не обращается.`;
+ return `<h3>Что делает комплекс</h3><p>${nR>1?'Два робота':'Робот'} ${nR>1?'снимают':'снимает'} коробки «${b.name}» (${b.l}×${b.w}×${b.h} мм, ${b.m} кг) с ${c.conveyors.length>1?'конвейеров':'конвейера'} и ${nR>1?'укладывают':'укладывает'} их на паллеты ${c.pallet}: по ${pat.n} в слое, ${pat.layers} слоёв, всего ${pat.total} коробок и ${f0(pat.mass)} кг на паллете. ${k>1?`За один ход берётся до ${k} коробок сразу. `:''}На паллету уходит ${D.cyclesPerPallet} циклов робота (${pat.groupsPerPallet} ходов с коробками${pat.sheets?` + ${pat.sheets} с листами`:''}${ex.in==='robot'?' + 1 с паллетой':''}), это ${f1(D.tPerPallet/60)} мин. Расчётная производительность — ${f0(D.bottleneck)} коробок в час (${f1(D.bottleneck/pat.total)} паллеты в час); ограничивает её ${D.bnName}.</p>
+<h3>Кто участвует</h3><ul><li><b>Конвейер${c.conveyors.length>1?'ы':''} подачи</b> — ${feedTxt}. Датчик на входе видит новую коробку, датчик у упора — что коробка доехала до зоны захвата${k>1?`, ещё один датчик — что собралась группа из ${k}`:''}.</li>
+<li><b>${nR>1?'Роботы':'Робот'}</b> (${D.rob.name}) — ${nR>1?'каждый':''} стоит на постаменте ${c.baseH} мм между конвейером и ${sts.length>1?'станциями':'станцией'} ${stList}. Работает на ${c.speedPct} % от максимальной скорости, ${f1(D.cpm)} циклов в минуту${sh.mode!=='none'?`; с листом идёт медленнее (${sh.speedPct} %)`:''}.</li>
+<li><b>Захват</b> — ${GRIPPERS[c.grip.type].name.toLowerCase()}: ${gripTxt}</li>
+<li><b>Станции паллет</b> ${stList}${nR>1?` (по ${c.stations} у каждого робота)`:''} — обмен: ${EXCH_OUT[ex.out].toLowerCase()}${ex.in==='robot'?', пустые паллеты — из стопки роботом':''}.</li>
+${sh.mode!=='none'?`<li><b>Магазин${D.mags.length>1?'ы':''} прокладок</b> на ${sh.cap} листов — ${SHEETS_BY[ex.sheetsBy].toLowerCase()}.</li>`:''}
+<li><b>Шкаф управления</b> — ПЛК ведёт последовательность и считает коробки, контроллер безопасности следит за ${fence?'дверью, завесами и стопами':'сканерами и стопами'}, панель оператора показывает, что происходит.</li></ul>
+<h3>Начало смены</h3><ol><li>Оператор включает питание, проверяет, что ${fence?'дверь закрыта и в проёмах никого нет':'рядом с ячейкой никого нет'}, ставит ${ex.in==='robot'?'стопку пустых паллет':ex.out==='conveyor'?'паллеты в диспенсер':'пустые паллеты на станции'}${sh.mode!=='none'?' и листы в магазин':''}.</li><li>Нажимает «Сброс»: ${nR>1?'роботы возвращаются':'робот возвращается'} в исходное положение, приводы получают разрешение, жёлтая лампа — ячейка готова.</li><li>Нажимает «Пуск»: конвейер${c.conveyors.length>1?'ы':''} разгоня${c.conveyors.length>1?'ются':'ется'}, зелёная лампа, ячейка работает.</li></ol>
+<h3>Рабочий цикл</h3><ol>${ex.in==='robot'?`<li>Если станция пуста, робот берёт из стопки паллету и ставит на станцию.</li>`:''}${sh.mode==='bottom'?`<li>${sheetTxt}</li>`:''}<li>Коробка попадает на конвейер${fence?', проходит через световую завесу (датчики мьютинга понимают, что это коробка, а не рука) и':' и'} доезжает до упора в зоне захвата.</li>
+<li>${k>1?`Конвейер собирает у упора группу из ${k} коробок вплотную друг к другу. `:''}ПЛК проверяет: есть ли станция с паллетой, которая не заполнена, и не нужна ли ей сейчас прокладка. Если всё в порядке — даёт роботу команду «взять».</li>
+<li>Робот опускает захват, ${vac?`включает вакуум и ждёт подтверждения от датчика (около ${f2(G.tGrip)} с)`:'закрывает захват и ждёт датчик'}, затем переносит ${k>1?'группу':'коробку'} на паллету.</li>
+<li>Место на паллете задаёт схема укладки «${pat.name}»: ${pat.interlock?'каждый следующий слой повёрнут на 180°, поэтому стыки коробок не совпадают и стопа перевязана':'слои одинаковые (колонны), поэтому стопу дополнительно фиксируют уголками и стрейч-плёнкой'}. Робот подводит коробку сверху, опускает, ${vac?'сбрасывает вакуум (сдув)':'раскрывает захват'} и уходит вверх.</li>
+<li>Когда слой заполнен (${pat.n} коробок), счётчик слоёв увеличивается на единицу. ${sh.mode==='between'||sh.mode==='everyN'?sheetTxt+' Лист робот несёт на '+sh.speedPct+' % скорости — он большой и лёгкий, иначе срывается.':''}</li>
+<li>После ${pat.layers}-го слоя паллета готова: ПЛК включает зелёную мигающую лампу для этой станции, ${outTxt}.${inTxt} ${sts.length>1?`Робот в это время работает на другой станции, поэтому ячейка не останавливается.`:'На это время робот ждёт.'}${ex.auto?' Обмен запускается автоматически, без команды оператора.':' Обмен запускает оператор.'}</li></ol>
+<h3>Что происходит, если…</h3><ul><li><b>Нет коробок</b> — робот ждёт в исходном положении, ячейка в работе (Execute). Через минуту простоя на панели появляется подсказка.</li>
+<li><b>Нет свободной паллеты${sh.mode!=='none'?' или кончились листы':''}</b> — ячейка переходит в Suspended (ожидание материала), жёлтая лампа, конвейер продолжает накапливать коробки. Как только паллету поставили${sh.mode!=='none'?' или магазин пополнили':''}, работа продолжается сама.</li>
+${sh.mode!=='none'?`<li><b>Листы заканчиваются</b> — ${sheetsBy}</li>`:''}
+<li><b>${fence?'Кто-то просунул руку в завесу или зашёл в проём станции, которая не освобождена':'Человек вошёл в защитное поле сканера'}</b> — защитная остановка: ${nR>1?'роботы тормозят':'робот тормозит'} за ${c.tStop} с, конвейер по рампе, потом снимается питание приводов. ${fence?'Продолжить можно только кнопкой «Сброс» с пульта, когда зона свободна.':'Когда человек вышел, ячейка перезапускается сама — зона полностью просматривается сканерами.'}${!fence?' Если человек только приблизился (поле предупреждения), робот не останавливается, а замедляется до безопасной скорости.':''} Проём освобождённой станции ${fence?'в мьютинге':'исключён из поля'} — там работать безопасно, робот туда не пойдёт, пока не нажата кнопка «готово».</li>
+<li><b>${vac?'Коробка оторвалась (пропал вакуум)':'Захват не подтвердил закрытие'}, заклинил ролик конвейера, ошибка робота</b> — ячейка переходит в Held (внутренний отказ), красная лампа, на панели — причина. Оператор устраняет, нажимает «Сброс» и «Пуск».</li>
+<li><b>Аварийный стоп</b> — всё обесточивается мгновенно. После отпускания кнопки: «Сброс» два раза (квитирование и возврат роботов в исходную), затем «Пуск».</li>
+${fence?'<li><b>Нужно войти в ячейку</b> — кнопка «Запрос доступа»: робот заканчивает перенос, возвращается в исходную, конвейер останавливается, и только тогда замок отпускает дверь.</li>':''}</ul>
+<h3>Обязанности оператора за смену</h3><ul><li>${c.conveyors.every(x=>x.feed==='manual')?'Класть коробки на конвейер, не заходя за завесу.':'Следить за подачей от упаковочной машины.'}</li><li>${ex.out==='jack'?'Вывозить готовые паллеты рохлей и закатывать пустые':ex.out==='forklift'?'Вызывать погрузчик или самому менять паллеты':ex.out==='amr'?'Следить за работой AMR и зарядкой':'Следить за конвейером паллет и диспенсером'}${sh.mode!=='none'?(ex.sheetsBy==='person'?', докладывать листы в магазин':', следить за заменой магазина AMR'):''}, реагировать на жёлтую и красную лампу.</li><li>В конце смены — «Стоп», дождаться Stopped, снять готовые паллеты, выключить питание.</li></ul>
+<h3>Цифры для проверки</h3><p>Цикл робота ${f1(D.tCycle)} с (${f1(D.cpm)} циклов/мин)${sh.mode!=='none'?`, цикл с листом ${f1(D.tSheet)} с`:''}${ex.in==='robot'?`, цикл с паллетой ${f1(D.tPallet)} с`:''}. На паллету ${D.cyclesPerPallet} циклов и ${f1(D.tPerPallet/60)} мин → ${f1(D.tPerBox)} с на коробку → ${f0(D.capRobot)} коробок в час у ${nR>1?'роботов':'робота'}. Подача даёт ${f0(D.capFeed)} в час, конвейер пропускает ${f0(D.capConv)}. Паллет в час ${f1(D.palletsPerHour)}${sh.mode!=='none'?`, листов в час ${f0(D.sheetsPerHour)}, пополнений магазина ${f1(D.refillsPerHour)} в час`:''}. За смену 8 ч при готовности 85 % — ${f0(D.bottleneck*8*0.85)} коробок, ${f0(D.bottleneck*8*0.85/pat.total)} паллет.</p>`;}
+// ======================= 3D-ВИД =======================
+const V3={ok:false,orbit:{theta:-0.9,phi:0.95,r:9,tx:0,ty:0.5,tz:1},follow:false,cache:{},pools:{},agents:{}};
+const COL3={box:[0xC9A66B,0x8DB3A0,0xB39DDB,0xE0A0A0],sheet:0x8FA3B5,robot:0xE0762C,fence:0x7B8794,pallet:0xB08D57,conv:0x9AA3AB,floor:0xD9DEE3,agent:0x3A6EA5,fork:0xF5B400,amr:0xF2F4F6,red:0xD33B2F,off:0xB8C0C8,green:0x2A9D5C,yellow:0xF5B400};
+function mat(col,o){return new THREE.MeshLambertMaterial(Object.assign({color:col},o||{}));}
+function box3(w,h,d,col,o){return new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(col,o));}
+function label3(text,size){const cv=document.createElement('canvas');cv.width=128;cv.height=64;const ctx=cv.getContext('2d');ctx.font='bold 40px sans-serif';ctx.fillStyle='#1E2730';ctx.textAlign='center';ctx.fillText(text,64,46);const t=new THREE.CanvasTexture(cv);const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false}));sp.scale.set((size||0.6),(size||0.6)/2,1);return sp;}
+function init3D(){
+ const wrap=$('v3wrap');if(typeof THREE==='undefined'){$('v3msg').textContent='Библиотека three.js не загрузилась — 3D-вид недоступен без доступа к cdnjs.cloudflare.com.';return;}
+ let ren;try{ren=new THREE.WebGLRenderer({antialias:true,alpha:true});}catch(e){$('v3msg').textContent='WebGL недоступен в этом браузере — 3D-вид отключён.';return;}
+ ren.setPixelRatio(Math.min(2,window.devicePixelRatio||1));wrap.appendChild(ren.domElement);
+ const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(45,1.6,0.05,300);
+ scene.add(new THREE.HemisphereLight(0xffffff,0x8a97a5,0.95));const dl=new THREE.DirectionalLight(0xffffff,0.65);dl.position.set(4,9,3);scene.add(dl);
+ Object.assign(V3,{ok:true,ren,scene,cam,wrap,root:new THREE.Group(),dyn:new THREE.Group()});scene.add(V3.root);scene.add(V3.dyn);
+ let drag=null;wrap.addEventListener('contextmenu',e=>e.preventDefault());
+ wrap.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,b:e.button,shift:e.shiftKey};wrap.setPointerCapture(e.pointerId);});
+ wrap.addEventListener('pointerup',()=>{drag=null;});wrap.addEventListener('pointercancel',()=>{drag=null;});
+ wrap.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;const o=V3.orbit;
+  if(drag.b===2||drag.shift){const s=o.r*0.0014;o.tx-=(dx*Math.sin(o.theta)-dy*Math.cos(o.theta))*s;o.tz-=(-dx*Math.cos(o.theta)-dy*Math.sin(o.theta))*s;V3.follow=false;}
+  else{o.theta+=dx*0.006;o.phi=clamp(o.phi-dy*0.006,0.05,1.52);}});
+ wrap.addEventListener('wheel',e=>{e.preventDefault();V3.orbit.r=clamp(V3.orbit.r*Math.exp(e.deltaY*0.0012),1.5,80);},{passive:false});
+ document.querySelectorAll('[data-v3]').forEach(b=>b.addEventListener('click',()=>{const o=V3.orbit,v=b.dataset.v3;V3.follow=false;
+  if(v==='iso'){o.theta=-0.9;o.phi=0.95;home3D();}else if(v==='top'){o.theta=-Math.PI/2;o.phi=0.03;home3D();}else if(v==='op'){o.theta=Math.PI;o.phi=1.25;o.r=7;const cv=DD.LY.convs[0];o.tx=(cv.x0-1500)/1000;o.tz=cv.y/1000;o.ty=0.8;}else if(v==='follow'){V3.follow=true;o.r=Math.min(o.r,5);}}));
+ window.addEventListener('resize',resize3D);resize3D();}
+function home3D(){const o=V3.orbit,G=GG;o.tx=(G.xMin+G.xMax)/2000;o.tz=(G.yMin+G.yMax)/2000;o.ty=0.5;o.r=Math.max(G.xMax-G.xMin,G.yMax-G.yMin)/1000*0.85;}
+function resize3D(){if(!V3.ok)return;const w=V3.wrap.clientWidth||900,h=V3.wrap.clientHeight||600;V3.ren.setSize(w,h,false);V3.cam.aspect=w/h;V3.cam.updateProjectionMatrix();}
+function clear3(g){while(g.children.length){const ch=g.children.pop();g.remove(ch);}}
+function build3D(){
+ if(!V3.ok)return;const c=CFG,D=DD,LY=D.LY,pal=D.pal,G=GG,mm=1/1000;clear3(V3.root);clear3(V3.dyn);V3.cache={};V3.pools={};V3.agents={};V3.robots=[];V3.gates={};V3.stations={};V3.mags={};V3.stacks={};V3.curtains=[];
+ const R=V3.root;const W=(G.xMax-G.xMin)*mm+4,H=(G.yMax-G.yMin)*mm+4,cx=(G.xMin+G.xMax)/2*mm,cz=(G.yMin+G.yMax)/2*mm;
+ const floor=new THREE.Mesh(new THREE.PlaneGeometry(W,H),mat(COL3.floor));floor.rotation.x=-Math.PI/2;floor.position.set(cx,-0.002,cz);R.add(floor);
+ const grid=new THREE.GridHelper(Math.max(W,H),Math.round(Math.max(W,H)),0xb8c0c8,0xcdd3d9);grid.position.set(cx,0,cz);R.add(grid);
+ if(D.safety==='fence'){const F=D.F,fm=mat(COL3.fence,{transparent:true,opacity:0.22,side:THREE.DoubleSide});const wall=(x0,z0,x1,z1)=>{const len=Math.hypot(x1-x0,z1-z0);const m=new THREE.Mesh(new THREE.PlaneGeometry(len,2),fm);m.position.set((x0+x1)/2,1,(z0+z1)/2);m.rotation.y=-Math.atan2(z1-z0,x1-x0);R.add(m);for(let t=0;t<=len;t+=1.5){const p=box3(0.06,2,0.06,COL3.fence);p.position.set(x0+(x1-x0)*t/len,1,z0+(z1-z0)*t/len);R.add(p);}};
+  const x0=F.x0*mm,x1=F.x1*mm,z0=F.y0*mm,z1=F.y1*mm;wall(x0,z0,x1,z0);wall(x1,z0,x1,z1);wall(x1,z1,x0,z1);wall(x0,z1,x0,z0);
+  LY.convs.forEach((cv,i)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(cv.w*mm+0.24,1.2),mat(COL3.red,{transparent:true,opacity:0.35,side:THREE.DoubleSide}));m.position.set(x0,0.9,cv.y*mm);m.rotation.y=Math.PI/2;R.add(m);V3.curtains.push(m);});
+  const door=box3(0.8,2,0.05,COL3.fence,{transparent:true,opacity:0.6});door.position.set(0.4,1,0);const dg=new THREE.Group();dg.position.set((F.x1-1100)*mm,0,F.y1*mm);dg.add(door);R.add(dg);V3.door=dg;}
+ else LY.robots.forEach(r=>{[[D.rStop,COL3.red],[Math.min(D.rSlow,3000),COL3.yellow]].forEach(([rad,col])=>{const ring=new THREE.Mesh(new THREE.RingGeometry(rad*mm-0.04,rad*mm,64),mat(col,{transparent:true,opacity:0.5,side:THREE.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.set(r.base.x*mm,0.004,r.base.y*mm);R.add(ring);});});
+ LY.convs.forEach((cv,i)=>{const len=cv.len*mm,w=cv.w*mm,h=c.convH*mm,xc=(cv.x0+cv.x1)/2*mm,zc=cv.y*mm;const frame=box3(len,0.08,w,COL3.conv);frame.position.set(xc,h-0.04,zc);R.add(frame);
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz])=>{const leg=box3(0.05,h,0.05,COL3.fence);leg.position.set(xc+sx*(len/2-0.15),h/2,zc+sz*(w/2-0.05));R.add(leg);});
+  const rg=new THREE.CylinderGeometry(0.03,0.03,w-0.1,10),rm=mat(0xc5ccd3);for(let x=cv.x0+75;x<cv.x1;x+=150){const roll=new THREE.Mesh(rg,rm);roll.rotation.x=Math.PI/2;roll.position.set(x*mm,h,zc);R.add(roll);}
+  const stop=box3(0.03,0.25,w,0x1e2730);stop.position.set(cv.x1*mm,h+0.1,zc);R.add(stop);});
+ const reach=D.rob.reach*mm,L=reach/2;
+ LY.robots.forEach(r=>{const bx=r.base.x*mm,bz=r.base.y*mm,bh=c.baseH*mm;if(bh>0){const ped=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.28,bh,24),mat(COL3.fence));ped.position.set(bx,bh/2,bz);R.add(ped);}
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(0.19,0.21,0.3,24),mat(0x2f3740));base.position.set(bx,bh+0.15,bz);R.add(base);
+  const g0=new THREE.Group();g0.position.set(bx,bh+0.15,bz);R.add(g0);const sh=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.3,20),mat(COL3.robot));sh.position.y=0.2;g0.add(sh);
+  const g1=new THREE.Group();g1.position.set(0,0.2,0);g0.add(g1);const ua=box3(L,0.16,0.14,COL3.robot);ua.position.x=L/2;g1.add(ua);const j1=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.22,20),mat(0x2f3740));j1.rotation.x=Math.PI/2;g1.add(j1);
+  const g2=new THREE.Group();g2.position.set(L,0,0);g1.add(g2);const fa=box3(L,0.13,0.12,COL3.robot);fa.position.x=L/2;g2.add(fa);const j2=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.2,20),mat(0x2f3740));j2.rotation.x=Math.PI/2;g2.add(j2);
+  const gw=new THREE.Group();gw.position.set(L,0,0);g2.add(gw);const fl=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,c.gripH*mm,16),mat(0x2f3740));fl.position.y=-c.gripH*mm/2;gw.add(fl);
+  const hb=D.heaviest,pw=c.grip.pick*hb.l*mm+0.05,pd=hb.w*mm+0.05;const plate=box3(pw,0.06,pd,0x4a525b);plate.position.y=-c.gripH*mm+0.03;gw.add(plate);
+  const carry=new THREE.Group();carry.position.y=-c.gripH*mm;gw.add(carry);
+  const cb=new THREE.Group();for(let j=0;j<c.grip.pick;j++){const b=box3(hb.l*mm-0.01,hb.h*mm,hb.w*mm-0.01,COL3.box[0]);b.position.set((j-(c.grip.pick-1)/2)*hb.l*mm,-hb.h*mm/2,0);cb.add(b);}cb.visible=false;carry.add(cb);
+  const cs=box3(pal.W*mm,0.01,pal.L*mm,COL3.sheet);cs.position.y=-0.005;cs.visible=false;carry.add(cs);const cp=palletMesh(pal);cp.position.y=-pal.h*mm;cp.visible=false;carry.add(cp);
+  V3.robots.push({r,g0,g1,g2,gw,cb,cs,cp,L});});
+ LY.robots.forEach(r=>r.slots.forEach(sl=>{const g=new THREE.Group();g.position.set(sl.cx*mm,0,sl.cy*mm);g.rotation.y=-sl.ang*Math.PI/180;R.add(g);
+  const outline=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(pal.W*mm,pal.L*mm)),new THREE.LineBasicMaterial({color:COL3.fence}));outline.rotation.x=-Math.PI/2;outline.position.y=0.005;g.add(outline);
+  const lb=label3(sl.id,0.5);lb.position.set(0,0.35,0);g.add(lb);
+  const gate=new THREE.Mesh(new THREE.PlaneGeometry(pal.L*mm+0.3,1.0),mat(COL3.red,{transparent:true,opacity:0.35,side:THREE.DoubleSide}));gate.position.set((pal.W/2+350)*mm,0.8,0);gate.rotation.y=Math.PI/2;g.add(gate);V3.gates[sl.id]=gate;
+  if(sl.kind==='mg'){const rack=new THREE.Group();g.add(rack);[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sz])=>{const p=box3(0.04,0.9,0.04,COL3.fence);p.position.set(sx*pal.W*mm/2,0.45,sz*pal.L*mm/2);rack.add(p);});const base=box3(pal.W*mm,pal.h*mm,pal.L*mm,COL3.pallet);base.position.y=pal.h*mm/2;g.add(base);const stack=box3(pal.W*mm-0.05,1,pal.L*mm-0.05,COL3.sheet);g.add(stack);V3.mags[sl.id]=stack;}
+  if(sl.kind==='ps'){const st=new THREE.Group();g.add(st);V3.stacks[sl.id]={g:st,pal};}
+  if(sl.kind==='st'){const st=new THREE.Group();g.add(st);V3.stations[sl.id]={g:st,outer:g,sl};}
+  if(sl.kind!=='ps'&&!(sl.kind==='st'&&c.exch.out==='conveyor')){const pad=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.6),mat(0xc5ccd3,{transparent:true,opacity:0.5}));pad.rotation.x=-Math.PI/2;pad.position.set(sl.park.x*mm,0.003,sl.park.y*mm);R.add(pad);}}));
+ V3.gridSig='';home3D();}
+function palletMesh(pal){const g=new THREE.Group(),mm=1/1000,W=pal.W*mm,Lz=pal.L*mm,h=pal.h*mm;const m=mat(COL3.pallet);
+ [-1,0,1].forEach(k=>{const b=new THREE.Mesh(new THREE.BoxGeometry(W,h*0.3,0.1),m);b.position.set(0,h*0.15,k*(Lz/2-0.06));g.add(b);});
+ const top=new THREE.Mesh(new THREE.BoxGeometry(W,h*0.2,Lz),m);top.position.y=h*0.9;g.add(top);
+ [-1,0,1].forEach(k=>{const b=new THREE.Mesh(new THREE.BoxGeometry(0.1,h*0.5,Lz),m);b.position.set(k*(W/2-0.06),h*0.55,0);g.add(b);});return g;}
+function buildStation3(s){const c=CFG,pal=DD.pal,mm=1/1000,b=boxOf(c,s.bi),col=COL3.box[s.bi%4],g=V3.stations[s.id].g;clear3(g);if(!s.present)return;
+ g.add(palletMesh(pal));const geo={0:new THREE.BoxGeometry(b.l*mm-0.008,b.h*mm-0.004,b.w*mm-0.008),1:new THREE.BoxGeometry(b.w*mm-0.008,b.h*mm-0.004,b.l*mm-0.008)},m=mat(col);
+ const sheetsBelow=j=>s.sheetLayers.filter(x=>x<=j).length*4;
+ const addLayer=(cells,idx,j)=>{const y=(pal.h+j*b.h+sheetsBelow(j))*mm;idx.forEach(i=>{const cl=cells[i];const mesh=new THREE.Mesh(geo[cl.rot],m);mesh.position.set(cl.x*mm,y+b.h*mm/2,cl.y*mm);g.add(mesh);});};
+ for(let j=0;j<s.layer;j++){const cells=(s.pat.interlock&&j%2)?s.pat.cellsB:s.pat.cells;addLayer(cells,cells.map((x,i)=>i),j);}
+ if(s.placed.length)addLayer(curCells(s),s.placed,s.layer);
+ s.sheetLayers.forEach(l=>{const y=(pal.h+l*b.h+s.sheetLayers.filter(x=>x<l).length*4)*mm;const sh=box3(pal.W*mm-0.02,0.004,pal.L*mm-0.02,COL3.sheet);sh.position.y=y+0.002;g.add(sh);});}
+function agentMesh(a){const c=CFG,pal=DD.pal,mm=1/1000,g=new THREE.Group();
+ if(a.kind==='person'||a.kind==='jack'){const body=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.2,1.3,14),mat(COL3.agent));body.position.set(0,0.65,0);const head=new THREE.Mesh(new THREE.SphereGeometry(0.13,14,12),mat(0xE8C39E));head.position.set(0,1.5,0);const person=new THREE.Group();person.add(body,head);
+  if(a.kind==='jack'){person.position.x=0.9;const forks=box3(1.2,0.06,0.55,COL3.agent);forks.position.set(0,0.06,0);const handle=box3(0.05,1.1,0.05,COL3.agent);handle.position.set(0.65,0.6,0);g.add(forks,handle);}g.add(person);}
+ else if(a.kind==='forklift'){const body=box3(1.4,0.9,1.1,COL3.fork);body.position.set(0.5,0.5,0);const mast=box3(0.1,2,1.0,COL3.fence);mast.position.set(-0.4,1,0);const forks=box3(1.2,0.05,0.5,COL3.fence);forks.position.set(-1.0,0.08,0);const cab=box3(0.9,0.9,0.9,0x2f3740,{transparent:true,opacity:0.35});cab.position.set(0.6,1.4,0);g.add(body,mast,forks,cab);}
+ else{const body=box3(1.3,0.35,0.95,COL3.amr);body.position.set(0,0.18,0);const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.05,10,8),mat(COL3.green));lamp.position.set(-0.6,0.4,0.4);g.add(body,lamp);}
+ const carry=new THREE.Group();carry.position.set(a.kind==='forklift'?-1.0:0,a.kind==='amr'?0.36:a.kind==='forklift'?0.1:0.09,0);g.add(carry);const pm=palletMesh(pal);carry.add(pm);
+ const load=box3(pal.W*mm-0.05,0.5,pal.L*mm-0.05,COL3.box[0]);load.position.y=pal.h*mm+0.25;carry.add(load);const sheets=box3(pal.W*mm-0.05,0.12,pal.L*mm-0.05,COL3.sheet);sheets.position.y=pal.h*mm+0.06;carry.add(sheets);
+ const hand=box3(0.5,0.06,0.4,COL3.sheet);hand.position.set(a.kind==='jack'?1.2:0.3,1.0,0);hand.visible=false;g.add(hand);
+ g.userData={carry,pm,load,sheets,hand};V3.dyn.add(g);return g;}
+function render3D(){
+ if(!V3.ok||!S||!DD)return;const c=CFG,D=DD,pal=D.pal,mm=1/1000,dyn=V3.dyn;
+ V3.robots.forEach(R=>{const r=S.robots[R.r.i];const dx=r.x-r.base.x,dz=r.y-r.base.y,yaw=Math.atan2(dz,dx);let d=Math.hypot(dx,dz)*mm;const hS=(c.baseH+350)*mm;let h=(r.z+c.gripH)*mm-hS;let Dd=Math.hypot(d,h);const L=R.L;if(Dd>2*L-0.01){const k=(2*L-0.01)/Dd;d*=k;h*=k;Dd=2*L-0.01;}if(d<0.05){d=0.05;Dd=Math.hypot(d,h);}
+  const a1=Math.atan2(h,d)+Math.acos(clamp(Dd/(2*L),-1,1)),phi=Math.acos(clamp((2*L*L-Dd*Dd)/(2*L*L),-1,1)),a2=phi-Math.PI;
+  R.g0.rotation.y=-yaw;R.g1.rotation.z=a1;R.g2.rotation.z=a2;R.gw.rotation.z=-(a1+a2);R.gw.rotation.y=0;
+  R.cb.visible=r.carryKind==='box';R.cs.visible=r.carryKind==='sheet';R.cp.visible=r.carryKind==='pallet';
+  if(r.carryKind==='box'){const col=COL3.box[r.carryBi%4];R.cb.children.forEach((m,j)=>{m.visible=j<r.carry;m.material.color.setHex(col);});}});
+ D.LY.convs.forEach((cv,i)=>{const key='cv'+i;if(!V3.pools[key])V3.pools[key]=[];const pool=V3.pools[key],b=cv.b,col=COL3.box[cv.bi%4];S.conv[i].boxes.forEach((bx,j)=>{if(!pool[j]){pool[j]=box3(b.l*mm-0.01,b.h*mm,b.w*mm-0.01,col);dyn.add(pool[j]);}const m=pool[j];m.visible=true;m.position.set((cv.x0+b.l/2+bx.p*(cv.len-b.l))*mm,(c.convH+b.h/2)*mm,cv.y*mm);});for(let j=S.conv[i].boxes.length;j<pool.length;j++)pool[j].visible=false;});
+ S.st.forEach(s=>{const st=V3.stations[s.id];if(!st)return;const sig=`${s.present}|${s.layer}|${s.placed.length}|${s.parity}|${s.sheetLayers.length}|${s.complete}`;if(V3.cache[s.id]!==sig){V3.cache[s.id]=sig;buildStation3(s);}
+  const off=s.phase==='out'?s.out*(pal.W+600):0;st.outer.position.set((s.slot.cx+s.slot.cos*off)*mm,0,(s.slot.cy+s.slot.sin*off)*mm);
+  const g=V3.gates[s.id];if(g)g.material.color.setHex(s.phase==='out'||(released(s)&&c.exch.out!=='conveyor')?COL3.off:COL3.red);});
+ S.mags.forEach(m=>{const st=V3.mags[m.id];if(!st)return;const hh=Math.max(0.004,m.sheets*0.004);st.scale.y=hh;st.position.y=pal.h*mm+hh/2;const g=V3.gates[m.id];if(g)g.material.color.setHex(m.loading?COL3.off:COL3.red);});
+ S.stacks.forEach(p=>{const st=V3.stacks[p.id];if(!st)return;const sig='ps'+p.n;if(V3.cache[p.id]!==sig){V3.cache[p.id]=sig;clear3(st.g);for(let i=0;i<p.n;i++){const pm=palletMesh(pal);pm.position.y=i*pal.h*mm;st.g.add(pm);}}});
+ const seen=new Set();S.agents.forEach(a=>{seen.add(a.id);let g=V3.agents[a.id];if(!g){g=agentMesh(a);V3.agents[a.id]=g;}g.position.set(a.x*mm,0,a.y*mm);g.rotation.y=-a.target.slot.ang*Math.PI/180+(a.kind==='forklift'?Math.PI:0);const u=g.userData;const byHand=a.carry==='sheets'&&a.kind!=='amr';u.carry.visible=!!a.carry&&!byHand;u.hand.visible=byHand;u.load.visible=a.carry==='full';u.sheets.visible=a.carry==='sheets';if(a.carry==='full')u.load.material.color.setHex(COL3.box[(a.target.bi||0)%4]);});
+ Object.keys(V3.agents).forEach(id=>{if(!seen.has(+id)){dyn.remove(V3.agents[id]);delete V3.agents[id];}});
+ if(D.safety==='cobot'){if(!V3.person){V3.person=agentMesh({kind:'person'});V3.person.rotation.y=Math.PI;V3.person.userData.carry.visible=false;}const rad=S.person==='away'?GG.rDraw+200:S.person==='slow'?Math.min(D.rSlow,GG.rDraw)-250:D.rStop-200;V3.person.position.set(rad*0.6*mm,0,rad*0.8*mm);V3.person.visible=true;}
+ if(D.safety==='fence'){V3.curtains.forEach(m=>m.material.color.setHex(S.lc.broken?COL3.yellow:S.lc.muted?COL3.off:COL3.red));if(V3.door)V3.door.rotation.y=S.door==='open'?-1.2:0;}
+ const o=V3.orbit;if(V3.follow){const r=S.robots[0];o.tx+=(r.x*mm-o.tx)*0.1;o.tz+=(r.y*mm-o.tz)*0.1;o.ty+=(r.z*mm*0.6-o.ty)*0.1;}
+ const cam=V3.cam;cam.position.set(o.tx+o.r*Math.sin(o.phi)*Math.cos(o.theta),o.ty+o.r*Math.cos(o.phi),o.tz+o.r*Math.sin(o.phi)*Math.sin(o.theta));cam.lookAt(o.tx,o.ty,o.tz);
+ V3.ren.render(V3.scene,cam);}
+// ======================= КОНФИГУРАТОР (UI) =======================
+const num=(k,v,step,min,max,title)=>`<input type="number" data-k="${k}" value="${v}" step="${step||1}" min="${min||0}" max="${max||100000}" title="${title||''}">`;
+const sel=(k,opts,v,dis)=>`<select data-k="${k}" ${dis?'disabled':''}>${opts.map(o=>`<option value="${o[0]}" ${String(o[0])===String(v)?'selected':''}>${o[1]}</option>`).join('')}</select>`;
+function renderCfg(){
+ const c=normalize(CFG),rob=robotOf(c),D=derive(c,true),G=D.grip,vac=GRIPPERS[c.grip.type].vac,ex=c.exch,sh=c.sheet;
+ $('cfgRobot').innerHTML=`<div class="field"><label>Количество роботов</label>${sel('robots',[[1,'1 робот'],[2,'2 робота (параллельные модули)']],c.robots)}<small>Второй робот получает свой конвейер и свои станции; ячейка общая</small></div>
+ <div class="field"><label>Модель</label>${sel('robot',ROBOTS.map(r=>[r.id,r.name]),c.robot)}<small>${rob.ex||'—'}</small></div>
+ ${c.robot==='custom'?`<div class="field"><label>Грузоподъёмность, кг</label>${num('custom.payload',c.custom.payload,.5,1,500)}</div><div class="field"><label>Досягаемость, мм</label>${num('custom.reach',c.custom.reach,10,500,4000)}</div><div class="field"><label>Тип</label>${sel('custom.cls',[['cobot','Коллаборативный'],['industrial','Промышленный']],c.custom.cls)}</div><div class="field"><label>Норматив, циклов/мин</label>${num('custom.cpm',c.custom.cpm,.5,1,30)}</div>`:`<div class="field"><label>Норматив робота</label><span class="badge ok">${rob.cpm} циклов/мин</span><small>Циклы «взял — положил» с подходами и отходами; методика оценки производительности паллетайзера</small></div>`}
+ <div class="field"><label>Скорость робота, % от максимальной</label>${num('speedPct',c.speedPct,5,10,100)}<small>Влияет на такт, ускорение груза и требуемую силу захвата (a = v / 0,25 с)</small></div>
+ <div class="field"><label>Высота постамента, мм</label>${num('baseH',c.baseH,50,0,1500)}<small>Кобот на постаменте 600–900 мм, напольный паллетайзер — 0</small></div>`;
+ $('cfgGrip').innerHTML=`<div class="field"><label>Тип захвата</label>${sel('grip.type',Object.entries(GRIPPERS).map(([k,v])=>[k,v.name]),c.grip.type)}</div>
+ ${c.grip.type==='cups'?`<div class="field"><label>Тип присосок</label>${sel('grip.cup',Object.entries(CUPS).map(([k,v])=>[k,v.name]),c.grip.cup)}<small>${CUPS[c.grip.cup].note}; μ = ${CUPS[c.grip.cup].mu}, вакуум до ${CUPS[c.grip.cup].vacMax} кПа</small></div>
+ <div class="field"><label>Диаметр присоски</label>${sel('grip.cupD',[[0,'авто (подбор)']].concat(CUP_D.map(d=>[d,'Ø'+d+' мм'])),c.grip.cupD)}</div>`:''}
+ ${vac?`<div class="field"><label>Уровень вакуума, кПа (−)</label>${num('grip.vac',c.grip.vac,5,20,90)}<small>Картон: 40–60 кПа; выше — расслоение и «продавливание»</small></div><div class="field"><label>Давление сжатого воздуха, бар</label>${num('grip.pressure',c.grip.pressure,.5,2,8)}<small>Эжектору нужно 4–6 бар; при пенной рамке — насос/нагнетатель</small></div>`:`<div class="field"><label>Давление сжатого воздуха, бар</label>${num('grip.pressure',c.grip.pressure,.5,2,8)}</div>`}
+ <div class="field"><label>Коробок за один захват</label>${sel('grip.pick',[1,2,3,4,5,6,7,8].map(x=>[x,String(x)]),c.grip.pick,!vac)}<small>${vac?'Группа собирается у упора конвейера вплотную; каждая коробка — своя вакуумная зона':'Групповой захват — только для вакуумных типов'}</small></div>
+ <div class="field"><label>Масса захвата, кг (0 = авто)</label>${num('grip.mass',c.grip.mass,.5,0,80)}<small>Расчётная масса: ${f1(G.mass)} кг</small></div>
+ <div class="field"><label>Высота захвата (фланец → контакт), мм</label>${num('gripH',c.gripH,10,50,600)}</div>
+ <div class="check"><div>Расчёт захвата<small>${G.case}; a = ${f1(G.a)} м/с², S = ${G.S}</small></div><span class="badge ${G.status}">${f0(G.Fth)} / ${f0(G.Fcap)} Н</span></div>
+ ${vac?`<div class="check"><div>${c.grip.type==='cups'?`Присоски: ${G.nPerBox} × Ø${G.cupD} мм на коробку, всего ${G.nCups}`:`Пенная рамка: площадь ${f0(G.A)} см²`}<small>${G.pump}; утечка ${f0(G.qLeak)} л/мин; воздух ≈ ${f0(G.air)} л/мин</small></div><span class="badge ok">захват ${f2(G.tGrip)} с · сброс ${f2(G.tRel)} с</span></div>`:`<div class="check"><div>${G.pump}<small>время захвата ${f2(G.tGrip)} с, отпускания ${f2(G.tRel)} с</small></div><span class="badge ok">${c.grip.type==='clamp'?'Ø'+G.cylD+' мм':'—'}</span></div>`}
+ ${G.notes.map(n=>`<p class="note">${n}</p>`).join('')}`;
+ $('cfgBoxes').innerHTML=`<div class="field"><label>Паллета</label>${sel('pallet',Object.keys(PALLETS).map(p=>[p,p]),c.pallet)}</div>
+ <div class="field"><label>Макс. высота стопы с паллетой, мм</label>${num('maxStack',c.maxStack,50,300,2400)}</div>
+ <div class="field"><label>Станций паллет у каждого робота</label>${sel('stations',[[1,'1'],[2,'2'],[3,'3'],[4,'4']],c.stations)}<small>Позиции вокруг робота: станции + магазины${ex.in==='robot'?' + стопка паллет':''} ≤ 6</small></div>
+ <div class="field"><label>Схема укладки</label>${sel('patternMode',[['auto','Авто: максимум коробок, перевязка если возможна'],['interlock','Перекрёстная (перевязка обязательна)'],['column','Колонная (простая сетка)']],c.patternMode)}</div>
+ <div class="row box h"><span>Коробка</span><span>L, мм</span><span>W, мм</span><span>H, мм</span><span>кг</span><span>выпуск шт/ч</span><span>слоёв</span><span></span></div>
+ ${c.boxes.map((b,i)=>`<div class="row box"><input type="text" data-k="boxes.${i}.name" value="${b.name}">${num(`boxes.${i}.l`,b.l,10,100,1200)}${num(`boxes.${i}.w`,b.w,10,100,1000)}${num(`boxes.${i}.h`,b.h,10,50,800)}${num(`boxes.${i}.m`,b.m,.5,0.1,150)}${num(`boxes.${i}.rate`,b.rate,10,0,5000,'производительность выпуска, шт/ч (0 — не задана)')}${num(`boxes.${i}.layers`,b.layers,1,0,30,'0 — авто по высоте стопы')}<button data-act="delBox" data-i="${i}" title="Удалить" ${c.boxes.length<2?'disabled':''}>×</button></div>`).join('')}
+ <div class="btns"><select id="boxPreset">${BOX_PRESETS.map((b,i)=>`<option value="${i}">${b.name} ${b.l}×${b.w}×${b.h}, ${b.m} кг${b.rate?', '+b.rate+' шт/ч':''}</option>`).join('')}</select><button data-act="addBox">Добавить коробку</button></div>
+ <p class="note">Артикулы М5П … МС10 — из оценки производительности REDCARGO PRO130 (выпуск и число слоёв по документу). «Слоёв» 0 — авто по лимиту высоты.</p>
+ ${Object.values(D.pats).map(p=>`<div class="check"><div>${p.name}<small>${p.stability}${p.loss>0?`; перевязка стоит ${p.loss} шт. в слое`:''}; ${p.groupsPerPallet} ходов${p.sheets?` + ${p.sheets} листов`:''} на паллету</small></div><span class="badge ${p.interlock?'ok':'warn'}">${p.n} в слое · ${p.layers} слоёв · ${p.total} шт.</span></div>`).join('')}`;
+ $('cfgConv').innerHTML=`<div class="row conv h"><span>Тип</span><span>L, м</span><span>м/мин</span><span>Накопление</span><span>Коробка</span><span></span></div>
+ ${c.conveyors.map((cv,i)=>`<div class="row conv">${sel(`conveyors.${i}.type`,Object.entries(CONV_TYPES).map(([k,v])=>[k,v.name]),cv.type)}${num(`conveyors.${i}.len`,cv.len,.5,1,12)}${num(`conveyors.${i}.speed`,cv.speed,1,3,60)}${sel(`conveyors.${i}.accum`,[['true','да'],['false','нет']],cv.accum,cv.type==='mdr')}${sel(`conveyors.${i}.box`,c.boxes.map((b,j)=>[j,b.name]),cv.box)}<button data-act="delConv" data-i="${i}" ${c.conveyors.length<2?'disabled':''}>×</button></div>
+ <div class="row feed"><span>${sel(`conveyors.${i}.feed`,Object.entries(FEEDS),cv.feed)}</span>${cv.feed==='interval'?`<span>каждые ${num(`conveyors.${i}.interval`,cv.interval,1,2,120)} с</span>`:cv.feed==='rate'?`<span>${num(`conveyors.${i}.rate`,cv.rate,.5,0.5,60)} кор/мин</span>`:`<span>оператор ≈ ${num(`conveyors.${i}.rate`,cv.rate,.5,0.5,30)} кор/мин</span>`}<span class="h">→ робот ${i%c.robots+1}</span></div>`).join('')}
+ <div class="btns"><button data-act="addConv" ${c.conveyors.length>=4?'disabled':''}>Добавить конвейер</button></div>
+ <div class="field"><label>Высота конвейера, мм</label>${num('convH',c.convH,50,300,1200)}</div>
+ <p class="note">Один конвейер кормит все станции своего робота одной коробкой; второй конвейер — следующие станции другой коробкой.</p>`;
+ $('cfgSheet').innerHTML=`<div class="field"><label>Режим прокладок</label>${sel('sheet.mode',Object.entries(SHEET_MODES),sh.mode)}</div>
+ ${sh.mode==='everyN'?`<div class="field"><label>Лист через каждые N слоёв</label>${num('sheet.everyN',sh.everyN,1,1,10)}</div>`:''}
+ ${sh.mode!=='none'?`<div class="field"><label>Магазинов у каждого робота</label>${sel('magazines',[[1,'1'],[2,'2']],c.magazines)}</div>
+ <div class="field"><label>Ёмкость магазина, листов</label>${num('sheet.cap',sh.cap,5,5,200)}<small>Пополнений в час при расчётной производительности: ${f1(D.refillsPerHour)}</small></div>
+ <div class="field"><label>Вызов пополнения при остатке ≤</label>${num('sheet.low',sh.low,1,0,50)}</div>
+ <div class="field"><label>Скорость робота с листом, %</label>${num('sheet.speedPct',sh.speedPct,5,10,100)}<small>Лист лёгкий и парусит: обычно 50–70 % скорости</small></div>
+ <div class="field"><label>Время захвата листа, с</label>${num('sheet.tGrip',sh.tGrip,.1,0.2,5)}<small>Цикл с листом: ${f1(D.tSheet)} с; ${D.stations[0].pat.sheets} листов на паллету</small></div>`:'<p class="note">Листы не используются: магазины убраны из компоновки. Допустимо только для жёстких коробок с перевязкой.</p>'}`;
+ $('cfgExch').innerHTML=`<div class="field"><label>Вывоз готовых паллет</label>${sel('exch.out',Object.entries(EXCH_OUT),ex.out)}</div>
+ <div class="field"><label>Подача пустых паллет</label>${sel('exch.in',Object.entries(EXCH_IN).filter(([k])=>ex.out==='conveyor'?k==='dispenser':k!=='dispenser'),ex.in)}<small>${ex.in==='robot'?`Стопка паллет занимает позицию у робота; хватает на ${f1(D.stackHours)} ч`:ex.in==='vehicle'?'Тележка увозит полную и привозит пустую за один выезд':'Диспенсер на 15 паллет на конвейере'}</small></div>
+ ${ex.in==='robot'?`<div class="field"><label>Паллет в стопке</label>${num('exch.stack',ex.stack,1,2,25)}</div>`:''}
+ ${sh.mode!=='none'?`<div class="field"><label>Пополнение прокладок</label>${sel('exch.sheetsBy',Object.entries(SHEETS_BY),ex.sheetsBy)}</div>`:''}
+ ${ex.out!=='conveyor'?`<div class="field"><label>Режим обмена в симуляции</label>${sel('exch.auto',[['true','Автоматически: тележка/человек приезжают сами'],['false','По команде с пульта (кнопки)']],ex.auto)}</div>
+ <div class="field"><label>Время подъезда, с</label>${num('exch.reaction',ex.reaction,5,0,300)}<small>От сигнала «паллета готова» до появления у проёма</small></div>`:'<p class="note">Конвейер паллет: обмен всегда автоматический — готовая паллета уезжает, диспенсер ставит пустую.</p>'}
+ <div class="check"><div>Обменов паллет в час<small>${EXCH_OUT[ex.out]}</small></div><span class="badge ${D.palletsPerHour>8&&ex.out==='jack'?'warn':'ok'}">${f1(D.palletsPerHour)}</span></div>`;
+ $('cfgSafety').innerHTML=`<div class="field"><label>Защита</label>${sel('safety',[['auto','Авто по типу робота'],['fence','Ограждение + световые завесы'],['cobot','Без ограждения: сканеры + снижение скорости']],c.safety,rob.cls!=='cobot')}<small>${rob.cls!=='cobot'?'Промышленный робот — только ограждение':'Кобот: допустима работа без ограждения при оценке риска по ISO/TS 15066'}</small></div>
+ <div class="field"><label>Время останова робота T, с</label>${num('tStop',c.tStop,.05,0.1,2)}<small>Из паспорта робота + реакция КБ; входит в S = K·T + C</small></div>
+ <div class="field"><label>Связь ПЛК ↔ робот ↔ ЧП</label>${sel('fieldbus',FIELDBUS.map(f=>[f,f]),c.fieldbus)}</div>
+ <div class="field"><label>Радиус расстановки паллет и магазинов, мм</label>${num('slotR',c.slotR,25,600,3000)}<small>Фактически ${f0(D.LY.R)} мм${D.LY.R>c.slotR?' (увеличен, чтобы позиции не перекрывались)':''}</small></div>
+ <div class="field"><label>База → точка захвата, мм</label>${num('pickDist',c.pickDist,25,400,3000)}</div>`;
+ $('cfgOpt').innerHTML=`<div class="field"><label>Целевая производительность, кор/ч</label>${num('opt.target',c.opt.target,10,10,5000)}</div>
+ <div class="field"><label>Допускать коботов</label>${sel('opt.allowCobot',[['true','да'],['false','нет — только промышленные']],c.opt.allowCobot)}</div>
+ <div class="field"><label>Максимум роботов</label>${sel('opt.maxRobots',[[1,'1'],[2,'2']],c.opt.maxRobots)}</div>
+ <div class="btns"><button data-act="optimize">Предложить конфигурацию</button></div><div class="opt" id="optOut"><p class="note">Перебирает роботы каталога, число роботов, коробок за захват и станций при текущих коробках, паллете и подаче; выбирает самый дешёвый вариант, который укладывается в досягаемость, нагрузку, силу захвата и даёт целевую производительность.</p></div>`;
+ renderPlan(planSKU(c,D));renderChecks(D);}
+function renderPlan(P){
+ const c=CFG;const rows=P.rows;
+ $('cfgPlan').innerHTML=`<p class="note">Как в оценке производительности паллетайзера: циклов на паллету = ходов с коробками (группы в слое × слоёв) + листы${c.exch.in==='robot'?' + паллета':''}; требуемые циклы/мин = циклы на паллету ÷ время, за которое приходит паллета коробок. Робот даёт <b>${f1(P.capCpm)} циклов/мин</b>${c.robots>1?' (два робота)':''} при ${c.grip.pick} коробк${c.grip.pick===1?'е':'ах'} за захват.</p>
+ <div class="svgwrap"><table><tr><th>Артикул</th><th>Размер, кг</th><th>Выпуск, шт/ч</th><th>Схема</th><th>В слое × слоёв</th><th>Ходов + листов</th><th>Паллета приходит за</th><th>Требуется циклов/мин</th><th>Загрузка робота</th></tr>
+ ${rows.map(r=>`<tr><td>${r.b.name}</td><td>${r.b.l}×${r.b.w}×${r.b.h}, ${r.b.m}</td><td>${r.b.rate||'—'}</td><td style="color:var(--muted)">${r.p.name}</td><td>${r.p.n} × ${r.p.layers} = ${r.p.total}</td><td>${r.p.groupsPerPallet} + ${r.p.sheets}${c.exch.in==='robot'?' + 1':''} = ${r.cyc}</td><td>${r.tPal?f1(r.tPal)+' мин':'—'}</td><td>${r.reqCpm?f1(r.reqCpm):'—'}</td><td>${r.reqCpm?`<span class="badge ${r.reqCpm/P.capCpm>1?'bad':r.reqCpm/P.capCpm>.85?'warn':'ok'}">${f0(r.reqCpm/P.capCpm*100)} %</span>`:'—'}</td></tr>`).join('')}</table></div>
+ ${rows.filter(r=>r.b.rate>0).length>1?`<p class="note" style="margin-top:8px">Все артикулы одновременно потребовали бы ${f1(P.sumAll)} циклов/мин. Пары, которые робот тянет вместе (для двух линий подачи), по убыванию загрузки: ${P.pairs.length?P.pairs.map(p=>`<b>${p.a.b.name} + ${p.b.b.name}</b> — ${f0(p.util*100)} %`).join('; '):'нет ни одной'}${P.bad?`; ${P.bad} пар${P.bad===1?'а':''} не проходят — компонуйте низкопроизводительные коробы с высокопроизводительными`:''}.</p>`:'<p class="note" style="margin-top:8px">Задайте выпуск (шт/ч) хотя бы двум коробкам — появится подбор пар для совместной укладки.</p>'}`;}
+function renderChecks(D){
+ const c=CFG;D=D||derive(c,true);const bd=(s,t)=>`<span class="badge ${s}">${t}</span>`;
+ const rows=[['Досягаемость',bd(D.reachStatus,`${f0(D.rReq)} / ${f0(D.rob.reach)} мм · запас ${f0(D.reachMargin*100)} %`),`самая дальняя точка: ${D.rWhere}; радиус расстановки ${f0(D.LY.R)} мм`],
+  ['Грузоподъёмность',bd(D.payStatus,`${f1(D.mReq)} / ${D.rob.payload} кг · ${f0(D.util*100)} %`),`${c.grip.pick>1?c.grip.pick+' × ':''}${D.heaviest.m} кг + захват ${f1(D.gripM)} кг${c.exch.in==='robot'?'; паллета '+D.pal.m+' кг':''}`],
+  ['Захват',bd(D.grip.status,`${f0(D.grip.Fth)} / ${f0(D.grip.Fcap)} Н · ${f0(D.grip.util*100)} %`),`${GRIPPERS[c.grip.type].name}; ${D.grip.case}; захват ${f2(D.grip.tGrip)} с`]];
+ Object.values(D.pats).forEach(p=>rows.push(['Схема укладки',bd(p.interlock?'ok':(c.patternMode==='column'?'ok':'warn'),`${p.n} в слое · ${p.layers} слоёв · ${p.total} шт.${c.grip.pick>1?` · ${f1(p.kEff)} за ход`:''}`),`${p.name}; ${p.stability}; заполнение ${f0(p.fill*100)} %; стопа ${f0(p.stackH)} мм, ${f0(p.mass)} кг`]));
+ rows.push(['Цикл робота',bd('ok',`${f1(D.tCycle)} с · ${f1(D.cpm)} циклов/мин`),`геометрия ${f1(D.tCycleModel)} с, норматив ${f1(D.tCycleNorm)} с${c.sheet.mode!=='none'?`; цикл с листом ${f1(D.tSheet)} с`:''}${c.exch.in==='robot'?`; с паллетой ${f1(D.tPallet)} с`:''}`],
+  ['На паллету',bd('ok',`${D.cyclesPerPallet} циклов · ${f1(D.tPerPallet/60)} мин`),`${f1(D.tPerBox)} с на коробку${c.stations===1?`; простой на обмен ${f0(D.exLoss*100)} %`:''}; ${c.robots>1?'два робота: ':''}${f0(D.capRobot)} кор/ч`],
+  ['Производительность',bd(D.bottleneck<D.capRobot*0.6?'warn':'ok',`${f0(D.bottleneck)} кор/ч · ${f1(D.palletsPerHour)} паллет/ч`),`ограничивает: ${D.bnName}; подача ${f0(D.capFeed)}, конвейер ${f0(D.capConv)}, ${c.robots>1?'роботы':'робот'} ${f0(D.capRobot)}`],
+  ['Обмен и расходники',bd(D.refillsPerHour>2||(c.exch.out==='jack'&&D.palletsPerHour>8)?'warn':'ok',`${f1(D.palletsPerHour)} паллет/ч${c.sheet.mode!=='none'?` · ${f0(D.sheetsPerHour)} листов/ч`:''}`),`${EXCH_OUT[c.exch.out]}${c.exch.in==='robot'?`; стопки хватает на ${f1(D.stackHours)} ч`:''}${c.sheet.mode!=='none'?`; магазин ${c.sheet.cap} листов → ${f1(D.refillsPerHour)} пополнений/ч (${SHEETS_BY[c.exch.sheetsBy].toLowerCase()})`:''}`],
+  ['Безопасное расстояние',bd('ok',D.safety==='fence'?`завеса S ≥ ${f0(D.Slc)} мм`:`поле сканера S ≥ ${f0(D.Ssc)} мм`),D.safety==='fence'?`ISO 13855: K=${D.Slc>500?'1600':'2000'} мм/с, T=${(c.tStop+0.03).toFixed(2)} с, C=128 мм`:`ISO 13855: K=1600, T=${(c.tStop+0.1).toFixed(2)} с, C=1200−0,4·H`]);
+ D.convs.forEach((x,i)=>{const cv=c.conveyors[i];rows.push([`Конвейер ${i+1}`,bd('ok',cv.type==='mdr'?`${x.zones} зон · БП ${x.psuStd} А`:`${x.Pstd} кВт · ЧП ${f1(x.I)} А`),`${x.zones} зон по ${f0(x.zoneLen)} мм; F = ${f0(x.F)} Н; пропуск ${f0(x.capPerMin)} кор/мин; подача ${f1(x.feedPerMin)} кор/мин; проход ${f0(x.transit)} с`]);});
+ $('checks').innerHTML=rows.map(r=>`<div class="check"><div>${r[0]}<small>${r[2]}</small></div>${r[1]}</div>`).join('');
+ $('warnings').innerHTML=D.warnings.length?D.warnings.map(w=>`<li>${w}</li>`).join(''):'<li style="color:var(--muted)">Замечаний нет.</li>';}
+function setPath(obj,path,val){const p=path.split('.');let o=obj;for(let i=0;i<p.length-1;i++)o=o[p[i]];o[p[p.length-1]]=val;}
+const STRUCT=/^(robot|robots|custom\.cls|grip\.type|grip\.cup|grip\.pick|stations|magazines|patternMode|pallet|safety|sheet\.mode|exch\.(out|in|sheetsBy|auto)|conveyors\.\d+\.(type|feed|box))$/;
+$('tab-cfg').addEventListener('input',e=>{const k=e.target.dataset.k;if(!k)return;let v=e.target.value;
+ if(e.target.type==='number'){v=+v;if(isNaN(v))return;}else if(v==='true'||v==='false')v=v==='true';else if(/^-?\d+(\.\d+)?$/.test(v)&&!k.endsWith('name'))v=+v;
+ setPath(CFG,k,v);if(k==='stations'||k==='exch.in'){const extra=CFG.exch.in==='robot'?1:0;if(CFG.stations+CFG.magazines+extra>6)CFG.magazines=Math.max(0,6-CFG.stations-extra);}
+ normalize(CFG);saveCfg();if(STRUCT.test(k))renderCfg();else{const D=derive(CFG,true);renderPlan(planSKU(CFG,D));renderChecks(D);}});
+$('tab-cfg').addEventListener('click',e=>{const act=e.target.dataset.act;if(!act)return;const i=+e.target.dataset.i;
+ if(act==='addBox'){const p=BOX_PRESETS[+$('boxPreset').value];CFG.boxes.push({...p,name:p.name+(CFG.boxes.some(b=>b.name===p.name)?' '+(CFG.boxes.length+1):'')});}
+ if(act==='delBox'){CFG.boxes.splice(i,1);CFG.conveyors.forEach(cv=>{if(cv.box>=CFG.boxes.length)cv.box=0;});}
+ if(act==='addConv')CFG.conveyors.push({type:'roller',len:3,speed:12,accum:true,box:Math.min(CFG.conveyors.length,CFG.boxes.length-1),feed:'manual',interval:10,rate:6});
+ if(act==='delConv'){CFG.conveyors.splice(i,1);if(CFG.robots>CFG.conveyors.length)CFG.robots=CFG.conveyors.length;}
+ if(act==='optimize'){runOptimizer();return;}
+ if(act==='applyOpt'){if(OPT&&OPT.best){CFG=OPT.best.t;CFG.opt=deep(OPT.opt);saveCfg();S.flags.optApplied=true;renderCfg();buildSim();renderArch();showTab('sim');}return;}
+ saveCfg();renderCfg();});
+let OPT=null;
+function runOptimizer(){const out=$('optOut');out.innerHTML='<p class="note">Считаю варианты…</p>';setTimeout(()=>{OPT=optimize(CFG);OPT.opt=deep(CFG.opt);const b=OPT.best;
+ if(!b){out.innerHTML='<p class="note">Ни один вариант каталога не проходит по досягаемости или нагрузке. Уменьшите число позиций, высоту стопы или радиус расстановки.</p>';return;}
+ const line=x=>`${x.nR>1?'2 × ':''}${x.r.name}, по ${x.k} кор. за захват, ${x.st} станц${x.st===1?'ия':'ии'}${x.nR>1?' у каждого':''} → ${f0(x.D.bottleneck)} кор/ч, ограничивает ${x.D.bnName}; досягаемость ${f0(x.D.rReq)}/${f0(x.r.reach)} мм, нагрузка ${f0(x.D.util*100)} %, защита — ${x.D.safety==='fence'?'ограждение':'сканеры'}; индекс стоимости ${f1(x.cost)}`;
+ out.innerHTML=`<p><b>${OPT.ok?'Рекомендация':'Цель не достигнута — лучшее по производительности'}:</b> ${line(b)}.</p>${OPT.ok?'':`<p class="note">Целевые ${f0(CFG.opt.target)} кор/ч недостижимы при текущей подаче (${f0(b.D.capFeed)} кор/ч) или конвейере: переведите подачу на автомат, добавьте конвейер или увеличьте скорость.</p>`}
+ ${OPT.alts.length?`<p class="note">Альтернативы:</p><ul class="warnings">${OPT.alts.map(x=>`<li>${line(x)}</li>`).join('')}</ul>`:''}<div class="btns"><button class="b-apply" data-act="applyOpt">Применить предложение</button></div>`;},30);}
+$('bApply').onclick=()=>{buildSim();renderArch();showTab('sim');};
+$('bDefaults').onclick=()=>{CFG=deep(DEF);saveCfg();renderCfg();};
+// ======================= АРХИТЕКТУРА =======================
+function renderArch(){
+ const c=CFG,D=DD;const disc=c.fieldbus==='Дискретные сигналы',nR=c.robots,ex=c.exch;
+ $('archCards').innerHTML=[['Роботы',`${nR} × ${D.rob.name}`,`нагрузка ${f0(D.util*100)} %, досягаемость ${f0((1-D.reachMargin)*100)} %`],['Захват',`${GRIPPERS[c.grip.type].name}`,`${c.grip.pick} кор. за ход, ${f0(D.grip.Fth)}/${f0(D.grip.Fcap)} Н`],['Защита',D.safety==='fence'?'Ограждение + завесы':'Сканеры + снижение скорости',D.safety==='fence'?`S завесы ${f0(D.Slc)} мм`:`поле ${f0(D.Ssc)} мм`],['Сигналы ПЛК',`${D.io.DI} DI / ${D.io.DO} DO`,`${D.io.BUS} объектов по шине`],['Цепь безопасности',`${D.io.SI} двухкан. входов`,`${D.io.SO} безопасных выходов`],['Производительность',`${f0(D.bottleneck)} кор/ч`,`${D.cyclesPerPallet} циклов на паллету; ограничивает ${D.bnName}`]].map(x=>`<div class="card"><span>${x[0]}</span><b>${x[1]}</b><span>${x[2]}</span></div>`).join('');
+ const N={},E=[];const node=(id,x,y,w,t,sub)=>N[id]={x,y,w,t,sub};
+ node('HMI',40,40,150,'Панель оператора HMI','Ethernet');node('SW',300,40,180,'Коммутатор Ethernet',disc?'HMI, ПЛК':c.fieldbus);
+ for(let r=0;r<nR;r++)node('ROB'+r,560+r*180,40,165,`Контроллер робота ${r+1}`,'пульт обучения');
+ node('PLC',40,180,190,'ПЛК',`${D.io.DI} DI · ${D.io.DO} DO`);node('SAF',300,180,190,'Контроллер безопасности',`${D.io.SI} вх. · ${D.io.SO} вых.`);node('KM',560,180,150,'Контактор KM1','питание приводов');
+ if(ex.out==='amr')node('AMR',740,180,150,'Флот-менеджер AMR','Wi-Fi / Ethernet');
+ let x=30;c.conveyors.forEach((cv,i)=>{node('DR'+i,x,330,150,cv.type==='mdr'?`Шлюз мотор-роликов ${i+1}`:`ЧП конвейера ${i+1}`,cv.type==='mdr'?`${D.convs[i].zones} зон`:`${D.convs[i].Pstd} кВт, STO`);x+=165;});
+ if(ex.out==='conveyor'){node('DRP',x,330,150,'ЧП конвейеров паллет',`${D.stations.length} шт., STO`);x+=165;}
+ node('IO',Math.min(x,560),330,160,'Датчики, пульт, лампы','24 В DI/DO');node('SDEV',Math.min(x+175,735),330,160,D.safety==='fence'?'Стопы, завесы, замок':'Стопы, сканеры','2-канальные цепи');
+ const edge=(a,b,l,safe)=>E.push({a,b,l,safe});
+ edge('HMI','SW','Ethernet');edge('SW','PLC',disc?'Ethernet':c.fieldbus);for(let r=0;r<nR;r++){edge('SW','ROB'+r,disc?'Ethernet (сервис)':c.fieldbus);if(disc)edge('PLC','ROB'+r,'16 DI/DO');edge('SAF','ROB'+r,'Protective / E-stop',true);}
+ c.conveyors.forEach((cv,i)=>{if(cv.type==='mdr')edge('SW','DR'+i,disc?'Ethernet':c.fieldbus);else{edge(disc?'PLC':'SW','DR'+i,disc?'DI/DO':c.fieldbus);edge('SAF','DR'+i,'STO',true);}});
+ if(ex.out==='conveyor'){edge(disc?'PLC':'SW','DRP',disc?'DI/DO':c.fieldbus);edge('SAF','DRP','STO',true);}
+ if(ex.out==='amr')edge('SW','AMR','заявки, статус');
+ edge('PLC','IO','24 В');edge('SAF','SDEV','OSSD, НЗ контакты',true);edge('SAF','KM','катушка + ОС',true);edge('PLC','SAF',disc?'диагностика DI':'диагностика по шине');
+ let s='';for(const id in N){const n=N[id];s+=`<rect x="${n.x}" y="${n.y}" width="${n.w}" height="56" rx="5" fill="var(--panel)" stroke="${id==='SAF'||id==='SDEV'?'var(--red)':id.startsWith('ROB')?'var(--robot)':'var(--fence)'}" stroke-width="1.5"/><text x="${n.x+n.w/2}" y="${n.y+23}" text-anchor="middle" font-size="12" font-weight="500" fill="var(--ink)">${n.t}</text><text x="${n.x+n.w/2}" y="${n.y+41}" text-anchor="middle" font-size="11" fill="var(--muted)">${n.sub}</text>`;}
+ let lines='';E.forEach(e=>{const a=N[e.a],b=N[e.b];if(!a||!b)return;const ax=a.x+a.w/2,ay=a.y+(b.y>a.y?56:b.y<a.y?0:28),bx=b.x+b.w/2,by=b.y+(a.y>b.y?56:a.y<b.y?0:28);const mx=(ax+bx)/2,my=(ay+by)/2;
+  lines+=`<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${e.safe?'var(--red)':'var(--muted)'}" stroke-width="1.5" ${e.safe?'stroke-dasharray="5 4"':''}/><rect x="${mx-e.l.length*3.3-3}" y="${my-8}" width="${e.l.length*6.6+6}" height="15" rx="3" fill="var(--panel)" opacity=".92"/><text x="${mx}" y="${my+3.5}" text-anchor="middle" font-size="10.5" fill="${e.safe?'var(--red)':'var(--muted)'}">${e.l}</text>`;});
+ $('net').innerHTML=lines+s;
+ $('bom').innerHTML='<tr><th>Группа</th><th>Элемент</th><th>Кол-во</th><th>Назначение и подключение</th></tr>'+D.bom.map(b=>`<tr><td class="tag">${b.g}</td><td>${b.n}</td><td>${b.q}</td><td style="color:var(--muted)">${b.p}</td></tr>`).join('');
+ $('ioSummary').innerHTML=`<div class="cards"><div class="card"><span>Дискретные входы</span><b>${D.io.DI}</b><span>${D.io.diMod} модуля по 16 (резерв 20 %)</span></div><div class="card"><span>Дискретные выходы</span><b>${D.io.DO}</b><span>${D.io.doMod} модуля по 16</span></div><div class="card"><span>По сети</span><b>${D.io.BUS}</b><span>объектов обмена</span></div><div class="card"><span>Безопасность</span><b>${D.io.SI} / ${D.io.SO}</b><span>двухканальных входов / выходов</span></div></div>`;
+ $('sig').innerHTML='<tr><th>Тип</th><th>Тег</th><th>Сигнал</th><th>Источник</th><th>Подключение</th></tr>'+D.sig.map(x=>`<tr><td class="tag">${x.k}</td><td class="tag">${x.t}</td><td>${x.nm}</td><td style="color:var(--muted)">${x.src}</td><td style="color:var(--muted)">${x.how}</td></tr>`).join('');
+ const G=D.grip,vac=GRIPPERS[c.grip.type].vac;
+ $('archText').innerHTML=`<h3>Как всё соединяется — от ввода до робота</h3>
+<p><b>Силовая часть.</b> Ввод 3~400 В → вводной выключатель с блокировкой → УЗИП и ЭМС-фильтр → главный контактор KM1 → автоматы потребителей: ЧП конвейеров, контроллер${nR>1?'ы':''} робот${nR>1?'ов':'а'}, блок питания 24 В. KM1 управляется безопасным выходом контроллера безопасности, его зеркальный контакт возвращается на вход КБ. Шина 24 В разделена на группы с отдельными автоматами: ПЛК и HMI, датчики, выходы, цепь безопасности.</p>
+<p><b>Цепь безопасности живёт отдельно от ПЛК.</b> ${D.safety==='fence'?'Аварийные стопы, контакты двери, контроль замка, OSSD световых завес и датчики мьютинга':'Аварийные стопы, OSSD лазерных сканеров и сигнал поля снижения скорости'} заходят двухканально в конфигурируемый контроллер безопасности. Его выходы: STO каждого ЧП, Protective Stop и Emergency Stop ${nR>1?'каждого контроллера робота':'контроллера робота'}${D.safety==='cobot'?', Reduced Mode (коллаборативные лимиты скорости и силы), выбор набора полей сканеров':', питание замка двери, мьютинг завес проёмов'}, катушка KM1. ПЛК получает только диагностику: PL e требует категории 3/4 с двумя каналами и самодиагностикой.</p>
+<p><b>Проёмы обмена.</b> ${ex.out==='conveyor'?'Паллеты выезжают через тоннель с завесой в мьютинге на выезд: ПЛК даёт сигнал «выезд», КБ мутирует завесу по датчикам паллеты.':`Каждая станция обмена имеет свой проём с завесой S6, лампой «освобождено» и кнопкой «готово». Логика КБ: завеса ${D.safety==='fence'?'в мьютинге (байпас)':'сектор исключён из поля сканера'} только когда ПЛК подтвердил «станция освобождена» (паллета готова, робот не в секторе) — это безопасный сигнал, поэтому робот блокируется от захода в сектор аппаратно. ${ex.out==='amr'?'AMR запрашивает стыковку у флот-менеджера, ПЛК даёт разрешение AMR.OK только для освобождённой станции; сигналы «на позиции» / «убыл» закрывают цикл.':'Человек или погрузчик входят в проём, меняют паллету, нажимают «готово» — только после этого робот снова допускается к станции.'}`}${c.sheet.mode!=='none'?` Магазин прокладок загружается снаружи через свой проём с завесой S7 по той же схеме; во время загрузки ПЛК исключает магазин из заданий робота.`:''}</p>
+<p><b>Категории стопов.</b> Аварийный стоп — категория 0: STO и KM1 сразу. Нарушение ${D.safety==='fence'?'завесы':'защитного поля'} — категория 1: управляемое торможение робота за ${c.tStop} с, затем снятие силового питания. Это время входит в S = K·T + C: ${D.safety==='fence'?`для завесы S = ${f0(D.Slc)} мм`:`для сканера S = ${f0(D.Ssc)} мм от границы досягаемости, радиус поля снижения скорости ${f0(D.rSlow)} мм`}.</p>
+<p><b>Захват и пневматика.</b> ${vac?`${c.grip.pick} вакуумных зон${c.grip.pick>1?' — по одной на коробку, чтобы неполная группа не теряла вакуум на пустой зоне':''}: ${G.pump}, на каждой зоне вакуумный датчик PS с аналоговым выходом или порогом −${G.vac} кПа. Клапаны вакуума и сдува управляет робот со своих выходов (короткая реакция), ПЛК получает копию сигналов для диагностики. Пневмоподготовка с реле давления: при падении ниже ${c.grip.pressure} бар ячейка уходит в Held до потери груза, а не после.`:c.grip.type==='clamp'?`Два цилиндра Ø${G.cylD} мм на распределителе 5/2 с датчиками положения; при аварийном стопе давление в зажиме сохраняется (обратные клапаны), чтобы коробка не упала.`:'Цилиндры вилок и прижима с датчиками положения; при аварийном стопе давление сохраняется.'}${ex.in==='robot'?' Для паллет на захвате откидные крюки с датчиком положения: робот берёт пустую паллету из стопки за верхнюю доску.':''}</p>
+<p><b>ПЛК ↔ робот.</b> ${disc?'Дискретный обмен: 8 выходов ПЛК на входы робота (пуск программы, стоп, сброс, два бита номера программы, «группа готова», «паллета готова», разрешение) и 8 выходов робота на входы ПЛК.':`По ${c.fieldbus}: ПЛК пишет слово команд и номер программы (рецепт укладки, номер слоя и позиции), читает слово состояния, счётчики, код ошибки. Сигналы безопасности — отдельными двухканальными цепями.`} ПЛК ведёт последовательность ячейки (PackML), робот исполняет программу укладки и возвращает статусы${nR>1?'; два робота получают независимые задания от ПЛК и не знают друг о друге':''}.</p>
+<p><b>ПЛК ↔ ЧП.</b> ${disc?'Дискретно: пуск/скорость через реле, «готов/авария» — назад.':`По ${c.fieldbus}: слово управления, задание частоты, обратно — состояние, ток, аварии.`} STO — отдельными жилами от КБ. ${D.convs.some((x,i)=>c.conveyors[i].type==='mdr')?'Мотор-ролики: контроллеры зон реализуют ZPA сами, ПЛК через шлюз даёт разрешение на выпуск коробки в зону захвата.':''}${c.grip.pick>1?` Для группового захвата зона у упора накапливает ${c.grip.pick} коробок: ПЛК останавливает подачу в зону, когда датчик B2 подтвердил полную группу, и разрешает роботу захват.`:''}</p>
+<p><b>Автоподача.</b> ${c.conveyors.some(x=>x.feed!=='manual')?'Упаковочная машина связана с ПЛК двумя сигналами: «готов принять» (ПЛК → машина, снимается при Suspended/Held и заполнении накопителя) и «коробка отправлена» (машина → ПЛК, счёт входа). При ручной загрузке эти сигналы заменяет датчик B5.':'При ручной загрузке интерфейса с оборудованием выше по потоку нет; вход считается по датчику B5.'}</p>
+<h3>Порядок пусконаладки</h3><ul><li>Цепь безопасности без питания приводов: каждый стоп, дверь, ${D.safety==='fence'?'завеса с мьютингом и без, байпас проёмов только при «освобождено»':'оба поля сканеров и переключение наборов полей'} — протокол валидации по ISO 13849-2.</li><li>I/O-check по списку сигналов.</li><li>ЧП: направление, рампы, ток; STO из шкафа.</li><li>Захват: ${vac?'вакуум на реальной коробке, время набора, тест на потерю при обрыве шланга':'усилие и датчики положения'}; масса захвата и центр тяжести — в настройки робота.</li><li>Робот: точки для каждой схемы и слоя, снижение скорости у паллеты, обмен с ПЛК по каждому шагу GRAFCET.</li>${ex.out==='amr'?'<li>AMR: маршруты, точки стыковки, обмен заявками с ПЛК, поведение при потере связи.</li>':''}<li>Прогон с коробками: такт, накопление, защитная остановка в каждой точке цикла — коробка не должна падать при стопе категории 1.</li></ul>`;
+ $('algoText').innerHTML=algoText(c,D);}
+// ======================= СИМУЛЯЦИЯ =======================
+const STEPS=[['wait','Ожидание коробок / выбор задания'],['toPick','Движение к зоне захвата'],['grip','Захват: вакуум ВКЛ, контроль датчиков'],['toPlace','Перенос на паллету'],['place','Укладка, счётчик слоя'],['toMag','Движение к магазину прокладок'],['gripSheet','Захват прокладочного листа'],['toSheet','Перенос листа на паллету'],['placeSheet','Укладка листа'],['toStack','Движение к стопке паллет'],['gripPallet','Захват пустой паллеты крюками'],['toStation','Перенос паллеты на станцию'],['placePallet','Установка паллеты'],['home','Возврат в исходную']];
+let DD,GG,S;
+const TASKSTATE=(()=>{try{return JSON.parse(localStorage.getItem('pal-sim-tasks4')||'{}')||{};}catch(e){return{};}})();
+function newPal(present){return{present:present!==false,count:0,layer:0,parity:0,gi:0,placed:[],last:null,sheets:0,sheetLayers:[],complete:false,needSheet:false,released:false,out:0,phase:'idle',gap:0,waitT:0,agent:null};}
+function geometry(c,D){
+ const LY=D.LY,rDraw=Math.min(D.rSlow,3000);let xMin,xMax,yMin,yMax;const cx0=Math.min(...LY.convs.map(x=>x.x0));
+ if(D.safety==='fence'){xMin=Math.min(D.F.x0,cx0)-250;xMax=D.F.x1+200;yMin=D.F.y0-200;yMax=D.F.y1+200;}
+ else{xMin=Math.min(cx0-300,-rDraw);xMax=Math.max(D.F.x1-400,rDraw);yMin=Math.min(D.F.y0-400,-rDraw);yMax=Math.max(D.F.y1-400,LY.robots[LY.robots.length-1].base.y+rDraw);}
+ if(c.exch.out!=='conveyor'||c.sheet.mode!=='none'){LY.robots.forEach(r=>r.slots.forEach(s=>{if(s.kind==='ps')return;xMin=Math.min(xMin,s.park.x-700);xMax=Math.max(xMax,s.park.x+700);yMin=Math.min(yMin,s.park.y-700);yMax=Math.max(yMax,s.park.y+700);}));}
+ const sc=Math.min(860/(xMax-xMin),520/(yMax-yMin));const ox=20+(860-(xMax-xMin)*sc)/2-xMin*sc,oy=40+(520-(yMax-yMin)*sc)/2-yMin*sc;
+ return{sc,ox,oy,P:(x,y)=>[ox+x*sc,oy+y*sc],rDraw,xMin,xMax,yMin,yMax};}
+function buildSim(){
+ normalize(CFG);DD=derive(CFG);GG=geometry(CFG,DD);const c=CFG;const prevOpt=S?S.flags.optApplied:false;
+ S={packml:'Stopped',why:'Требуется сброс после включения питания',estop:false,door:'closed',lock:true,accessReq:false,safetyStop:false,autoResume:false,resumeTo:'Idle',
+  lc:{broken:false,fault:false,timer:0,muted:false},person:'away',speedFactor:1,override:c.speedPct/100,timeScale:+($('tScale').value||1),
+  conv:c.conveyors.map((cv,i)=>({robot:i%c.robots,boxes:[],vfd:{target:0,actual:0,accel:2,sto:true,run:false,fault:false},stuck:false,nom:cv.speed,feedT:0,fed:0,type:cv.type})),
+  robots:DD.LY.robots.map(r=>({i:r.i,base:r.base,home:r.home,x:r.home.x,y:r.home.y,z:c.baseH+600,zt:c.baseH+600,step:'wait',carry:0,carryKind:null,carryBi:0,job:null,power:false,dwell:0})),
+  st:DD.stations.map(s=>Object.assign(newPal(c.exch.in!=='robot'),{id:s.id,robot:s.robot,slot:s,bi:s.bi,pat:s.pat})),
+  mags:DD.mags.map(m=>({id:m.id,robot:m.robot,slot:m,sheets:c.sheet.cap,loading:false,waitT:0,agent:null})),
+  stacks:DD.stacks.map(p=>({id:p.id,robot:p.robot,slot:p,n:c.exch.stack})),
+  agents:[],stats:{placed:0,run:0,pallets:0,dropped:0,exch:0,refills:0},nextId:1,timer:0,tasks:TASKSTATE,
+  flags:{lcTripped:false,estopTripped:false,palletDone:false,palletRemoved:false,vfdTripped:false,typesPlaced:new Set(),optApplied:prevOpt,agentSeen:new Set()}};
+ if(c.sheet.mode==='bottom')S.st.forEach(s=>{if(s.present)s.needSheet=S.mags.length>0;});
+ $('ovr').value=c.speedPct;$('ovrV').textContent=c.speedPct+' %';
+ $('log').innerHTML='';buildStatic();buildButtons();buildIO();
+ $('steps').innerHTML=STEPS.map((st,i)=>`<li id="st-${st[0]}"><span>${i+1}</span>${st[1]}</li>`).join('');
+ log(`Конфигурация применена: ${c.robots} × ${DD.rob.name}, захват ${GRIPPERS[c.grip.type].name.toLowerCase()} по ${c.grip.pick}, ${c.conveyors.length} конв., ${DD.stations.length} станц., обмен — ${EXCH_OUT[c.exch.out].toLowerCase()}, защита — ${DD.safety==='fence'?'ограждение и завесы':'сканеры'}. ПЛК в состоянии Stopped`);
+ if(DD.reachStatus==='bad'){S.why='Робот не достаёт: '+DD.rWhere+' — исправьте конфигурацию';log('Пуск заблокирован: точки укладки вне досягаемости','alarm');}
+ if(!S.tasks.t7&&DD.rob.cls==='cobot'&&Math.max(...c.boxes.map(b=>b.m))>=15&&DD.payStatus==='ok'&&DD.reachStatus==='ok')done('t7');
+ if(!S.tasks.t10&&c.conveyors.some(x=>x.type==='mdr'))done('t10');
+ if(!S.tasks.t11&&c.grip.pick>=2&&DD.grip.status==='ok'&&DD.payStatus!=='bad'&&DD.reachStatus!=='bad')done('t11');
+ if(!S.tasks.t12&&Object.values(DD.pats).some(p=>p.interlock))done('t12');
+ if(!S.tasks.t13&&S.flags.optApplied)done('t13');
+ if(!S.tasks.t16&&c.boxes.filter(b=>b.rate>0).length>=2)done('t16');
+ if(typeof build3D==='function')build3D();render();}
+function rotG(slot,inner){const [px,py]=GG.P(slot.cx,slot.cy);return`<g transform="rotate(${slot.ang} ${px.toFixed(1)} ${py.toFixed(1)})">${inner}</g>`;}
+function buildStatic(){
+ const c=CFG,D=DD,G=GG,P=G.P,sc=G.sc,pal=D.pal,LY=D.LY,ex=c.exch;let s='';
+ if(D.safety==='fence'){const F=D.F,[x0,y0]=P(F.x0,F.y0),[x1,y1]=P(F.x1,F.y1);
+  s+=`<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" fill="none" stroke="var(--fence)" stroke-width="3" stroke-dasharray="12 5"/><text x="${x0+8}" y="${y0-6}" font-size="11" fill="var(--muted)">Ограждение h=2000 мм, ISO 14120 · периметр ${f0(D.fencePerim/1000)} м</text>`;
+  LY.convs.forEach((cv,i)=>{const [gx,gy0]=P(F.x0,cv.y-cv.w/2-120),[,gy1]=P(F.x0,cv.y+cv.w/2+120);s+=`<rect x="${gx-5}" y="${gy0}" width="10" height="${gy1-gy0}" fill="var(--bg)"/><line id="lc${i}" x1="${gx}" y1="${gy0}" x2="${gx}" y2="${gy1}" stroke="var(--red)" stroke-width="3"/>`;
+   const [m1x,m1y]=P(F.x0-250,cv.y-cv.w/2-40),[m2x]=P(F.x0+250,cv.y);s+=`<circle cx="${m1x}" cy="${m1y}" r="3.5" fill="var(--muted)"/><circle cx="${m2x}" cy="${m1y}" r="3.5" fill="var(--muted)"/><text x="${gx-14}" y="${gy1+13}" font-size="10" fill="var(--muted)">S4.${i+1} мьютинг M${i+1}</text>`;});
+  const [dx0,dy]=P(F.x1-1100,F.y1),[dx1]=P(F.x1-300,F.y1);s+=`<rect x="${dx0}" y="${dy-6}" width="${dx1-dx0}" height="12" fill="var(--bg)"/><line id="doorLine" data-x2="${dx1}" x1="${dx0}" y1="${dy}" x2="${dx1}" y2="${dy}" stroke="var(--fence)" stroke-width="5"/><circle id="lockDot" cx="${dx1+9}" cy="${dy}" r="6" fill="var(--green)"/><text x="${dx0}" y="${dy-9}" font-size="10" fill="var(--muted)">дверь S2/S3, замок Q1</text>`;}
+ else LY.robots.forEach(r=>{const [bx,by]=P(r.base.x,r.base.y);s+=`<circle cx="${bx}" cy="${by}" r="${D.rSlow*sc}" fill="var(--yellow)" fill-opacity=".07" stroke="var(--yellow)" stroke-dasharray="6 5"/><circle cx="${bx}" cy="${by}" r="${D.rStop*sc}" fill="var(--red)" fill-opacity=".05" stroke="var(--red)" stroke-dasharray="6 5"/>`;if(r.i===0)s+=`<text x="${bx+D.rStop*sc*0.7}" y="${by-D.rStop*sc*0.72}" font-size="10" fill="var(--red)">защитное поле</text><text x="${bx+Math.min(D.rSlow,G.rDraw)*sc*0.6}" y="${by-Math.min(D.rSlow,G.rDraw)*sc*0.8}" font-size="10" fill="var(--warnfg)">поле снижения скорости S=${f0(D.Ssc)} мм</text>`;});
+ // проёмы обмена (завеса/сектор) у станций, магазинов, стопок
+ LY.robots.forEach(r=>r.slots.forEach(sl=>{const isConvOut=sl.kind==='st'&&ex.out==='conveyor';const d=pal.W/2+250,L2=pal.L/2+100;const [ax,ay]=P(sl.cx+sl.cos*d-sl.sin*(-L2),sl.cy+sl.sin*d+sl.cos*(-L2)),[bx,by]=P(sl.cx+sl.cos*d-sl.sin*L2,sl.cy+sl.sin*d+sl.cos*L2);
+  s+=`<line id="gate-${sl.id}" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="var(--red)" stroke-width="3"/><text x="${(ax+bx)/2+sl.cos*10}" y="${(ay+by)/2+sl.sin*10+4}" font-size="10" text-anchor="middle" fill="var(--muted)">${D.safety==='fence'?(sl.kind==='st'?'S6'+sl.id:sl.kind==='mg'?'S7.'+sl.id:'S8'):'сектор '+sl.id}</text>`;
+  if(!isConvOut&&sl.kind!=='ps'){const [px,py]=P(sl.park.x,sl.park.y);s+=`<rect x="${px-14}" y="${py-14}" width="28" height="28" rx="4" fill="none" stroke="var(--line)" stroke-dasharray="3 3"/><circle id="lamp-${sl.id}" cx="${px+sl.cos*22}" cy="${py+sl.sin*22}" r="4" fill="var(--off)"/>`;}}));
+ LY.convs.forEach((cv,i)=>{const [x0,y0]=P(cv.x0,cv.y-cv.w/2),[x1,y1]=P(cv.x1,cv.y+cv.w/2);s+=`<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" rx="3" fill="var(--dim)" stroke="var(--line)"/>`;
+  if(75*sc>3.5)for(let x=cv.x0+75;x<cv.x1;x+=75){const [rx]=P(x,0);s+=`<line x1="${rx}" y1="${y0+2}" x2="${rx}" y2="${y1-2}" stroke="var(--line)"/>`;}
+  const [exx]=P(cv.x1-30,0);s+=`<rect x="${exx}" y="${y0-2}" width="4" height="${y1-y0+4}" fill="var(--ink)"/><text x="${x0}" y="${y0-5}" font-size="10" fill="var(--muted)">конвейер ${i+1}: ${cv.b.name} ${cv.b.m} кг · ${c.conveyors[i].feed==='manual'?'ручная подача':'автоподача'} → робот ${cv.robot+1}</text>`;
+  const [ox,oy]=P(cv.x0-250,cv.y);if(c.conveyors[i].feed==='manual')s+=`<circle cx="${ox}" cy="${oy-8}" r="7" fill="none" stroke="var(--muted)" stroke-width="2"/><line x1="${ox}" y1="${oy-1}" x2="${ox}" y2="${oy+14}" stroke="var(--muted)" stroke-width="2"/>`;else s+=`<rect x="${ox-14}" y="${oy-12}" width="24" height="24" rx="3" fill="none" stroke="var(--muted)" stroke-width="2"/><text x="${ox-2}" y="${oy+4}" font-size="9" text-anchor="middle" fill="var(--muted)">УМ</text>`;});
+ LY.robots.forEach(r=>r.slots.forEach(sl=>{const [px,py]=P(sl.cx,sl.cy),w=pal.W*sc,h=pal.L*sc;
+  if(sl.kind==='st')s+=rotG(sl,`<rect x="${px-w/2}" y="${py-h/2}" width="${w}" height="${h}" fill="none" stroke="var(--line)" stroke-dasharray="4 4"/>`)+`<text x="${px}" y="${py+4}" font-size="11" text-anchor="middle" fill="var(--muted)" opacity=".8">${sl.id}</text>`;
+  else if(sl.kind==='mg')s+=rotG(sl,`<rect x="${px-w/2}" y="${py-h/2}" width="${w}" height="${h}" rx="3" fill="none" stroke="var(--sheet)" stroke-width="2"/>`)+`<text id="sheets-${sl.id}" x="${px}" y="${py+5}" font-size="14" text-anchor="middle" fill="var(--ink)" font-weight="600">${c.sheet.cap}</text><text x="${px}" y="${py+h/2+13}" font-size="10" text-anchor="middle" fill="var(--muted)">магазин ${sl.id}</text>`;
+  else s+=rotG(sl,`<rect x="${px-w/2}" y="${py-h/2}" width="${w}" height="${h}" rx="2" fill="var(--dim)" stroke="var(--fence)" stroke-width="2"/><rect x="${px-w/2+4}" y="${py-h/2+4}" width="${w-8}" height="${h-8}" fill="none" stroke="var(--fence)"/>`)+`<text id="stack-${sl.id}" x="${px}" y="${py+5}" font-size="14" text-anchor="middle" fill="var(--ink)" font-weight="600">${c.exch.stack}</text><text x="${px}" y="${py+h/2+13}" font-size="10" text-anchor="middle" fill="var(--muted)">стопка паллет</text>`;}));
+ LY.robots.forEach(r=>{const [bx,by]=P(r.base.x,r.base.y);s+=`<circle cx="${bx}" cy="${by}" r="${D.rob.reach*sc}" fill="none" stroke="var(--robot)" stroke-dasharray="4 5" opacity=".7"/><circle cx="${bx}" cy="${by}" r="${Math.max(9,180*sc)}" fill="var(--dim)" stroke="var(--ink)" stroke-width="2"/><text x="${bx-16}" y="${by+Math.max(9,180*sc)+13}" font-size="10" fill="var(--muted)">R${r.i+1} · ${D.rob.reach} мм</text>`;});
+ $('static').innerHTML=s;
+ $('legend').innerHTML=`Оранжевый пунктир — досягаемость; ${D.safety==='fence'?'красные линии — световые завесы (серые — в мьютинге), серый пунктир — ограждение':'жёлтое поле — снижение скорости, красное — защитная остановка, серая линия — исключённый сектор'}; пунктирные квадраты — площадки ожидания тележек; ${[...new Set(D.stations.map(x=>x.bi))].map(bi=>`<i style="background:${boxColor(bi)}"></i>${boxOf(c,bi).name}`).join(' ')} <i style="background:var(--sheet)"></i>прокладка <i style="background:var(--robot)"></i>манипулятор <i style="background:var(--blue)"></i>тележка/человек`;}
+function buildButtons(){
+ const D=DD,c=CFG,ex=c.exch;
+ $('evtBtns').innerHTML=c.conveyors.map((cv,i)=>cv.feed==='manual'?`<button data-b="box" data-i="${i}">Положить коробку на конвейер ${i+1}</button>`:`<span class="note" style="margin:0">Конвейер ${i+1}: автоподача ${cv.feed==='interval'?'каждые '+cv.interval+' с':cv.rate+' кор/мин'}</span>`).join('');
+ $('safBtns').innerHTML=D.safety==='fence'?c.conveyors.map((cv,i)=>`<button data-b="hand" data-i="${i}">Просунуть руку в завесу ${i+1}</button>`).join('')+`<button data-b="access">Запросить доступ в ячейку</button><button data-b="door">Открыть дверь</button>`
+  :`<button data-b="pslow">Подойти: поле снижения скорости</button><button data-b="pstop">Войти в защитное поле</button><button data-b="paway">Отойти от ячейки</button>`;
+ let p='';if(ex.out==='conveyor')p+=`<span class="note" style="margin:0">Обмен паллет автоматический: конвейер паллет + диспенсер.</span>`;
+ else if(ex.auto)p+=`<span class="note" style="margin:0">Автообмен: ${AGENT[ex.out==='jack'?'jack':ex.out].name} приезжает через ${ex.reaction} с после готовности паллеты.</span>`+S.st.map(s=>`<button data-b="pal" data-i="${s.id}">Вызвать сейчас: ${s.id}</button>`).join('');
+ else p+=S.st.map(s=>`<button data-b="pal" data-i="${s.id}">Вывезти паллету ${s.id}</button>`).join('');
+ if(S.mags.length)p+=(ex.auto?'':'')+S.mags.map(m=>`<button data-b="refill" data-i="${m.id}">Пополнить прокладки ${m.id}</button>`).join('');
+ if(S.stacks.length)p+=`<button data-b="stack">Пополнить стопку паллет</button>`;
+ $('palBtns').innerHTML=p;
+ $('faultBtns').innerHTML=`<button data-b="vac">Отказ: ${GRIPPERS[c.grip.type].vac?'потеря вакуума':'раскрытие захвата'} (робот 1)</button><button data-b="vfd">Отказ: авария ЧП 1</button><button data-b="stuck">Отказ: залип датчик B11</button>`;}
+let LIVE_DI=[],LIVE_DO=[];
+function buildIO(){
+ const c=CFG,D=DD;LIVE_DI=[['S1','Аварийный стоп (НЗ)',()=>!S.estop]];
+ if(D.safety==='fence')LIVE_DI.push(['S2','Дверь закрыта',()=>S.door==='closed'],['S3','Замок заблокирован',()=>S.lock],['S4','Световые завесы OSSD',()=>!S.lc.broken],['M','Мьютинг активен',()=>S.lc.muted]);
+ else LIVE_DI.push(['LS','Сканер: защитное поле свободно',()=>S.person!=='stop'],['LS.W','Поле снижения свободно',()=>S.person==='away']);
+ c.conveyors.forEach((cv,i)=>{LIVE_DI.push([`B${i+1}5`,`Коробка на входе ${i+1}`,()=>S.conv[i].boxes.some(b=>b.p<.12)],[`B${i+1}1`,`Коробка у упора ${i+1}`,()=>boxesAtEnd(i)>0]);if(c.grip.pick>1)LIVE_DI.push([`B${i+1}2`,`Группа из ${c.grip.pick} собрана ${i+1}`,()=>boxesAtEnd(i)>=c.grip.pick]);});
+ S.st.forEach(s=>{LIVE_DI.push([`B${s.id}`,`Паллета на станции ${s.id}`,()=>s.present&&s.phase!=='out']);if(c.exch.out!=='conveyor')LIVE_DI.push([`SB${s.id}`,`Кнопка «готово» ${s.id} (проём занят)`,()=>!!s.agent]);});
+ S.mags.forEach(m=>LIVE_DI.push([`B4.${m.id}`,`Прокладки в ${m.id}`,()=>m.sheets>0],[`B4L.${m.id}`,`Мало прокладок ${m.id}`,()=>m.sheets<=c.sheet.low]));
+ S.stacks.forEach(p=>LIVE_DI.push([`B5.${p.id}`,`Стопка паллет: есть`,()=>p.n>0]));
+ LIVE_DI.push(['PS1',GRIPPERS[c.grip.type].vac?'Вакуум достигнут (робот 1)':'Захват закрыт (робот 1)',()=>S.robots[0].carryKind!==null],['PA','Давление воздуха в норме',()=>true],['R1','Робот 1 в исходной',()=>near(S.robots[0],S.robots[0].home)]);
+ LIVE_DO=[];c.conveyors.forEach((cv,i)=>{LIVE_DO.push([`K${i+1}`,cv.type==='mdr'?`Мотор-ролики ${i+1}: разрешение`:`Конвейер ${i+1} RUN → ЧП`,()=>S.conv[i].vfd.run]);if(cv.type!=='mdr')LIVE_DO.push([`STO${i+1}`,`STO ЧП ${i+1}`,()=>S.conv[i].vfd.sto,'alarm']);if(cv.feed!=='manual')LIVE_DO.push([`UP${i+1}`,`Разрешение подачи ${i+1}`,()=>['Execute','Suspended','Starting'].includes(S.packml)&&!S.conv[i].boxes.some(b=>b.p<.12)]);});
+ S.st.forEach(s=>{if(c.exch.out!=='conveyor')LIVE_DO.push([`H${s.id}`,`Лампа «освобождено» ${s.id}`,()=>released(s),'warn']);});
+ S.mags.forEach(m=>LIVE_DO.push([`H4.${m.id}`,`Лампа «магазин ${m.id} освобождён»`,()=>m.loading,'warn']));
+ if(D.safety==='fence')LIVE_DO.push(['Q1','Замок двери (питание)',()=>S.lock]);else LIVE_DO.push(['R.RS','Робот: сниженная скорость',()=>S.speedFactor<1,'warn']);
+ LIVE_DO.push(['EN','Разрешение движения роботов',()=>S.robots[0].power],['Y1',GRIPPERS[c.grip.type].vac?'Вакуум ВКЛ (робот 1)':'Захват закрыть (робот 1)',()=>S.robots[0].carryKind!==null],['H1','Лампа красная',()=>lamp().r,'alarm'],['H2','Лампа жёлтая',()=>lamp().y,'warn'],['H3','Лампа зелёная',()=>lamp().g]);
+ $('di').innerHTML=LIVE_DI.map(d=>`<tr><td class="tag">${d[0]}</td><td><span class="dot" id="di-${d[0]}"></span>${d[1]}</td></tr>`).join('');
+ $('do').innerHTML=LIVE_DO.map(d=>`<tr><td class="tag">${d[0]}</td><td><span class="dot" id="do-${d[0]}"></span>${d[1]}</td></tr>`).join('');
+ $('drives').innerHTML=c.conveyors.map((cv,i)=>cv.type==='mdr'?`<div class="vfd"><div class="ttl">Конвейер ${i+1}: мотор-ролики 24 В, ${DD.convs[i].zones} зон (ZPA)</div><div>Состояние <div class="v" id="vS${i}">Готов</div></div><div>Разрешение <div class="v" id="vR${i}">нет</div></div><div>Скорость <div class="v">${cv.speed} м/мин</div></div><div>Питание <div class="v">24 В</div></div><div class="zones" id="zn${i}">${'<i></i>'.repeat(DD.convs[i].zones)}</div></div>`
+  :`<div class="vfd"><div class="ttl">ЧП ${i+1}: ${DD.convs[i].Pstd} кВт, ${CONV_TYPES[cv.type].name.split(' (')[0]}</div><div>Задание <div class="v" id="vT${i}">0,0 Гц</div></div><div>Выход <div class="v" id="vA${i}">0,0 Гц</div></div><div>Состояние <div class="v" id="vS${i}">Готов</div></div><div>STO <div class="v" id="vSTO${i}">активно</div></div><div class="bar"><i id="vBar${i}"></i></div><label>Рампа <input type="range" data-acc="${i}" min="0.5" max="5" step="0.5" value="2"> <span id="vAccV${i}">2,0 с</span></label></div>`).join('');}
+function near(a,b){return Math.hypot(a.x-b.x,a.y-b.y)<3;}
+function gapOf(i){const g=DD.LY.convs[i];return(g.b.l+120)/(g.len-g.b.l);}
+function boxesAtEnd(i){const cv=S.conv[i];if(cv.stuck)return Math.max(1,CFG.grip.pick);const gap=gapOf(i);let n=0;for(let j=0;j<cv.boxes.length;j++){if(cv.boxes[j].p>=1-j*gap-0.01)n++;else break;}return n;}
+function lamp(){const s=S.packml;return{r:['Aborted','Aborting','Held','Holding'].includes(s)||S.safetyStop,y:['Idle','Stopped','Suspended','Resetting','Stopping','Starting'].includes(s)||S.speedFactor<1,g:s==='Execute'};}
+function log(m,k){const li=document.createElement('li');if(k)li.className=k;const t=new Date();li.innerHTML=`<time>${t.toTimeString().slice(0,8)}</time>${m}`;const el=$('log');el.prepend(li);while(el.children.length>60)el.lastChild.remove();}
+function setState(s,why){if(S.packml!==s)log(`Состояние: ${S.packml} → <b>${s}</b>${why?' — '+why:''}`);S.packml=s;S.why=why||'';}
+function safeInputsOK(){return !S.estop&&S.door==='closed'&&S.lock&&!S.lc.broken&&S.person!=='stop';}
+function stopDrives(hard){S.conv.forEach(cv=>{cv.vfd.target=0;cv.vfd.run=false;if(hard){cv.vfd.actual=0;cv.vfd.sto=true;}});}
+function allPower(v){S.robots.forEach(r=>r.power=v);}
+function abort(reason){stopDrives(true);allPower(false);S.safetyStop=true;setState('Aborted',reason);log('Стоп категории 0: STO на всех ЧП, контактор KM1 отключён','alarm');}
+function protectiveStop(reason,auto){if(['Aborted','Held','Holding'].includes(S.packml))return;S.resumeTo=['Execute','Starting','Suspended'].includes(S.packml)?'Execute':'Idle';stopDrives(false);allPower(false);S.safetyStop=true;S.autoResume=!!auto;setState('Held',reason);log('Защитная остановка категории 1: управляемое торможение, затем STO','alarm');}
+function hold(reason){if(['Aborted','Held','Holding'].includes(S.packml))return;stopDrives(false);allPower(false);setState('Held',reason);log('Held: внутренняя причина (отказ оборудования), материал есть — это не Suspended','alarm');}
+function suspend(reason){if(S.packml==='Execute')setState('Suspended',reason);}
+function runDrives(){S.conv.forEach(cv=>{if(!cv.vfd.fault){cv.vfd.sto=false;cv.vfd.run=true;cv.vfd.target=cv.type==='mdr'?50:35;}});}
+function moveTo(r,t,dt,f){const d=Math.hypot(t.x-r.x,t.y-r.y),v=DD.rob.v*1000*S.override*S.speedFactor*(f||1)*dt;if(d<=v){r.x=t.x;r.y=t.y;return true;}r.x+=(t.x-r.x)/d*v;r.y+=(t.y-r.y)/d*v;return false;}
+function robotBusyAt(slotId){return S.robots.some(r=>r.power&&r.job&&((r.job.st&&r.job.st.id===slotId)||(r.job.mag&&r.job.mag.id===slotId))&&!['wait','home'].includes(r.step));}
+function released(s){return (s.complete||!s.present)&&!robotBusyAt(s.id);}
+function avail(s){return s.present&&!s.complete&&s.phase==='idle'&&!s.agent;}
+function curCells(s){return s.parity?s.pat.cellsB:s.pat.cells;}
+function curGroups(s){return s.parity?s.pat.groupsB:s.pat.groupsA;}
+function groupWorld(s,g){const cells=curCells(s);let x=0,y=0;g.forEach(i=>{const w=DD.LY.cw(s.slot,cells[i]);x+=w.x;y+=w.y;});return{x:x/g.length,y:y/g.length};}
+function pickWorld(ci,g){const cv=DD.LY.convs[ci];return{x:-CFG.pickDist-(g-1)*(cv.b.l+120)/2,y:cv.y};}
+function magsOf(r){return S.mags.filter(m=>m.robot===r&&!m.loading);}
+function findJob(ri){
+ const c=CFG,convs=DD.LY.robots[ri].convs,sts=S.st.filter(s=>s.robot===ri),mags=magsOf(ri),ps=S.stacks.find(p=>p.robot===ri);
+ if(c.exch.in==='robot'&&ps&&ps.n>0){const s=sts.find(s=>!s.present&&!s.agent);if(s)return{kind:'pallet',st:s,ps};}
+ for(const ci of convs){const have=boxesAtEnd(ci);if(!have)continue;for(const s of sts.filter(s=>s.slot.conv===ci)){if(!avail(s))continue;if(s.needSheet){const m=mags.find(m=>m.sheets>0);if(m)return{kind:'sheet',st:s,mag:m};continue;}const g=curGroups(s)[s.gi];if(have>=g.length)return{kind:'box',conv:ci,st:s,g:g.length,group:g};}}
+ for(const s of sts)if(avail(s)&&s.needSheet){const m=mags.find(m=>m.sheets>0);if(m)return{kind:'sheet',st:s,mag:m};}
+ return null;}
+function noPallet(){return S.st.every(s=>!avail(s))&&!(CFG.exch.in==='robot'&&S.stacks.some(p=>p.n>0)&&S.st.some(s=>!s.present&&!s.agent));}
+function noSheet(){return S.mags.length>0&&S.st.some(s=>avail(s)&&s.needSheet&&!magsOf(s.robot).some(m=>m.sheets>0));}
+function zTravel(r){const c=CFG,pal=DD.pal;let z=c.convH+400;S.st.filter(s=>s.robot===r.i).forEach(s=>{z=Math.max(z,pal.h+s.pat.layers*boxOf(c,s.bi).h+300);});return z;}
+function robotTick(r,dt){
+ r.z+=clamp(r.zt-r.z,-1,1)*Math.min(Math.abs(r.zt-r.z),900*S.override*S.speedFactor*dt);
+ if(!r.power)return;
+ const c=CFG,pal=DD.pal;
+ if(S.packml==='Resetting'){r.zt=zTravel(r);if(moveTo(r,r.home,dt)){r.step=r.carryKind==='box'?'toPlace':r.carryKind==='sheet'?'toSheet':r.carryKind==='pallet'?'toStation':'wait';if(S.robots.every(x=>near(x,x.home)||x.step!=='home'&&x.step!=='wait'))setState('Idle','Готов к пуску');}return;}
+ if(S.packml==='Stopping'&&r.carryKind===null&&['wait','toPick','home','toMag','toStack'].includes(r.step)){r.step='home';r.zt=zTravel(r);if(moveTo(r,r.home,dt)&&S.conv.every(cv=>cv.vfd.actual===0)&&S.robots.every(x=>x===r||!x.power||near(x,x.home)))finishStop();return;}
+ if(!['Execute','Stopping','Suspended'].includes(S.packml))return;
+ if(S.packml==='Suspended'){if(!noPallet()&&!noSheet())setState('Execute','Условие возобновления выполнено');else return;}
+ const s=r.job?r.job.st:null;const b=s?boxOf(c,s.bi):DD.heaviest;
+ switch(r.step){
+  case 'wait':{r.zt=zTravel(r);if(S.packml==='Stopping')break;const j=findJob(r.i);if(!j){if(noPallet())suspend(c.exch.in==='robot'&&S.stacks.every(p=>p.n===0)?'Стопка паллет пуста — пополните (B5=0)':'Нет свободной паллеты — ожидание обмена');else if(noSheet())suspend('Магазин прокладок пуст или загружается — ожидание (B4=0)');break;}r.job=j;r.step=j.kind==='sheet'?'toMag':j.kind==='pallet'?'toStack':'toPick';break;}
+  case 'toPick':r.zt=zTravel(r);if(moveTo(r,pickWorld(r.job.conv,r.job.g),dt)){r.step='grip';r.dwell=DD.grip.tGrip;r.zt=c.convH+DD.LY.convs[r.job.conv].b.h;}break;
+  case 'grip':r.dwell-=dt;if(r.dwell<=0){const cv=S.conv[r.job.conv],have=cv.boxes.filter(x=>x.p>=1-(r.job.g-1)*gapOf(r.job.conv)-0.01).length;
+   if(have<r.job.g){hold(`PS1 = 0: захват не подтверждён — коробок нет, хотя B${r.job.conv+1}1 = 1 (залип датчик)`);break;}
+   if(DD.util>1){hold(`Ошибка робота ${r.i+1}: перегрузка — ${f1(DD.mReq)} кг > ${DD.rob.payload} кг`);break;}
+   if(DD.grip.status==='bad'){hold(`Потеря груза при подъёме: сила захвата ${f0(DD.grip.Fcap)} Н < требуемых ${f0(DD.grip.Fth)} Н`);S.stats.dropped+=r.job.g;cv.boxes.splice(0,r.job.g);break;}
+   cv.boxes.sort((a,x)=>x.p-a.p);cv.boxes.splice(0,r.job.g);r.carry=r.job.g;r.carryKind='box';r.carryBi=DD.LY.convs[r.job.conv].bi;r.step='toPlace';r.zt=zTravel(r);}break;
+  case 'toPlace':if(s.agent||!s.present){r.step='wait';r.carryKind=null;r.carry=0;break;}if(moveTo(r,groupWorld(s,r.job.group),dt)){r.step='place';r.dwell=DD.grip.tRel+0.3;r.zt=pal.h+s.layer*b.h+b.h+s.sheetLayers.length*4;}break;
+  case 'place':r.dwell-=dt;if(r.dwell<=0){r.carryKind=null;r.carry=0;s.count+=r.job.g;S.stats.placed+=r.job.g;S.flags.typesPlaced.add(s.bi);r.job.group.forEach(i=>s.placed.push(i));s.gi++;r.zt=zTravel(r);
+   if(s.gi>=curGroups(s).length){s.layer++;s.last={cells:curCells(s),parity:s.parity};s.placed=[];s.gi=0;S.tasks.t1||done('t1');
+    if(s.layer>=s.pat.layers){s.complete=true;S.flags.palletDone=true;S.stats.pallets++;log(`Паллета ${s.id} готова: ${s.count} коробок, ${s.sheets} прокладок, ${f0(s.pat.mass)} кг${c.exch.out!=='conveyor'?` — лампа H${s.id} «освобождено»`:''}`);if(c.exch.out==='conveyor'){s.phase='out';log(`Станция ${s.id}: конвейер паллет ВКЛ, завеса S6${s.id} в мьютинге на выезд`);}}
+    else{s.parity=s.pat.interlock?s.layer%2:0;if(S.mags.length&&sheetAfterLayer(c.sheet,s.layer,s.pat.layers))s.needSheet=true;}}
+   r.step='home';}break;
+  case 'toMag':r.zt=zTravel(r);if(r.job.mag.loading){r.step='wait';break;}if(moveTo(r,{x:r.job.mag.slot.cx,y:r.job.mag.slot.cy},dt)){r.step='gripSheet';r.dwell=c.sheet.tGrip;r.zt=pal.h+r.job.mag.sheets*4;}break;
+  case 'gripSheet':r.dwell-=dt;if(r.dwell<=0){if(r.job.mag.sheets>0){r.job.mag.sheets--;r.carryKind='sheet';r.step='toSheet';r.zt=zTravel(r);}else r.step='wait';}break;
+  case 'toSheet':if(s.agent||!s.present){r.step='wait';r.carryKind=null;break;}if(moveTo(r,{x:s.slot.cx,y:s.slot.cy},dt,c.sheet.speedPct/100)){r.step='placeSheet';r.dwell=DD.grip.tRel+0.3;r.zt=pal.h+s.layer*b.h+s.sheetLayers.length*4;}break;
+  case 'placeSheet':r.dwell-=dt;if(r.dwell<=0){r.carryKind=null;s.sheets++;s.sheetLayers.push(s.layer);s.needSheet=false;S.tasks.t2||done('t2');r.step='home';r.zt=zTravel(r);}break;
+  case 'toStack':r.zt=zTravel(r);if(moveTo(r,{x:r.job.ps.slot.cx,y:r.job.ps.slot.cy},dt)){r.step='gripPallet';r.dwell=2;r.zt=pal.h*r.job.ps.n;}break;
+  case 'gripPallet':r.dwell-=dt;if(r.dwell<=0){if(r.job.ps.n>0){r.job.ps.n--;r.carryKind='pallet';r.step='toStation';r.zt=zTravel(r);}else r.step='wait';}break;
+  case 'toStation':if(s.agent||s.present){r.step='wait';r.carryKind=null;break;}if(moveTo(r,{x:s.slot.cx,y:s.slot.cy},dt,0.6)){r.step='placePallet';r.dwell=1;r.zt=pal.h;}break;
+  case 'placePallet':r.dwell-=dt;if(r.dwell<=0){r.carryKind=null;Object.assign(s,newPal(true));if(c.sheet.mode==='bottom'&&S.mags.length)s.needSheet=true;S.stats.exch++;log(`Станция ${s.id}: робот поставил пустую паллету из стопки (B${s.id}=1, осталось ${r.job.ps.n})`);S.tasks.t15||done('t15');r.step='home';r.zt=zTravel(r);}break;
+  case 'home':r.zt=zTravel(r);if(moveTo(r,r.home,dt))r.step='wait';break;}}
+function finishStop(){S.conv.forEach(cv=>cv.vfd.sto=true);allPower(false);setState('Stopped',S.accessReq?'Роботы в исходной, конвейеры стоят':'Остановлено оператором');if(S.accessReq){S.lock=false;log('Q1 = 0: замок двери разблокирован, доступ разрешён','warn');}}
+function done(id){S.tasks[id]=true;const t=TASKS.find(t=>t[0]===id);log('Задание выполнено: '+t[1]);try{localStorage.setItem('pal-sim-tasks4',JSON.stringify(S.tasks));}catch(e){}}
+// ---------- агенты: человек, рохля, погрузчик, AMR ----------
+function dispatch(task,target,kind){
+ const c=CFG;if(target.agent)return false;const A=AGENT[kind];const a={id:S.nextId++,kind,task,target,x:target.slot.park.x,y:target.slot.park.y,park:target.slot.park,phase:'go',t:0,carry:task==='sheets'?(kind==='amr'?'sheets':'sheets'):null,crossed:false,v:A.v,lift:A.lift};
+ target.agent=a;S.agents.push(a);S.flags.agentSeen.add(kind);
+ if(task==='pallet')log(kind==='amr'?`AMR: заявка на станцию ${target.id} принята флот-менеджером, тележка выехала`:`${A.name[0].toUpperCase()+A.name.slice(1)} подъезжает к проёму станции ${target.id}`);
+ else log(kind==='amr'?`AMR везёт паллету с листами к магазину ${target.id}`:`Оператор идёт к магазину ${target.id} с листами`);
+ return true;}
+function agentTick(a,dt){
+ const c=CFG,D=DD,s=a.target,slot=s.slot,gateD=D.pal.W/2+350;const move=(to,f)=>{const d=Math.hypot(to.x-a.x,to.y-a.y),v=a.v*1000*(f||1)*dt;if(d<=v){a.x=to.x;a.y=to.y;return true;}a.x+=(to.x-a.x)/d*v;a.y+=(to.y-a.y)/d*v;return false;};
+ const center=(a.task==='sheets'&&a.kind!=='amr')?{x:slot.cx+slot.cos*(D.pal.W/2+300),y:slot.cy+slot.sin*(D.pal.W/2+300)}:{x:slot.cx,y:slot.cy};
+ const crossing=()=>{const d=Math.hypot(a.x-slot.cx,a.y-slot.cy);if(d<gateD&&!a.crossed){a.crossed=true;const ok=a.task==='pallet'?released(s):!robotBusyAt(s.id);
+  if(ok){if(a.task==='sheets'){s.loading=true;}log(D.safety==='fence'?`Проём ${a.task==='pallet'?'S6'+s.id:'S7.'+s.id}: станция освобождена — завеса в мьютинге (MUTE${s.id}=1), ${AGENT[a.kind].name} входит`:`Сканер: сектор ${s.id} исключён из защитного поля (LS.SET), ${AGENT[a.kind].name} входит`);}
+  else{log(`${AGENT[a.kind].name[0].toUpperCase()+AGENT[a.kind].name.slice(1)} пересёк проём ${s.id}, пока робот работает на этой позиции`,'alarm');protectiveStop(`Пересечён проём ${s.id} без освобождения (${D.safety==='fence'?'S6'+s.id+' не в мьютинге':'сектор в защитном поле'})`,D.safety!=='fence');S.lc.fault=D.safety==='fence';a.phase='back';a.carry=null;}}};
+ switch(a.phase){
+  case 'go':crossing();if(a.phase!=='go')break;if(move(center)){a.phase=a.task==='pallet'?'lift':'load';a.t=a.task==='pallet'?a.lift:2+c.sheet.cap/10;}break;
+  case 'lift':a.t-=dt;if(a.t<=0){if(s.present){s.present=false;a.carry='full';S.stats.exch++;log(`${AGENT[a.kind].name[0].toUpperCase()+AGENT[a.kind].name.slice(1)} забрал паллету ${s.id} (B${s.id}=0)`);if(S.flags.palletDone)S.flags.palletRemoved=true;}a.phase='back';}break;
+  case 'load':a.t-=dt;if(a.t<=0){s.sheets=c.sheet.cap;s.loading=false;S.stats.refills++;a.carry=null;log(a.kind==='amr'?`AMR заменил магазин ${s.id}: ${c.sheet.cap} листов (B4=1), уезжает`:`Оператор доложил листы в ${s.id} до ${c.sheet.cap}, нажал «готово» (SB4.${s.id})`);S.tasks.t14||done('t14');a.phase='back';}break;
+  case 'back':if(move(a.park)){if(a.task==='pallet'&&a.carry==='full'){a.phase='drop';a.t=3;}else a.phase='done';}break;
+  case 'drop':a.t-=dt;if(a.t<=0){a.carry=null;if(c.exch.in==='vehicle'){a.carry='empty';a.phase='go2';a.crossed=false;log(`${AGENT[a.kind].name[0].toUpperCase()+AGENT[a.kind].name.slice(1)} везёт пустую паллету на станцию ${s.id}`);}else a.phase='done';}break;
+  case 'go2':crossing();if(a.phase!=='go2')break;if(move(center)){a.phase='set';a.t=a.lift*0.7;}break;
+  case 'set':a.t-=dt;if(a.t<=0){Object.assign(s,newPal(true),{agent:a});if(c.sheet.mode==='bottom'&&S.mags.length)s.needSheet=true;a.carry=null;log(`Пустая паллета на станции ${s.id} (B${s.id}=1)`);if(S.flags.palletRemoved&&!S.tasks.t5)done('t5');a.phase='back2';}break;
+  case 'back2':if(move(a.park))a.phase='done';break;}
+ if(a.phase==='done'){s.agent=null;s.waitT=0;if(a.task==='pallet'&&c.exch.out!=='conveyor')log(`Проём ${s.id} закрыт: кнопка «готово» (SB${s.id}), станция снова доступна роботу`);return false;}
+ return true;}
+function autoExchange(dt){
+ const c=CFG,ex=c.exch;if(!['Execute','Suspended','Starting','Idle','Stopping'].includes(S.packml))return;
+ if(ex.out!=='conveyor'){S.st.forEach(s=>{const need=(s.complete||(!s.present&&ex.in==='vehicle'))&&!s.agent;if(need&&ex.auto){s.waitT+=dt;if(s.waitT>=ex.reaction)dispatch('pallet',s,ex.out);}else if(!need)s.waitT=0;});}
+ S.mags.forEach(m=>{const need=m.sheets<=c.sheet.low&&!m.agent&&!m.loading;if(need&&ex.auto){m.waitT+=dt;if(m.waitT>=ex.reaction)dispatch('sheets',m,ex.sheetsBy==='amr'?'amr':'person');}else if(!need)m.waitT=0;});}
+function tick(dt){
+ S.timer+=dt;const D=DD,c=CFG;
+ S.conv.forEach((cv,i)=>{const v=cv.vfd,rate=50/v.accel*dt,cf=c.conveyors[i];
+  if(v.fault){v.actual=Math.max(0,v.actual-rate*3);v.run=false;v.target=0;}
+  else if(v.sto)v.actual=Math.max(0,v.actual-rate*2.5);
+  else if(v.actual<v.target)v.actual=Math.min(v.target,v.actual+(cv.type==='mdr'?rate*4:rate));else if(v.actual>v.target)v.actual=Math.max(v.target,v.actual-rate);
+  const g=D.LY.convs[i],b=g.b,spd=(cv.nom/60*1000)*(v.actual/50)*dt/(g.len-b.l),gap=gapOf(i);
+  cv.boxes.sort((a,x)=>x.p-a.p);cv.boxes.forEach((bx,j)=>{const lim=j===0?1:cv.boxes[j-1].p-gap;bx.p=Math.min(lim,bx.p+spd);});
+  if(cf.feed!=='manual'&&['Execute','Suspended','Starting'].includes(S.packml)){cv.feedT+=dt;const per=cf.feed==='interval'?cf.interval:60/cf.rate;if(cv.feedT>=per){if(!cv.boxes.some(x=>x.p<.13)){cv.boxes.push({p:0,id:S.nextId++});cv.fed++;cv.feedT=0;}}}});
+ const centerX=(i,p)=>{const g=D.LY.convs[i];return g.x0+g.b.l/2+p*(g.len-g.b.l);};
+ if(D.safety==='fence'){S.lc.muted=S.conv.some((cv,i)=>cv.boxes.some(b=>Math.abs(centerX(i,b.p)-D.F.x0)<D.LY.convs[i].b.l/2+220));
+  if(S.lc.timer>0){S.lc.timer-=dt;if(S.lc.timer<=0)S.lc.broken=false;}
+  if(S.lc.broken&&!S.lc.muted&&!S.lc.fault&&['Execute','Starting','Suspended','Stopping','Idle'].includes(S.packml)){S.lc.fault=true;S.flags.lcTripped=true;protectiveStop('Нарушена световая завеса S4 без мьютинга');}}
+ else{S.speedFactor=S.person==='slow'?0.25:1;
+  if(S.person==='stop'&&['Execute','Starting','Suspended','Stopping','Idle'].includes(S.packml)){S.flags.lcTripped=true;protectiveStop('Человек в защитном поле сканера',true);}
+  if(S.packml==='Held'&&S.autoResume&&S.person!=='stop'&&S.conv.every(cv=>cv.vfd.actual===0)){S.autoResume=false;S.safetyStop=false;if(S.resumeTo==='Execute'){allPower(true);runDrives();setState('Execute','Защитное поле свободно — автоматический перезапуск (зона полностью просматривается сканерами)');}else{S.conv.forEach(cv=>cv.vfd.sto=true);setState('Idle','Защитное поле свободно, ячейка готова к пуску');}}}
+ if(S.packml==='Held'&&S.conv.some(cv=>cv.vfd.actual===0&&!cv.vfd.sto&&!cv.vfd.fault)){S.conv.forEach(cv=>{if(cv.vfd.actual===0)cv.vfd.sto=true;});log('Приводы остановлены, STO активировано');}
+ S.st.forEach(s=>{if(s.phase==='out'){s.out+=dt/3;if(s.out>=1){s.present=false;s.phase='gap';s.gap=0;s.out=0;S.stats.exch++;log(`Станция ${s.id}: паллета выехала (B${s.id}x=1), диспенсер подаёт пустую`);}}else if(s.phase==='gap'){s.gap+=dt;if(s.gap>2){Object.assign(s,newPal(true));if(c.sheet.mode==='bottom'&&S.mags.length)s.needSheet=true;if(S.flags.palletDone&&!S.tasks.t5)done('t5');log(`Станция ${s.id}: пустая паллета на позиции (B${s.id}=1)`);}}});
+ autoExchange(dt);S.agents=S.agents.filter(a=>agentTick(a,dt));
+ if(S.packml==='Starting'&&S.timer>.6)setState('Execute','Ячейка работает');
+ if(S.packml==='Execute')S.stats.run+=dt;
+ S.robots.forEach(r=>robotTick(r,dt));
+ if(S.packml==='Execute'){if(!S.tasks.t3&&S.flags.lcTripped)done('t3');if(!S.tasks.t6&&S.flags.estopTripped)done('t6');if(!S.tasks.t9&&S.flags.vfdTripped)done('t9');if(!S.tasks.t8&&c.conveyors.length>=2&&S.flags.typesPlaced.size>=2)done('t8');if(!S.tasks.t17&&S.flags.agentSeen.has('amr')&&S.stats.exch>0)done('t17');}
+ render();}
+// ---------- пульт ----------
+$('bStart').onclick=()=>{if(S.packml!=='Idle'||DD.reachStatus==='bad')return;S.timer=0;runDrives();allPower(true);setState('Starting','Разгон конвейеров, включение роботов');};
+$('bStop').onclick=()=>{if(!['Execute','Suspended','Held','Starting'].includes(S.packml))return;stopDrives(false);if(S.packml==='Held'){allPower(false);S.safetyStop=false;S.autoResume=false;setState('Stopped','Остановлено из Held');return;}allPower(true);setState('Stopping','Роботы завершают операции, конвейеры тормозят');};
+$('bReset').onclick=()=>{
+ if(S.packml==='Aborted'){if(S.estop){log('Сброс невозможен: аварийный стоп нажат','warn');return;}S.safetyStop=false;setState('Stopped','Аварийная ситуация квитирована (Clear)');return;}
+ if(!safeInputsOK()){log('Сброс невозможен: цепь безопасности разомкнута','warn');return;}
+ if(['Stopped','Held'].includes(S.packml)){S.lc.fault=false;S.safetyStop=false;S.autoResume=false;S.accessReq=false;S.conv.forEach((cv,i)=>{if(cv.vfd.fault){cv.vfd.fault=false;log(`ЧП ${i+1}: авария сброшена`);}cv.stuck=false;cv.vfd.sto=false;cv.vfd.target=0;});allPower(true);setState('Resetting','Роботы возвращаются в исходную');}};
+$('bEstop').onclick=()=>{S.estop=!S.estop;$('bEstop').classList.toggle('pressed',S.estop);if(S.estop){S.flags.estopTripped=true;abort('Аварийный стоп S1 нажат');}else log('Аварийный стоп отпущен. Для возобновления требуется сброс','warn');};
+$('tScale').onchange=e=>{S.timeScale=+e.target.value;};
+$('ovr').oninput=e=>{S.override=+e.target.value/100;$('ovrV').textContent=e.target.value+' %';};
+$('tab-sim').addEventListener('click',e=>{const b=e.target.dataset.b;if(!b)return;const i=e.target.dataset.i;
+ if(b==='box'){const cv=S.conv[+i];if(cv.boxes.some(x=>x.p<.13)){log(`Место на входе конвейера ${+i+1} занято (B${+i+1}5=1)`,'warn');return;}cv.boxes.push({p:0,id:S.nextId++});cv.fed++;}
+ if(b==='refill'){const m=S.mags.find(x=>x.id===i);if(!m||m.agent){log('Пополнение уже идёт','warn');return;}dispatch('sheets',m,CFG.exch.sheetsBy==='amr'?'amr':'person');}
+ if(b==='stack'){S.stacks.forEach(p=>p.n=CFG.exch.stack);log('Стопка паллет пополнена погрузчиком через проём S8 (B5=1)');}
+ if(b==='hand'){S.lc.broken=true;S.lc.timer=1.2;if(S.lc.muted)log('Завеса пересечена во время мьютинга — так проходит коробка, реакции нет','warn');}
+ if(b==='access'){if(S.accessReq)return;S.accessReq=true;log('Запрос доступа: ячейка переводится в безопасную остановку');
+  if(['Execute','Suspended','Starting'].includes(S.packml)){stopDrives(false);allPower(true);setState('Stopping','Запрос доступа: роботы идут в исходную');}
+  else if(['Idle','Stopped','Aborted','Held'].includes(S.packml)&&S.conv.every(cv=>cv.vfd.actual===0)){S.lock=false;allPower(false);if(S.packml==='Idle')setState('Stopped','Доступ разрешён');log('Q1 = 0: приводы остановлены, замок двери разблокирован','warn');}
+  else log('Доступ будет предоставлен после остановки','warn');}
+ if(b==='door'){if(S.door==='closed'){if(S.lock){log('Дверь удерживается замком (S3=1): опасное движение ещё возможно — ISO 14119','alarm');return;}
+   S.door='open';allPower(false);S.conv.forEach(cv=>cv.vfd.sto=true);if(S.accessReq&&!S.tasks.t4)done('t4');log('Дверь открыта (S2=0). Роботы и конвейеры обесточены');if(['Idle','Stopped'].includes(S.packml))setState('Stopped','Дверь открыта');}
+  else{S.door='closed';S.lock=true;S.accessReq=false;log('Дверь закрыта, замок заблокирован (S2=1, S3=1). Требуется сброс');}}
+ if(b==='pslow'){S.person='slow';log('LS.W = 0: человек в поле снижения скорости → Reduced Mode, 250 мм/с (ISO/TS 15066)','warn');}
+ if(b==='pstop'){S.person='stop';log('LS1 OSSD = 0: человек в защитном поле','alarm');}
+ if(b==='paway'){S.person='away';log('Поля сканеров свободны');}
+ if(b==='pal'){const s=S.st.find(x=>x.id===i);if(s.agent){log(`У станции ${i} уже работает ${AGENT[s.agent.kind].name}`,'warn');return;}if(!s.present&&CFG.exch.in!=='vehicle'){log('Станция пуста: паллету поставит '+(CFG.exch.in==='robot'?'робот из стопки':'диспенсер'),'warn');return;}dispatch('pallet',s,CFG.exch.out);}
+ if(b==='vac'){const r=S.robots[0];if(r.carryKind==='box'){S.stats.dropped+=r.carry;r.carry=0;r.carryKind=null;hold(GRIPPERS[CFG.grip.type].vac?'Потеря вакуума в переносе: PS1=0 — коробка упала, робот остановлен':'Захват раскрылся в переносе: датчик S_GR1=0 — коробка упала');}else log('Отказ имитируется во время переноса коробки роботом 1','warn');}
+ if(b==='vfd'){const cv=S.conv[0];if(cv.type==='mdr'){log('На мотор-роликах нет ЧП: отказ зоны сообщит контроллер зоны по шине','warn');return;}if(cv.vfd.fault)return;cv.vfd.fault=true;S.flags.vfdTripped=true;hold('ЧП 1: авария F0001 перегрузка по току (заклинил ролик)');}
+ if(b==='stuck'){S.conv[0].stuck=true;log('Датчик B11 залип в «1» (загрязнён отражатель) — ждите реакции робота','warn');}});
+$('drives').addEventListener('input',e=>{const i=e.target.dataset.acc;if(i===undefined)return;S.conv[+i].vfd.accel=+e.target.value;$('vAccV'+i).textContent=f1(+e.target.value)+' с';});
+// ---------- отрисовка ----------
+function armPts(r){const L=DD.rob.reach/2,dx=r.x-r.base.x,dy=r.y-r.base.y;let d=Math.hypot(dx,dy);d=clamp(d,1,2*L-1);const a=Math.atan2(dy,dx),c=Math.acos(d/(2*L)),ex=r.base.x+L*Math.cos(a-c),ey=r.base.y+L*Math.sin(a-c);const P=GG.P,[bx,by]=P(r.base.x,r.base.y),[px,py]=P(ex,ey),[tx,ty]=P(r.x,r.y);return`${bx},${by} ${px.toFixed(1)},${py.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;}
+function palSvg(s){const pal=DD.pal,sc=GG.sc,b=boxOf(CFG,s.bi),col=boxColor(s.bi);if(!s.present)return'';
+ const off=s.phase==='out'?s.out*(pal.W+600):0;const sl={...s.slot,cx:s.slot.cx+s.slot.cos*off,cy:s.slot.cy+s.slot.sin*off};const [px,py]=GG.P(sl.cx,sl.cy),w=pal.W*sc,h=pal.L*sc;
+ let o=`<rect x="${px-w/2}" y="${py-h/2}" width="${w}" height="${h}" rx="2" fill="var(--dim)" stroke="var(--fence)" stroke-width="2"/>`;
+ const cells=s.placed.length?curCells(s):(s.last?s.last.cells:null),shown=s.placed.length?s.placed:(s.last?s.last.cells.map((c,i)=>i):[]);
+ if(cells)shown.forEach(i=>{const c=cells[i],bw=(c.rot?b.w:b.l)*sc,bh=(c.rot?b.l:b.w)*sc;o+=`<rect x="${px+c.x*sc-bw/2+1}" y="${py+c.y*sc-bh/2+1}" width="${Math.max(1,bw-2)}" height="${Math.max(1,bh-2)}" fill="${col}" stroke="var(--ink)" stroke-width="1"/>`;});
+ if(!s.placed.length&&!s.complete&&!s.needSheet&&s.sheetLayers.length&&s.sheetLayers[s.sheetLayers.length-1]===s.layer)o+=`<rect x="${px-w/2+4}" y="${py-h/2+4}" width="${w-8}" height="${h-8}" fill="none" stroke="var(--sheet)" stroke-width="3"/>`;
+ let out=rotG(sl,o);out+=`<text x="${px}" y="${py+4}" font-size="11" text-anchor="middle" fill="var(--ink)" font-weight="600" stroke="var(--panel)" stroke-width="3" paint-order="stroke">${s.id} ${s.layer}/${s.pat.layers} · ${s.count}</text>`;
+ if(s.complete)out+=`<text x="${px}" y="${py-h/2-5}" font-size="11" text-anchor="middle" fill="var(--green)" font-weight="600">готова</text>`;return out;}
+function agentSvg(a){const P=GG.P,sc=GG.sc,pal=DD.pal,[x,y]=P(a.x,a.y),sl=a.target.slot,deg=sl.ang;let o='';const rot=`transform="rotate(${deg} ${x.toFixed(1)} ${y.toFixed(1)})"`;
+ if(a.carry==='full'||a.carry==='empty'||a.carry==='sheets'){const w=pal.W*sc,h=pal.L*sc;o+=`<rect ${rot} x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="2" fill="${a.carry==='full'?boxColor(a.target.bi||0):a.carry==='sheets'?'var(--sheet)':'var(--dim)'}" stroke="var(--fence)" stroke-width="1.5" opacity=".9"/>`;}
+ if(a.kind==='person'||a.kind==='jack'){if(a.kind==='jack'){const w=550*sc,h=1200*sc;o+=`<rect ${rot} x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" fill="none" stroke="var(--blue)" stroke-width="2"/>`;}const hx=x+sl.cos*(a.kind==='jack'?900*sc:0),hy=y+sl.sin*(a.kind==='jack'?900*sc:0);o+=`<circle cx="${hx}" cy="${hy}" r="6" fill="var(--panel)" stroke="var(--blue)" stroke-width="2.5"/><circle cx="${hx}" cy="${hy}" r="2" fill="var(--blue)"/>`;}
+ else if(a.kind==='forklift'){const w=1100*sc,h=2300*sc;o+=`<rect ${rot} x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="3" fill="var(--warnbg)" stroke="var(--blue)" stroke-width="2"/><g ${rot}><rect x="${x-w/2+3}" y="${y-h/2+3}" width="${w-6}" height="${h*0.35}" fill="var(--yellow)" opacity=".8"/></g>`;}
+ else{const w=900*sc,h=1400*sc;o+=`<rect ${rot} x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="6" fill="var(--panel)" stroke="var(--blue)" stroke-width="2.5"/><circle cx="${x}" cy="${y}" r="3" fill="var(--green)"/>`;}
+ return o;}
+function render(){
+ const D=DD,G=GG,P=G.P,sc=G.sc,c=CFG;let dyn='';
+ D.LY.convs.forEach((cv,i)=>{const b=cv.b,col=boxColor(cv.bi);S.conv[i].boxes.forEach(bx=>{const x=cv.x0+b.l/2+bx.p*(cv.len-b.l),[px,py]=P(x-b.l/2,cv.y-b.w/2);dyn+=`<rect x="${px}" y="${py}" width="${b.l*sc}" height="${b.w*sc}" rx="2" fill="${col}" stroke="var(--ink)"/>`;});});
+ S.st.forEach(s=>dyn+=palSvg(s));
+ S.agents.forEach(a=>dyn+=agentSvg(a));
+ S.robots.forEach(r=>{dyn+=`<polyline points="${armPts(r)}" fill="none" stroke="var(--robot)" stroke-width="${Math.max(6,120*sc)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const [tx,ty]=P(r.x,r.y),cb=boxOf(c,r.carryBi),bw=cb.l*sc,bh=cb.w*sc;
+  if(r.carryKind==='box'){const n=r.carry;for(let j=0;j<n;j++)dyn+=`<rect x="${tx-n*bw/2+j*bw}" y="${ty-bh/2}" width="${bw}" height="${bh}" rx="2" fill="${boxColor(r.carryBi)}" stroke="var(--ink)"/>`;}
+  else if(r.carryKind==='sheet')dyn+=`<rect x="${tx-D.pal.W*sc/2}" y="${ty-D.pal.L*sc/2}" width="${D.pal.W*sc}" height="${D.pal.L*sc}" fill="none" stroke="var(--sheet)" stroke-width="3"/>`;
+  else if(r.carryKind==='pallet')dyn+=`<rect x="${tx-D.pal.W*sc/2}" y="${ty-D.pal.L*sc/2}" width="${D.pal.W*sc}" height="${D.pal.L*sc}" fill="var(--dim)" stroke="var(--fence)" stroke-width="2"/>`;
+  else dyn+=`<circle cx="${tx}" cy="${ty}" r="6" fill="${r.power?'var(--robot)':'var(--off)'}"/>`;});
+ if(D.safety==='cobot'){const rad=S.person==='away'?G.rDraw+200:S.person==='slow'?Math.min(D.rSlow,G.rDraw)-250:D.rStop-200;const [px,py]=P(rad*0.6,rad*0.8);const col=S.person==='stop'?'var(--red)':S.person==='slow'?'var(--warnfg)':'var(--muted)';dyn+=`<circle cx="${px}" cy="${py-8}" r="7" fill="none" stroke="${col}" stroke-width="2"/><line x1="${px}" y1="${py-1}" x2="${px}" y2="${py+14}" stroke="${col}" stroke-width="2"/>`;}
+ $('dyn').innerHTML=dyn;
+ S.mags.forEach(m=>{const e=$('sheets-'+m.id);if(e)e.textContent=m.sheets;});S.stacks.forEach(p=>{const e=$('stack-'+p.id);if(e)e.textContent=p.n;});
+ S.st.forEach(s=>{const g=$('gate-'+s.id);if(g)g.setAttribute('stroke',s.phase==='out'||(released(s)&&c.exch.out!=='conveyor')?'var(--off)':'var(--red)');const l=$('lamp-'+s.id);if(l)l.setAttribute('fill',released(s)&&c.exch.out!=='conveyor'?'var(--green)':'var(--off)');});
+ S.mags.forEach(m=>{const g=$('gate-'+m.id);if(g)g.setAttribute('stroke',m.loading?'var(--off)':'var(--red)');const l=$('lamp-'+m.id);if(l)l.setAttribute('fill',m.sheets<=c.sheet.low?'var(--yellow)':'var(--off)');});
+ if(D.safety==='fence'){S.conv.forEach((cv,i)=>{const e=$('lc'+i);e.setAttribute('stroke',S.lc.broken?'var(--yellow)':S.lc.muted?'var(--off)':'var(--red)');e.setAttribute('stroke-width',S.lc.broken?6:3);});
+  const d=$('doorLine'),x1=+d.getAttribute('x1'),y1=+d.getAttribute('y1');d.setAttribute('x2',S.door==='open'?x1+40:+d.dataset.x2);d.setAttribute('y2',S.door==='open'?y1-40:y1);$('lockDot').setAttribute('fill',S.lock?'var(--green)':'var(--yellow)');}
+ const lp=lamp();$('lr').setAttribute('fill',lp.r?'var(--red)':'var(--off)');$('ly').setAttribute('fill',lp.y?'var(--yellow)':'var(--off)');$('lg').setAttribute('fill',lp.g?'var(--green)':'var(--off)');
+ $('pr').classList.toggle('on',lp.r);$('py').classList.toggle('on',lp.y);$('pg').classList.toggle('on',lp.g);
+ $('msg').textContent=S.why;$('stName').textContent=S.packml;$('stWhy').textContent=S.why;
+ const r0=S.robots[0];STEPS.forEach(s=>$('st-'+s[0]).classList.toggle('on',r0.step===s[0]&&r0.power));
+ LIVE_DI.forEach(d=>{const e=$('di-'+d[0]);if(e)e.classList.toggle('on',!!d[2]());});
+ LIVE_DO.forEach(d=>{const e=$('do-'+d[0]);if(!e)return;e.classList.toggle('on',!!d[2]());if(d[3])e.classList.toggle(d[3],true);});
+ S.conv.forEach((cv,i)=>{const v=cv.vfd;if(cv.type==='mdr'){$('vS'+i).textContent=v.run?'Работа':'Готов';$('vR'+i).textContent=v.run?'да':'нет';const z=$('zn'+i);const zones=z.children.length;const occ=new Set(cv.boxes.map(b=>Math.min(zones-1,Math.floor(b.p*zones))));[...z.children].forEach((el,j)=>el.classList.toggle('on',occ.has(j)));}
+  else{$('vT'+i).textContent=f1(v.target)+' Гц';$('vA'+i).textContent=f1(v.actual)+' Гц';$('vS'+i).textContent=v.fault?'АВАРИЯ F0001':v.sto?'Заблокирован':v.actual>0&&v.actual<v.target?'Разгон':v.actual>v.target?'Торможение':v.run?'Работа':'Готов';$('vSTO'+i).textContent=v.sto?'активно':'снято';$('vBar'+i).style.width=(v.actual/50*100)+'%';}});
+ const st=S.stats,hrs=st.run/3600;$('stats').innerHTML=`<div>Уложено<b>${st.placed}</b></div><div>Паллет<b>${st.pallets}</b></div><div>Факт кор/ч<b>${st.run>20?f0(st.placed/hrs):'—'}</b></div><div>Расчёт кор/ч<b>${f0(D.bottleneck)}</b></div><div>Время Execute<b>${f0(st.run)} с</b></div><div>Уронено<b>${st.dropped}</b></div><div>Обменов паллет<b>${st.exch}</b></div><div>Пополнений листов<b>${st.refills}</b></div>`;
+ $('bStart').disabled=S.packml!=='Idle'||D.reachStatus==='bad';
+ $('bStop').disabled=!['Execute','Suspended','Held','Starting'].includes(S.packml);
+ $('bReset').disabled=!['Aborted','Stopped','Held'].includes(S.packml);
+ const acc=document.querySelector('[data-b="access"]');if(acc)acc.disabled=S.accessReq||!S.lock||S.door==='open';
+ const dr=document.querySelector('[data-b="door"]');if(dr)dr.textContent=S.door==='closed'?'Открыть дверь':'Закрыть дверь';
+ document.querySelectorAll('[data-b="pal"]').forEach(b=>{const s=S.st.find(x=>x.id===b.dataset.i);b.disabled=!!s.agent||(!s.present&&c.exch.in!=='vehicle');b.textContent=c.exch.auto?`Вызвать сейчас: ${s.id}`:s.present?`Вывезти паллету ${s.id}`:`Привезти паллету ${s.id}`;});
+ document.querySelectorAll('[data-b="refill"]').forEach(b=>{const m=S.mags.find(x=>x.id===b.dataset.i);b.disabled=!!m.agent;});
+ TASKS.forEach(t=>{const li=$('tk-'+t[0]);if(!li)return;const d=!!S.tasks[t[0]];li.classList.toggle('done',d);li.firstChild.textContent=d?'✓':'☐';li.firstChild.className=d?'ok':'todo';});}
+// ======================= ЗАДАНИЯ И СПРАВОЧНИК =======================
+const TASKS=[
+ ['t1','Запустить ячейку и уложить первый слой','PackML: Stopped → Сброс → Idle → Пуск → Execute. «Пуск» неактивен вне Idle — переходы разрешает машина состояний.'],
+ ['t2','Дождаться укладки прокладочного листа','Робот проверяет счётчик слоя после каждой укладки; лист нужен по режиму: снизу, между слоями или через N слоёв.'],
+ ['t3','Вызвать защитную остановку (завеса или защитное поле), затем вернуться в Execute','Категория 1 (МЭК 60204-1): рампа торможения, потом STO. За ограждением перезапуск вручную; со сканерами допустим автоматический, если зона просматривается целиком.'],
+ ['t4','Запросить доступ и войти через дверь (режим с ограждением)','Замок с удержанием (ISO 14119): Q1 снимается только когда роботы в исходной, а конвейеры стоят.'],
+ ['t5','Завершить паллету и получить новую','Проём освобождённой станции в мьютинге; человек, погрузчик или AMR меняют паллету, пока робот работает на другой станции.'],
+ ['t6','Нажать аварийный стоп и вернуть ячейку в работу','Категория 0: STO и KM1 сразу. Возврат: отпустить грибок → Сброс (Clear) → Сброс (Idle) → Пуск.'],
+ ['t7','Подобрать кобота под коробку 15 кг с запасом по нагрузке и досягаемости','Нагрузка = коробки + захват ≤ 80 % грузоподъёмности; досягаемость до верхнего слоя дальней станции с запасом ≥ 10 %.'],
+ ['t8','Настроить два конвейера с разными коробками и заполнить станции обоих','Второй конвейер = второй артикул → следующие станции. ПЛК выбирает задание по датчикам упора и доступности станций.'],
+ ['t9','Отработать аварию ЧП: Held → Сброс → Execute','Held — внутренняя причина (отказ), Suspended — внешняя (нет материала). Разный учёт простоев.'],
+ ['t10','Собрать конфигурацию на мотор-роликах (ZPA)','Уходят ЧП, STO-цепи и пневмоупоры; появляются контроллеры зон, блок питания 24/48 В и шлюз.'],
+ ['t11','Настроить групповой захват по 2+ коробки с запасом по вакууму и нагрузке','Сила = m·(g + a)·S или m·(g + a/μ)·S — что больше; каждая коробка на своей вакуумной зоне; конвейер собирает группу у упора.'],
+ ['t12','Получить перевязанную (перекрёстную) схему укладки','Слои с поворотом на 180° перевязывают стопу; иногда это стоит одной-двух коробок в слое.'],
+ ['t13','Воспользоваться подбором оптимальной конфигурации и применить предложение','Оптимизатор перебирает роботов, число роботов, коробок за захват и станций; выбирает самый дешёвый вариант, дающий целевую производительность.'],
+ ['t14','Дождаться пополнения магазина прокладок (человек или AMR)','При остатке ≤ порога ПЛК зажигает лампу у проёма магазина; во время загрузки магазин исключён из заданий робота.'],
+ ['t15','Настроить подачу паллет роботом из стопки','Крюки на захвате, стопка занимает позицию у робота, паллета — отдельный цикл; нагрузка считается и по пустой паллете.'],
+ ['t16','Задать выпуск двум и более артикулам и посмотреть планировщик','Методика «циклов на паллету»: ходы + листы + паллета ÷ время прихода паллеты коробок = требуемые циклы/мин.'],
+ ['t17','Организовать обмен паллет роботизированной тележкой (AMR)','Заявка через флот-менеджер, разрешение стыковки только для освобождённой станции, мьютинг/сектор на время стыковки.']];
+const GLOSS=[['ПЛК (PLC)','Логика ячейки: состояния PackML, счётчики слоёв, выбор задания, обмен с роботами и ЧП. Не участвует в отключении по безопасности.'],['Контроллер безопасности (КБ)','Устройство категории 3/4, PL e: два канала, самодиагностика, тест-импульсы. Все стопы, завесы, замки, STO — через него.'],['STO','Безопасный вход ЧП: снятие 24 В блокирует силовые ключи, двигатель не создаёт момент. Не тормозит — только не даёт разгоняться.'],['Категории стопа (МЭК 60204-1)','0 — немедленное снятие питания; 1 — управляемое торможение, затем снятие питания; 2 — остановка с сохранением питания.'],['Световая завеса тип 4','Многолучевой датчик с двумя OSSD. Разрешение 14 мм (пальцы), 30 мм (рука), 40–90 мм (тело). S = K·T + C по ISO 13855.'],['Мьютинг','Временное отключение завесы для прохода коробки: два датчика срабатывают в последовательности и в окне времени.'],['Освобождённая станция','Сигнал ПЛК «паллета готова и робот не в секторе», подтверждённый в КБ: завеса проёма в байпасе или сектор исключён из поля сканера. Робот аппаратно заблокирован от захода, пока не нажата кнопка «готово».'],['Замок безопасности с удержанием','Выключатель ISO 14119: положение двери и запирание; снимается только сигналом КБ. RFID против обхода.'],['Лазерный сканер безопасности','Поля: защитное (стоп) и предупреждающее (снижение скорости). Наборы полей переключаются безопасными входами. Основа режима «разделение и мониторинг скорости» по ISO/TS 15066.'],['AMR / AGV','Автономная тележка: получает заявки от флот-менеджера, стыкуется к станции по разрешению ПЛК. AGV идёт по разметке, AMR — по карте.'],['Вакуумный захват','Сила = разрежение × площадь. Картон течёт, поэтому нужен большой расход эжектора и умеренный вакуум (40–60 кПа). Датчик PS подтверждает захват.'],['Сильфонная присоска','Складки компенсируют неровности и наклон; ниже жёсткость при боковых ускорениях — для быстрых переносов плоские с рёбрами.'],['Пенная рамка','Площадной захват: пористая пена герметизирует крышку с рёбрами и щелями; вакуум от нагнетателя, много воздуха.'],['Групповой захват','Несколько вакуумных зон; коробки собираются у упора вплотную. Такт на коробку падает, растёт нагрузка и требования к досягаемости.'],['Перевязка (перекрёстная укладка)','Слои повёрнуты на 180° или зеркальны, стыки не совпадают — стопа держится без уголков. Пинвил, кирпичная, зонная схемы.'],['Циклы на паллету','Методика оценки: ходов с коробками + листов + паллет на одну паллету; делим на время прихода паллеты коробок — получаем требуемые циклы в минуту, сравниваем с нормативом робота.'],['ЧП','Питает двигатель напряжением переменной частоты. Конвейер: U/f, рампы 1–3 с. STO — отдельно.'],['Мотор-ролик 24/48 В','Зона роликов с встроенным двигателем и контроллером. ZPA — накопление без давления.'],['PackML','Модель состояний машины: Stopped, Idle, Execute, Held, Suspended, Aborted. Единый язык ПЛК, HMI и робота.'],['GRAFCET / SFC','Последовательность шагами и переходами. Один активный шаг = одно действие.'],['I/O-лист','Таблица сигналов: тег, назначение, тип, адрес, клемма. Основа схем, программы и пусконаладки.']];
+function initHelp(){
+ $('tasks').innerHTML=TASKS.map(t=>`<li id="tk-${t[0]}"><span class="todo">☐</span><b>${t[1]}</b><p>${t[2]}</p></li>`).join('');
+ $('gloss').innerHTML=GLOSS.map(g=>`<dt>${g[0]}</dt><dd>${g[1]}</dd>`).join('');
+ $('stdText').innerHTML=`<h3>Нормы, к которым привязан тренажёр</h3><ul><li>ГОСТ Р ИСО 12100 — оценка рисков.</li><li>ГОСТ Р ИСО 13849-1/-2 — PL, категории архитектуры, валидация.</li><li>ГОСТ Р МЭК 60204-1 — электрооборудование машин, категории стопов.</li><li>ГОСТ Р ИСО 10218-1/-2, ISO/TS 15066 — роботы, коллаборативные режимы.</li><li>ГОСТ ИСО 13855, 13857, 14119, ISO 14120 — расстояния, ограждения, блокировки.</li><li>EN 415-4 — безопасность паллетайзеров; ISO 3691-4 — безопасность беспилотных транспортных средств (AMR/AGV).</li><li>ISA-TR88.00.02 (PackML), МЭК 60848 (GRAFCET), МЭК 61131-3, МЭК 61439-1.</li><li>Методика расчёта вакуумных захватов — по рекомендациям производителей присосок (три расчётных случая, коэффициент запаса 1,5–2).</li><li>Методика оценки производительности паллетайзера по циклам на паллету (REDCARGO PRO130).</li></ul><h3>Что упрощено в модели</h3><p>Схемы укладки — из семейства сетка / две зоны / пинвил без перевязки внутри слоя; конвейер — установившийся режим; цикл робота — по расстояниям в плане с нормативом циклов; поля сканеров — круги; тележки и люди идут по прямой к проёму; расход через картон и время набора вакуума — оценочные. Все параметры каталога подлежат проверке по паспорту.</p>`;}
+// ======================= ИНИЦИАЛИЗАЦИЯ =======================
+function showTab(t){document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));if(t==='3d'&&typeof resize3D==='function')resize3D();}
+$('tabs').addEventListener('click',e=>{const t=e.target.dataset.tab;if(t)showTab(t);});
+initHelp();renderCfg();if(typeof init3D==='function')init3D();buildSim();renderArch();
+let last=performance.now();
+function loop(now){const dt=Math.min(.1,(now-last)/1000)*(S.timeScale||1);last=now;tick(dt);if(typeof render3D==='function'&&$('tab-3d').classList.contains('on'))render3D();requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
