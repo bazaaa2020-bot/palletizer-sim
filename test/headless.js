@@ -72,6 +72,45 @@ check('оптимизатор возвращает вариант', w.eval('!!OP
 w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();`);
 check('сброс к типовой конфигурации', w.eval('CFG.robot') === 'cb20');
 
+console.log('Группы захвата по форме слоя');
+const grp = (pitch, tShift, extra) => {
+  w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.robot='pl130';CFG.grip.pick=4;CFG.grip.pitch='${pitch}';CFG.grip.tShift=${tShift};${extra || ''}renderCfg();buildSim();renderArch();`);
+  return w.eval('Object.values(DD.pats)[0]');
+};
+const pat = () => w.eval('Object.values(DD.pats)[0]');
+
+const rowsPerPallet = grp('fixed', 1.5).groupsPerPallet;
+check('фиксированный шаг зон — группы только ряды', w.eval('Object.values(DD.pats)[0].groupsA.every(g=>g.nr===1)'));
+check('без раздвижки перестроений нет', w.eval('DD.shiftsPerPallet') === 0);
+
+const adj = grp('adj', 1.5);
+check('регулируемый шаг зон даёт блоки', w.eval('Object.values(DD.pats)[0].groupsA.some(g=>g.nr>1)'), 'формы: ' + adj.shapes);
+check('ходов на паллету стало меньше', adj.groupsPerPallet < rowsPerPallet, `${adj.groupsPerPallet} против ${rowsPerPallet}`);
+check('слой разобран без потерь и дублей', w.eval('(()=>{const p=Object.values(DD.pats)[0],a=[].concat(...p.groupsA);return a.length===p.n&&new Set(a).size===p.n;})()'));
+check('группа не больше захвата и равна своей форме', w.eval('Object.values(DD.pats)[0].groupsA.every(g=>g.length<=4&&g.nc*g.nr===g.length)'));
+check('перестроений по два на блок', w.eval('(()=>{const p=Object.values(DD.pats)[0];let n=0;for(let j=0;j<p.layers;j++)(p.interlock&&j%2?p.groupsB:p.groupsA).forEach(g=>{if(g.nr>1)n+=2;});return p.shifts>0&&n===p.shifts;})()'), 'shifts=' + adj.shifts);
+check('время перестроения вошло в такт паллеты', Math.abs(w.eval('DD.tShiftPallet') - w.eval('DD.shiftsPerPallet') * 1.5) < 1e-9);
+
+grp('adj', 0.5); const tFast = w.eval('DD.tPerPallet');
+grp('adj', 4);   const tSlow = w.eval('DD.tPerPallet');
+check('дороже перестроение — дольше паллета', tSlow > tFast, `${tSlow.toFixed(1)} против ${tFast.toFixed(1)} с`);
+
+grp('adj', 1.5, `CFG.patternMode='column';CFG.boxes[0]={name:'Мелкая',l:300,w:200,h:250,m:8,rate:0,layers:0};`);
+check('где ряды и так оптимальны — блоки не берутся', pat().adjUsed === false && pat().shifts === 0, 'adjUsed=' + pat().adjUsed);
+
+grp('adj', 1.5, `CFG.conveyors[0].feed='rate';CFG.conveyors[0].rate=30;CFG.exch.reaction=5;`);
+click('#bReset'); run(2); click('#bStart'); run(1);
+let sawShift = false;
+for (let i = 0; i < 3000; i++) {
+  w.eval('tick(0.05)');
+  if (!sawShift && i % 4 === 0) { const st = w.eval('S.robots[0].step'); if (st === 'shift' || st === 'unshift') sawShift = true; }
+}
+check('робот перестраивает захват в цикле', sawShift);
+check('укладка блоками идёт', S().stats.placed > 20, 'placed=' + S().stats.placed);
+check('на блоках коробки не терялись', S().stats.dropped === 0);
+
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();`);
+
 check('нет ошибок выполнения', errs.length === 0, errs.join('; '));
 console.log(failed ? `\nПровалено проверок: ${failed}` : '\nВсе проверки пройдены');
 process.exit(failed ? 1 : 0);
