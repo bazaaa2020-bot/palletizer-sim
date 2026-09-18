@@ -154,6 +154,27 @@ check('медленнее подвод — длиннее такт', w.eval('DD.
 
 w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();`);
 
+console.log('Обмен паллет и высота переноса');
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.robot='pl130';CFG.conveyors[0].feed='rate';CFG.conveyors[0].rate=30;CFG.exch.reaction=5;CFG.boxes[0].layers=2;renderCfg();buildSim();renderArch();`);
+click('#bReset'); run(2); click('#bStart'); run(1);
+const probe = () => w.eval(`(()=>{const r=S.robots[0],pal=DD.pal,c=CFG;
+  const load=r.carryKind==='box'?boxOf(c,r.carryBi).h:r.carryKind==='sheet'?4:r.carryKind==='pallet'?pal.h:0;
+  const tgt=r.job&&r.job.st?r.job.st.id:null;let clr=1e9;
+  S.st.forEach(s=>{if(!s.present||s.id===tgt)return;const b=boxOf(c,s.bi);
+   const top=pal.h+(s.layer+(s.placed.length?1:0))*b.h+s.sheetLayers.length*4;
+   if(Math.hypot(r.x-s.slot.cx,r.y-s.slot.cy)<Math.max(pal.W,pal.L)/2)clr=Math.min(clr,(r.z-load)-top);});
+  return{started:S.st.filter(s=>s.count>0&&!s.complete).length,clr};})()`);
+let bothStarted = 0, through = 0, worst = 0;
+for (let i = 0; i < 8000; i++) {
+  w.eval('tick(0.05)');
+  const q = probe();
+  if (q.started > 1) bothStarted++;
+  if (q.clr < 0) { through++; worst = Math.min(worst, q.clr); }
+}
+check('обмен паллет прошёл', S().stats.exch > 0, 'exch=' + S().stats.exch);
+check('начатая паллета дозаполняется до конца', bothStarted === 0, bothStarted + ' тактов с двумя начатыми паллетами');
+check('груз не проходит сквозь чужую стопу', through === 0, through ? `${through} тактов, заход на ${(-worst).toFixed(0)} мм` : '');
+
 check('нет ошибок выполнения', errs.length === 0, errs.join('; '));
 console.log(failed ? `\nПровалено проверок: ${failed}` : '\nВсе проверки пройдены');
 process.exit(failed ? 1 : 0);

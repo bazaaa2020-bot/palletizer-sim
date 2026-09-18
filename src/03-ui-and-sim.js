@@ -299,14 +299,25 @@ function curGroups(s){return s.parity?s.pat.groupsB:s.pat.groupsA;}
 function groupWorld(s,g){const cells=curCells(s);let x=0,y=0;g.forEach(i=>{const w=DD.LY.cw(s.slot,cells[i]);x+=w.x;y+=w.y;});return{x:x/g.length,y:y/g.length};}
 function pickWorld(ci,g){const cv=DD.LY.convs[ci];return{x:-CFG.pickDist-(g-1)*(cv.b.l+120)/2,y:cv.y};}
 function magsOf(r){return S.mags.filter(m=>m.robot===r&&!m.loading);}
+// Начатая паллета доводится до конца: станция с большим числом уложенных коробок идёт
+// первой, иначе освободившаяся соседняя станция перехватывала бы робота на середине слоя.
+function byStarted(sts){return sts.slice().sort((a,b)=>b.count-a.count);}
 function findJob(ri){
- const c=CFG,convs=DD.LY.robots[ri].convs,sts=S.st.filter(s=>s.robot===ri),mags=magsOf(ri),ps=S.stacks.find(p=>p.robot===ri);
+ const c=CFG,convs=DD.LY.robots[ri].convs,sts=byStarted(S.st.filter(s=>s.robot===ri)),mags=magsOf(ri),ps=S.stacks.find(p=>p.robot===ri);
  if(c.exch.in==='robot'&&ps&&ps.n>0){const s=sts.find(s=>!s.present&&!s.agent);if(s)return{kind:'pallet',st:s,ps};}
  for(const ci of convs){const have=boxesAtEnd(ci);if(!have)continue;for(const s of sts.filter(s=>s.slot.conv===ci)){if(!avail(s))continue;if(s.needSheet){const m=mags.find(m=>m.sheets>0);if(m)return{kind:'sheet',st:s,mag:m};continue;}const g=curGroups(s)[s.gi];if(have>=g.length)return{kind:'box',conv:ci,st:s,g:g.length,group:g};}}
  for(const s of sts)if(avail(s)&&s.needSheet){const m=mags.find(m=>m.sheets>0);if(m)return{kind:'sheet',st:s,mag:m};}
  return null;}
 function noPallet(){return S.st.every(s=>!avail(s))&&!(CFG.exch.in==='robot'&&S.stacks.some(p=>p.n>0)&&S.st.some(s=>!s.present&&!s.agent));}
 function noSheet(){return S.mags.length>0&&S.st.some(s=>avail(s)&&s.needSheet&&!magsOf(s.robot).some(m=>m.sheets>0));}
+// Высота, ниже которой нельзя идти в плане: верх самой высокой стопы, магазина или
+// конвейера этого робота, плюс габарит груза и запас точки подхода.
+function zSafe(r,hLoad){const c=CFG,pal=DD.pal;let z=0;
+ DD.LY.robots[r.i].convs.forEach(ci=>{z=Math.max(z,c.convH+DD.LY.convs[ci].b.h);});
+ S.st.filter(s=>s.robot===r.i).forEach(s=>{if(!s.present)return;const b=boxOf(c,s.bi);z=Math.max(z,pal.h+(s.layer+(s.placed.length?1:0))*b.h+s.sheetLayers.length*4);});
+ S.mags.filter(m=>m.robot===r.i).forEach(m=>{z=Math.max(z,pal.h+m.sheets*4);});
+ S.stacks.filter(p=>p.robot===r.i).forEach(p=>{z=Math.max(z,pal.h*p.n);});
+ return z+(hLoad||0)+c.motion.hAppr;}
 function zTravel(r){const c=CFG,pal=DD.pal;let z=c.convH+400;S.st.filter(s=>s.robot===r.i).forEach(s=>{z=Math.max(z,pal.h+s.pat.layers*boxOf(c,s.bi).h+300);});return z;}
 function robotTick(r,dt){
  if(!r.power)return;
@@ -319,7 +330,8 @@ function robotTick(r,dt){
  switch(r.step){
   case 'wait':{moveZ(r,zTravel(r),M.vZ,dt);if(S.packml==='Stopping')break;const j=findJob(r.i);if(!j){if(noPallet())suspend(c.exch.in==='robot'&&S.stacks.every(p=>p.n===0)?'Стопка паллет пуста — пополните (B5=0)':'Нет свободной паллеты — ожидание обмена');else if(noSheet())suspend('Магазин прокладок пуст или загружается — ожидание (B4=0)');break;}r.job=j;r.step=j.kind==='sheet'?'toMag':j.kind==='pallet'?'toStack':'toPick';break;}
   // ---- коробки: подход сверху, опускание на подводе, отрыв строго вверх ----
-  case 'toPick':{const okZ=moveZ(r,zPickOf(r.job.conv)+M.hAppr,M.vZ,dt),okT=turnTo(r,0,dt),okXY=moveTo(r,pickWorld(r.job.conv,r.job.g),dt);if(okXY&&okZ&&okT)r.step='downPick';break;}
+  case 'toPick':{const okXY=moveTo(r,pickWorld(r.job.conv,r.job.g),dt),zA=zPickOf(r.job.conv)+M.hAppr;
+   const okZ=moveZ(r,okXY?zA:Math.max(zA,zSafe(r,0)),M.vZ,dt),okT=turnTo(r,0,dt);if(okXY&&okZ&&okT)r.step='downPick';break;}
   case 'downPick':if(moveZ(r,zPickOf(r.job.conv),M.vPlace,dt)){r.step='grip';r.dwell=DD.grip.tGrip;r.zRel=r.z;}break;
   case 'grip':r.dwell-=dt;if(r.dwell<=0){const cv=S.conv[r.job.conv],have=cv.boxes.filter(x=>x.p>=1-(r.job.g-1)*gapOf(r.job.conv)-0.01).length;
    if(have<r.job.g){hold(`PS1 = 0: захват не подтверждён — коробок нет, хотя B${r.job.conv+1}1 = 1 (залип датчик)`);break;}
@@ -330,7 +342,8 @@ function robotTick(r,dt){
   case 'shift':r.dwell-=dt;if(r.dwell<=0)r.step='toPlace';break;
   case 'unshift':r.dwell-=dt;if(r.dwell<=0)r.step='home';break;
   case 'toPlace':{if(s.agent||!s.present){r.step='wait';r.carryKind=null;r.carry=0;break;}
-   const okZ=moveZ(r,zPlaceOf(s,b)+M.hAppr,M.vZ,dt),okT=turnTo(r,boxYaw(s,r.job.group),dt),okXY=moveTo(r,groupWorld(s,r.job.group),dt);if(okXY&&okZ&&okT)r.step='downPlace';break;}
+   const okXY=moveTo(r,groupWorld(s,r.job.group),dt),zA=zPlaceOf(s,b)+M.hAppr;
+   const okZ=moveZ(r,okXY?zA:Math.max(zA,zSafe(r,b.h)),M.vZ,dt),okT=turnTo(r,boxYaw(s,r.job.group),dt);if(okXY&&okZ&&okT)r.step='downPlace';break;}
   case 'downPlace':if(moveZ(r,zPlaceOf(s,b),M.vPlace,dt)){r.step='place';r.dwell=DD.grip.tRel;r.zRel=r.z;}break;
   case 'place':r.dwell-=dt;if(r.dwell<=0){r.carryKind=null;r.carry=0;s.count+=r.job.g;S.stats.placed+=r.job.g;S.flags.typesPlaced.add(s.bi);r.job.group.forEach(i=>s.placed.push(i));s.gi++;
    if(s.gi>=curGroups(s).length){s.layer++;s.last={cells:curCells(s),parity:s.parity};s.placed=[];s.gi=0;S.tasks.t1||done('t1');
@@ -340,23 +353,27 @@ function robotTick(r,dt){
   case 'upPlace':if(moveZ(r,r.zRel+b.h+M.hAppr,M.vZ,dt)){if(DD.tShift>0&&r.job.group&&r.job.group.nr>1){r.step='unshift';r.dwell=DD.tShift;}else r.step='home';}break;
   // ---- прокладочный лист: перенос с доворотом, сброс вакуума по секциям ----
   case 'toMag':{if(r.job.mag.loading){r.step='wait';break;}
-   const okZ=moveZ(r,zMagOf(r.job.mag)+M.hAppr,M.vZ,dt),okT=turnTo(r,r.job.mag.slot.ang,dt),okXY=moveTo(r,{x:r.job.mag.slot.cx,y:r.job.mag.slot.cy},dt);if(okXY&&okZ&&okT)r.step='downMag';break;}
+   const okXY=moveTo(r,{x:r.job.mag.slot.cx,y:r.job.mag.slot.cy},dt),zA=zMagOf(r.job.mag)+M.hAppr;
+   const okZ=moveZ(r,okXY?zA:Math.max(zA,zSafe(r,0)),M.vZ,dt),okT=turnTo(r,r.job.mag.slot.ang,dt);if(okXY&&okZ&&okT)r.step='downMag';break;}
   case 'downMag':if(moveZ(r,zMagOf(r.job.mag),M.vPlace,dt)){r.step='gripSheet';r.dwell=c.sheet.tGrip;}break;
   case 'gripSheet':r.dwell-=dt;if(r.dwell<=0){if(r.job.mag.sheets>0){r.job.mag.sheets--;r.carryKind='sheet';r.zRel=r.z;r.step='upMag';}else r.step='wait';}break;
   case 'upMag':if(moveZ(r,r.zRel+M.hAppr,M.vPlace,dt))r.step='toSheet';break;
   case 'toSheet':{if(s.agent||!s.present){r.step='wait';r.carryKind=null;break;}
-   const okZ=moveZ(r,zSheetOf(s,b)+M.hAppr,M.vZ,dt),okT=turnTo(r,s.slot.ang,dt),okXY=moveTo(r,{x:s.slot.cx,y:s.slot.cy},dt,c.sheet.speedPct/100);if(okXY&&okZ&&okT)r.step='downSheet';break;}
+   const okXY=moveTo(r,{x:s.slot.cx,y:s.slot.cy},dt,c.sheet.speedPct/100),zA=zSheetOf(s,b)+M.hAppr;
+   const okZ=moveZ(r,okXY?zA:Math.max(zA,zSafe(r,4)),M.vZ,dt),okT=turnTo(r,s.slot.ang,dt);if(okXY&&okZ&&okT)r.step='downSheet';break;}
   case 'downSheet':if(moveZ(r,zSheetOf(s,b),M.vPlace,dt)){r.step='placeSheet';r.dwell=DD.tRelSheet;r.zRel=r.z;r.sect=0;}break;
   case 'placeSheet':{const n=Math.min(c.sheet.sect,Math.floor((DD.tRelSheet-r.dwell)/Math.max(0.01,DD.grip.tRel))+1);if(n>r.sect){r.sect=n;if(n===1)log(`Лист лёг на слой ${s.layer} станции ${s.id}: сброс вакуума по ${c.sheet.sect} секциям, чтобы лист не парусил`);}
    r.dwell-=dt;if(r.dwell<=0){r.carryKind=null;s.sheets++;s.sheetLayers.push(s.layer);s.needSheet=false;S.tasks.t2||done('t2');r.step='upSheet';}break;}
   case 'upSheet':if(moveZ(r,r.zRel+M.hAppr,M.vZ,dt))r.step='home';break;
   // ---- пустая паллета из стопки ----
-  case 'toStack':{const okZ=moveZ(r,pal.h*r.job.ps.n+M.hAppr,M.vZ,dt),okT=turnTo(r,r.job.ps.slot.ang,dt),okXY=moveTo(r,{x:r.job.ps.slot.cx,y:r.job.ps.slot.cy},dt);if(okXY&&okZ&&okT)r.step='downStack';break;}
+  case 'toStack':{const okXY=moveTo(r,{x:r.job.ps.slot.cx,y:r.job.ps.slot.cy},dt),zA=pal.h*r.job.ps.n+M.hAppr;
+   const okZ=moveZ(r,okXY?zA:Math.max(zA,zSafe(r,0)),M.vZ,dt),okT=turnTo(r,r.job.ps.slot.ang,dt);if(okXY&&okZ&&okT)r.step='downStack';break;}
   case 'downStack':if(moveZ(r,pal.h*r.job.ps.n,M.vPlace,dt)){r.step='gripPallet';r.dwell=2;}break;
   case 'gripPallet':r.dwell-=dt;if(r.dwell<=0){if(r.job.ps.n>0){r.job.ps.n--;r.carryKind='pallet';r.zRel=r.z;r.step='upStack';}else r.step='wait';}break;
   case 'upStack':if(moveZ(r,r.zRel+M.hAppr,M.vPlace,dt))r.step='toStation';break;
   case 'toStation':{if(s.agent||s.present){r.step='wait';r.carryKind=null;break;}
-   const okZ=moveZ(r,pal.h+M.hAppr,M.vZ,dt),okT=turnTo(r,s.slot.ang,dt),okXY=moveTo(r,{x:s.slot.cx,y:s.slot.cy},dt,0.6);if(okXY&&okZ&&okT)r.step='downStation';break;}
+   const okXY=moveTo(r,{x:s.slot.cx,y:s.slot.cy},dt,0.6),zA=pal.h+M.hAppr;
+   const okZ=moveZ(r,okXY?zA:Math.max(zA,zSafe(r,pal.h)),M.vZ,dt),okT=turnTo(r,s.slot.ang,dt);if(okXY&&okZ&&okT)r.step='downStation';break;}
   case 'downStation':if(moveZ(r,pal.h,M.vPlace,dt)){r.step='placePallet';r.dwell=1;r.zRel=r.z;}break;
   case 'placePallet':r.dwell-=dt;if(r.dwell<=0){r.carryKind=null;Object.assign(s,newPal(true));if(c.sheet.mode==='bottom'&&S.mags.length)s.needSheet=true;S.stats.exch++;log(`Станция ${s.id}: робот поставил пустую паллету из стопки (B${s.id}=1, осталось ${r.job.ps.n})`);S.tasks.t15||done('t15');r.step='upStation';}break;
   case 'upStation':if(moveZ(r,r.zRel+pal.h+M.hAppr,M.vZ,dt))r.step='home';break;
