@@ -45,11 +45,12 @@ function build3D(){
   const g1=new THREE.Group();g1.position.set(0,0.2,0);g0.add(g1);const ua=box3(L,0.16,0.14,COL3.robot);ua.position.x=L/2;g1.add(ua);const j1=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.22,20),mat(0x2f3740));j1.rotation.x=Math.PI/2;g1.add(j1);
   const g2=new THREE.Group();g2.position.set(L,0,0);g1.add(g2);const fa=box3(L,0.13,0.12,COL3.robot);fa.position.x=L/2;g2.add(fa);const j2=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.2,20),mat(0x2f3740));j2.rotation.x=Math.PI/2;g2.add(j2);
   const gw=new THREE.Group();gw.position.set(L,0,0);g2.add(gw);const fl=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,c.gripH*mm,16),mat(0x2f3740));fl.position.y=-c.gripH*mm/2;gw.add(fl);
-  const hb=D.heaviest,pw=c.grip.pick*hb.l*mm+0.05,pd=hb.w*mm+0.05;const plate=box3(pw,0.06,pd,0x4a525b);plate.position.y=-c.gripH*mm+0.03;gw.add(plate);
+  const hb=D.heaviest,pw=c.grip.pick*hb.l*mm+0.05,pd=hb.w*mm+0.05;
   const carry=new THREE.Group();carry.position.y=-c.gripH*mm;gw.add(carry);
+  const plate=box3(pw,0.06,pd,0x4a525b);plate.position.y=0.03;carry.add(plate);
   const cb=new THREE.Group();for(let j=0;j<c.grip.pick;j++){const b=box3(hb.l*mm-0.01,hb.h*mm,hb.w*mm-0.01,COL3.box[0]);b.position.set((j-(c.grip.pick-1)/2)*hb.l*mm,-hb.h*mm/2,0);cb.add(b);}cb.visible=false;carry.add(cb);
   const cs=box3(pal.W*mm,0.01,pal.L*mm,COL3.sheet);cs.position.y=-0.005;cs.visible=false;carry.add(cs);const cp=palletMesh(pal);cp.position.y=-pal.h*mm;cp.visible=false;carry.add(cp);
-  V3.robots.push({r,g0,g1,g2,gw,cb,cs,cp,L});});
+  V3.robots.push({r,g0,g1,g2,gw,carry,plate,cb,cs,cp,L,pw,pd,hb});});
  LY.robots.forEach(r=>r.slots.forEach(sl=>{const g=new THREE.Group();g.position.set(sl.cx*mm,0,sl.cy*mm);g.rotation.y=-sl.ang*Math.PI/180;R.add(g);
   const outline=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(pal.W*mm,pal.L*mm)),new THREE.LineBasicMaterial({color:COL3.fence}));outline.rotation.x=-Math.PI/2;outline.position.y=0.005;g.add(outline);
   const lb=label3(sl.id,0.5);lb.position.set(0,0.35,0);g.add(lb);
@@ -84,8 +85,16 @@ function render3D(){
  V3.robots.forEach(R=>{const r=S.robots[R.r.i];const dx=r.x-r.base.x,dz=r.y-r.base.y,yaw=Math.atan2(dz,dx);let d=Math.hypot(dx,dz)*mm;const hS=(c.baseH+350)*mm;let h=(r.z+c.gripH)*mm-hS;let Dd=Math.hypot(d,h);const L=R.L;if(Dd>2*L-0.01){const k=(2*L-0.01)/Dd;d*=k;h*=k;Dd=2*L-0.01;}if(d<0.05){d=0.05;Dd=Math.hypot(d,h);}
   const a1=Math.atan2(h,d)+Math.acos(clamp(Dd/(2*L),-1,1)),phi=Math.acos(clamp((2*L*L-Dd*Dd)/(2*L*L),-1,1)),a2=phi-Math.PI;
   R.g0.rotation.y=-yaw;R.g1.rotation.z=a1;R.g2.rotation.z=a2;R.gw.rotation.z=-(a1+a2);R.gw.rotation.y=0;
+  R.carry.rotation.y=yaw-(r.yaw||0)*Math.PI/180;   // кисть довёрнута по стороне паллеты
   R.cb.visible=r.carryKind==='box';R.cs.visible=r.carryKind==='sheet';R.cp.visible=r.carryKind==='pallet';
-  if(r.carryKind==='box'){const col=COL3.box[r.carryBi%4];R.cb.children.forEach((m,j)=>{m.visible=j<r.carry;m.material.color.setHex(col);});}});
+  if(r.carryKind==='box'){const col=COL3.box[r.carryBi%4],hb=R.hb;
+   // после перестроения зоны стоят блоком nc×nr, до него — рядом, как коробки пришли с конвейера
+   const g=r.job&&r.job.group,blk=['toPlace','downPlace','place'].includes(r.step)&&g&&g.nr>1;
+   const nc=Math.max(1,blk?g.nc:r.carry),nr=Math.max(1,blk?g.nr:1);
+   R.cb.children.forEach((m,j)=>{m.visible=j<r.carry;m.material.color.setHex(col);
+    if(j<r.carry)m.position.set((j%nc-(nc-1)/2)*hb.l*mm,-hb.h*mm/2,(Math.floor(j/nc)-(nr-1)/2)*hb.w*mm);});
+   R.plate.scale.set((nc*hb.l*mm+0.05)/R.pw,1,(nr*hb.w*mm+0.05)/R.pd);}
+  else R.plate.scale.set(1,1,1);});
  D.LY.convs.forEach((cv,i)=>{const key='cv'+i;if(!V3.pools[key])V3.pools[key]=[];const pool=V3.pools[key],b=cv.b,col=COL3.box[cv.bi%4];S.conv[i].boxes.forEach((bx,j)=>{if(!pool[j]){pool[j]=box3(b.l*mm-0.01,b.h*mm,b.w*mm-0.01,col);dyn.add(pool[j]);}const m=pool[j];m.visible=true;m.position.set((cv.x0+b.l/2+bx.p*(cv.len-b.l))*mm,(c.convH+b.h/2)*mm,cv.y*mm);});for(let j=S.conv[i].boxes.length;j<pool.length;j++)pool[j].visible=false;});
  S.st.forEach(s=>{const st=V3.stations[s.id];if(!st)return;const sig=`${s.present}|${s.layer}|${s.placed.length}|${s.parity}|${s.sheetLayers.length}|${s.complete}`;if(V3.cache[s.id]!==sig){V3.cache[s.id]=sig;buildStation3(s);}
   const off=s.phase==='out'?s.out*(pal.W+600):0;st.outer.position.set((s.slot.cx+s.slot.cos*off)*mm,0,(s.slot.cy+s.slot.sin*off)*mm);

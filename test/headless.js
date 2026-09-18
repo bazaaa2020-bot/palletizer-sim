@@ -36,7 +36,7 @@ check('спецификация и сигналы собраны', w.eval('DD.bo
 check('3D отключился без three.js', d.getElementById('v3msg').textContent.length > 0);
 
 console.log('Пуск и укладка (автоподача, автообмен)');
-w.eval(`CFG.conveyors[0].feed='rate';CFG.conveyors[0].rate=20;CFG.exch.reaction=5;CFG.sheet.cap=8;CFG.sheet.low=2;renderCfg();buildSim();renderArch();`);
+w.eval(`CFG.conveyors[0].feed='rate';CFG.conveyors[0].rate=20;CFG.exch.reaction=5;CFG.sheet.cap=4;CFG.sheet.low=1;renderCfg();buildSim();renderArch();`);
 check('состояние Stopped после сборки', S().packml === 'Stopped');
 click('#bReset'); run(2);
 check('после сброса Idle', S().packml === 'Idle', S().packml);
@@ -108,6 +108,49 @@ for (let i = 0; i < 3000; i++) {
 check('робот перестраивает захват в цикле', sawShift);
 check('укладка блоками идёт', S().stats.placed > 20, 'placed=' + S().stats.placed);
 check('на блоках коробки не терялись', S().stats.dropped === 0);
+
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();`);
+
+console.log('Реалистичная укладка (roadmap, п. 9)');
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.conveyors[0].feed='rate';CFG.conveyors[0].rate=30;CFG.exch.reaction=5;renderCfg();buildSim();renderArch();`);
+click('#bReset'); run(2); click('#bStart'); run(1);
+const snap = () => w.eval("(()=>{const r=S.robots[0];return{step:r.step,z:r.z,zRel:r.zRel,vz:r.vz,vxy:r.vxy,x:r.x,y:r.y,placed:S.stats.placed};})()");
+const yawFits = () => w.eval("(()=>{const r=S.robots[0];const t=r.step==='downPlace'?boxYaw(r.job.st,r.job.group):r.job.st.slot.ang;let d=(r.yaw-t)%360;if(d>180)d-=360;if(d<-180)d+=360;return Math.abs(d)<0.6;})()");
+const vPlace = w.eval('CFG.motion.vPlace'), aMax = w.eval('DD.aMax') * 1000;
+const seen = new Set();
+let vDown = 0, lateral = 0, accMax = 0, yawOk = true, dropped = 0, nPlace = 0, t0 = 0, touch = 0;
+let prev = snap();
+for (let i = 0; i < 4000; i++) {
+  w.eval('tick(0.05)');
+  const r = snap();
+  seen.add(r.step);
+  if (r.step === 'downPlace' || r.step === 'downPick' || r.step === 'downSheet') vDown = Math.max(vDown, Math.abs(r.vz));
+  if (r.step === 'upPick' || r.step === 'upPlace' || r.step === 'upSheet') lateral = Math.max(lateral, Math.hypot(r.x - prev.x, r.y - prev.y));
+  // ускорение меряем на ходу: приход оси в цель случается внутри такта и скачок там мнимый
+  if (r.step === prev.step) {
+    if (r.vxy > 0 && prev.vxy > 0) accMax = Math.max(accMax, Math.abs(r.vxy - prev.vxy) / 0.05);
+    if (r.vz > 0 && prev.vz > 0) accMax = Math.max(accMax, Math.abs(r.vz - prev.vz) / 0.05);
+  }
+  if (prev.step === 'downPlace' && r.step === 'place') touch = Math.max(touch, prev.vz);
+  if ((r.step === 'downPlace' || r.step === 'downSheet') && !yawFits()) yawOk = false;
+  if (r.placed > prev.placed) { nPlace++; if (Math.abs(r.z - r.zRel) > 2) dropped++; if (!t0) t0 = i; }
+  prev = r;
+}
+check('цикл проходит подвод, захват, отрыв и подъём', ['toPick','downPick','grip','upPick','toPlace','downPlace','place','upPlace'].every(x => seen.has(x)), [...seen].join(' '));
+check('коробка ложится только после опускания захвата', nPlace > 5 && dropped === 0, `укладок ${nPlace}, с высоты ${dropped}`);
+check('опускание идёт на скорости подвода', vDown > 0 && vDown <= vPlace * 1.05, `${vDown.toFixed(0)} против ${vPlace} мм/с`);
+check('касание слоя на скорости подвода, а не броском', touch > 0 && touch <= vPlace * 1.05, `${touch.toFixed(0)} мм/с`);
+check('отрыв и подъём строго вертикальные', lateral < 0.5, 'смещение ' + lateral.toFixed(2) + ' мм за такт');
+check('ускорение ограничено профилем', accMax <= aMax * 1.2, `${accMax.toFixed(0)} против ${aMax.toFixed(0)} мм/с²`);
+check('кисть доворачивается до опускания', yawOk);
+check('лист переносится с доворотом и ложится по секциям', seen.has('downSheet') && seen.has('upSheet') && w.eval('CFG.sheet.sect') > 1 && Math.abs(w.eval('DD.tRelSheet') - w.eval('CFG.sheet.sect * DD.grip.tRel')) < 1e-9);
+
+const kEff = w.eval('Object.values(DD.pats)[0].kEff'), tC = w.eval('DD.tCycle');
+const real = (4000 - t0) * 0.05 / ((w.eval('S.stats.placed') - 1) / kEff);
+check('симуляция сходится с расчётным тактом', real > tC * 0.7 && real < tC * 1.4, `${real.toFixed(2)} с против расчётных ${tC.toFixed(2)} с`);
+
+w.eval(`CFG.motion.vPlace=50;CFG.motion.hAppr=200;renderCfg();buildSim();`);
+check('медленнее подвод — длиннее такт', w.eval('DD.tCycleModel') > tC, w.eval('DD.tCycleModel').toFixed(2) + ' с');
 
 w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();`);
 
