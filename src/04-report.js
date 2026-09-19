@@ -122,9 +122,34 @@ const CSV_TABLES={
    h.m1.map(x=>x.m.n).join('; '),h.m2.map(x=>x.m.n).join('; '),h.m3.map(x=>x.m.n).join('; '),
    h.todo.map(k=>MEAS[k].n).join('; '),
    h.res.s,h.res.f,h.res.o,h.res.a,RISK_CLS[h.cls],h.ok?'да':'нет',h.sf?h.plr:'',h.sf||''])})},
+ oee:{name:'Смена: простои и OEE',file:'смена-OEE',build:(c,D,s)=>{
+  if(typeof S==='undefined'||!S||!S.oee||S.oee.obs<=0)
+   return{head:['Показатель','Значение','Ед.'],rows:[['Смена','не запускалась — прогоните ячейку на вкладке «Симуляция»','']]};
+  const K=oeeCalc(S.oee,S.stats,D),SH=shiftProj(K,c.shift,D),P=dtPareto(S.oee);
+  const R=[['Сводка','','','','',''],
+   ['Наблюдаемое время',csvNum(K.obs,0,s),'с','','',''],
+   ['Время работы (Execute)',csvNum(K.run,0,s),'с','','',''],
+   ['Готовность A',csvNum(K.A*100,1,s),'%','','',''],
+   ['Производительность P',csvNum(K.P*100,1,s),'%','','',''],
+   ['Качество Q',csvNum(K.Q*100,1,s),'%','','',''],
+   ['OEE',csvNum(K.oee*100,1,s),'%','','',''],
+   ['Уложено',csvNum(K.good,0,s),'шт.','','',''],
+   ['Уронено',csvNum(S.stats.dropped,0,s),'шт.','','',''],
+   ['Промахов захвата',csvNum(S.stats.missed,0,s),'шт.','','',''],
+   ['Паллет собрано',csvNum(S.stats.pallets,0,s),'шт.','','',''],
+   ['Сценарий тревог',SCEN[S.scen.key].n,'','','',''],
+   ['Проекция на смену, коробок',csvNum(SH.boxes,0,s),'шт.','','',''],
+   ['Проекция на смену, паллет',csvNum(SH.pallets,1,s),'шт.','','','']];
+  R.push(['','','','','','']);R.push(['Категории времени','','','','','']);
+  DT_ORDER.forEach(k=>R.push([DT_CAT[k].n,csvNum(S.oee.by[k]||0,0,s),'с',csvNum((S.oee.by[k]||0)/K.obs*100,1,s)+' %','','']));
+  R.push(['','','','','','']);R.push(['Причины простоя (Парето)','Всего, с','Раз','Доля, %','Накопленная, %','Категория']);
+  P.rows.forEach(x=>R.push([x.why,csvNum(x.t,0,s),x.n,csvNum(x.share*100,1,s),csvNum(x.cum*100,1,s),DT_CAT[x.cat].n]));
+  R.push(['','','','','','']);R.push(['Журнал простоев: от начала, с','Состояние','Категория','Причина','Длительность, с','']);
+  shiftRows().filter(x=>x.cat!=='run').forEach(x=>R.push([csvNum(x.t0,0,s),x.state,DT_CAT[x.cat].n,x.why,csvNum(x.dur,1,s),'']));
+  return{head:['Показатель','Значение','Ед.','Доля','Накопленная','Категория'],rows:R};}},
  warn:{name:'Замечания расчёта',file:'замечания',build:(c,D,s)=>({
   head:['№','Замечание'],rows:D.warnings.map((w,i)=>[i+1,w])})}};
-const CSV_ORDER=['bom','sig','params','sku','risk','pl','base','warn'];
+const CSV_ORDER=['bom','sig','params','sku','risk','pl','base','oee','warn'];
 let CSV_LAST='bom';
 // Один «лист» на файл; вариант «все таблицы» кладёт их блоками с заголовками.
 function csvBuild(key){const c=normalize(CFG),D=derive(c),s=csvSep(),T=CSV_TABLES[key];
@@ -283,6 +308,19 @@ function reportHTML(c,D,png){
   ['Промышленная сеть',c.fieldbus],
   ['Сигналы',`${D.io.DI} DI / ${D.io.DO} DO / ${D.io.SI} безопасных входов / ${D.io.SO} безопасных выходов / ${D.io.BUS} объектов по шине`],
   ['Модули ввода-вывода',`${D.io.diMod} × DI16, ${D.io.doMod} × DO16 (с запасом 20 %)`]]));
+ if(typeof S!=='undefined'&&S&&S.oee&&S.oee.obs>20){const K=oeeCalc(S.oee,S.stats,D),SH=shiftProj(K,c.shift,D),PR=dtPareto(S.oee);
+  H.push(`<h3>Смена: простои и OEE</h3>`+repTable([
+   ['Наблюдаемое время',`${f0(K.obs)} с, из них работа ${f0(K.run)} с; сценарий тревог — ${SCEN[S.scen.key].n.toLowerCase()}`],
+   ['Готовность A',`${f1(K.A*100)} % — доля времени в состоянии Execute`],
+   ['Производительность P',`${f1(K.P*100)} % при идеальном такте ${f2(K.tIdeal)} с на коробку`],
+   ['Качество Q',`${f1(K.Q*100)} % — ${K.good} уложено из ${K.total} взятых в работу (уронено ${S.stats.dropped}, промахов ${S.stats.missed})`],
+   ['OEE',`<b>${f1(K.oee*100)} %</b> = A × P × Q`],
+   ['Проекция на смену',`${c.shift.len} ч минус ${c.shift.breaks} мин плановых остановок → ${f0(SH.boxes)} коробок, ${f1(SH.pallets)} паллет; потолок без потерь ${f0(SH.ideal)} коробок`]]));
+  H.push(repCols(['Категория времени','Секунд','Доля'],
+   DT_ORDER.map(k=>[DT_CAT[k].n,f0(S.oee.by[k]||0),f1((S.oee.by[k]||0)/K.obs*100)+' %'])));
+  if(PR.rows.length)H.push(repCols(['Причина простоя','Раз','Всего, с','Доля','Накопленная'],
+   PR.rows.slice(0,10).map(x=>[x.why,String(x.n),f0(x.t),f1(x.share*100)+' %',f1(x.cum*100)+' %'])));
+  H.push(`<p class="sub">OEE считается на наблюдаемом окне с первого пуска, а не на полной смене. Идеальный такт взят по роботу как ограничителю; качество — доля тары, доехавшей до слоя без потерь.</p>`);}
  {const R=D.risk;
   H.push(`<h3>Оценка риска по ISO 12100</h3>`+repTable([
    ['Опасностей в реестре',`${R.rows.length}; выведены из состава ячейки`],

@@ -311,7 +311,8 @@ function buildSim(){
   st:DD.stations.map(s=>Object.assign(newPal(c.exch.in!=='robot'),{id:s.id,robot:s.robot,slot:s,bi:s.bi,pat:s.pat})),
   mags:DD.mags.map(m=>({id:m.id,robot:m.robot,slot:m,sheets:c.sheet.cap,loading:false,waitT:0,agent:null})),
   stacks:DD.stacks.map(p=>({id:p.id,robot:p.robot,slot:p,n:c.exch.stack})),
-  agents:[],stats:{placed:0,run:0,pallets:0,dropped:0,missed:0,exch:0,refills:0},nextId:1,timer:0,tasks:TASKSTATE,
+  agents:[],stats:{placed:0,run:0,pallets:0,dropped:0,missed:0,exch:0,refills:0,sheets:0,setPallets:0},nextId:1,timer:0,tasks:TASKSTATE,
+  oee:newShift(),scen:{key:($('scenSel')||{}).value||'none',t:0,i:0,on:false},
   flags:{lcTripped:false,estopTripped:false,palletDone:false,palletRemoved:false,vfdTripped:false,typesPlaced:new Set(),optApplied:prevOpt,agentSeen:new Set()}};
  if(c.sheet.mode==='bottom')S.st.forEach(s=>{if(s.present)s.needSheet=S.mags.length>0;});
  $('ovr').value=c.speedPct;$('ovrV').textContent=c.speedPct+' %';
@@ -508,7 +509,7 @@ function robotTick(r,dt){
    const okZ=moveZ(r,okXY?zA:Math.max(zA,zSafe(r,4)),M.vZ,dt),okT=turnTo(r,s.slot.ang,dt);if(okXY&&okZ&&okT)r.step='downSheet';break;}
   case 'downSheet':if(moveZ(r,zSheetOf(s,b),M.vPlace,dt)){r.step='placeSheet';r.dwell=DD.tRelSheet;r.zRel=r.z;r.sect=0;}break;
   case 'placeSheet':{const n=Math.min(c.sheet.sect,Math.floor((DD.tRelSheet-r.dwell)/Math.max(0.01,DD.grip.tRel))+1);if(n>r.sect){r.sect=n;if(n===1)log(`Лист лёг на слой ${s.layer} станции ${s.id}: сброс вакуума по ${c.sheet.sect} секциям, чтобы лист не парусил`);}
-   r.dwell-=dt;if(r.dwell<=0){r.carryKind=null;s.sheets++;s.sheetLayers.push(s.layer);s.needSheet=false;S.tasks.t2||done('t2');r.step='upSheet';}break;}
+   r.dwell-=dt;if(r.dwell<=0){r.carryKind=null;s.sheets++;S.stats.sheets++;s.sheetLayers.push(s.layer);s.needSheet=false;S.tasks.t2||done('t2');r.step='upSheet';}break;}
   case 'upSheet':if(moveZ(r,r.zRel+M.hAppr,M.vZ,dt))r.step='home';break;
   // ---- пустая паллета из стопки ----
   case 'toStack':{const okXY=moveTo(r,{x:r.job.ps.slot.cx,y:r.job.ps.slot.cy},dt),zA=pal.h*r.job.ps.n+M.hAppr;
@@ -520,7 +521,7 @@ function robotTick(r,dt){
    const okXY=moveTo(r,{x:s.slot.cx,y:s.slot.cy},dt,0.6),zA=pal.h+M.hAppr;
    const okZ=moveZ(r,okXY?zA:Math.max(zA,zSafe(r,pal.h)),M.vZ,dt),okT=turnTo(r,s.slot.ang,dt);if(okXY&&okZ&&okT)r.step='downStation';break;}
   case 'downStation':if(moveZ(r,pal.h,M.vPlace,dt)){r.step='placePallet';r.dwell=1;r.zRel=r.z;}break;
-  case 'placePallet':r.dwell-=dt;if(r.dwell<=0){r.carryKind=null;Object.assign(s,newPal(true));if(c.sheet.mode==='bottom'&&S.mags.length)s.needSheet=true;S.stats.exch++;log(`Станция ${s.id}: робот поставил пустую паллету из стопки (B${s.id}=1, осталось ${r.job.ps.n})`);S.tasks.t15||done('t15');r.step='upStation';}break;
+  case 'placePallet':r.dwell-=dt;if(r.dwell<=0){r.carryKind=null;Object.assign(s,newPal(true));if(c.sheet.mode==='bottom'&&S.mags.length)s.needSheet=true;S.stats.exch++;S.stats.setPallets++;log(`Станция ${s.id}: робот поставил пустую паллету из стопки (B${s.id}=1, осталось ${r.job.ps.n})`);S.tasks.t15||done('t15');r.step='upStation';}break;
   case 'upStation':if(moveZ(r,r.zRel+pal.h+M.hAppr,M.vZ,dt))r.step='home';break;
   case 'home':moveZ(r,zTravel(r),M.vZ,dt);if(moveTo(r,r.home,dt))r.step='wait';break;}}
 function finishStop(){S.conv.forEach(cv=>cv.vfd.sto=true);allPower(false);setState('Stopped',S.accessReq?'Роботы в исходной, конвейеры стоят':'Остановлено оператором');if(S.accessReq){S.lock=false;log('Q1 = 0: замок двери разблокирован, доступ разрешён','warn');}}
@@ -580,9 +581,37 @@ function tick(dt){
  autoExchange(dt);S.agents=S.agents.filter(a=>agentTick(a,dt));
  if(S.packml==='Starting'&&S.timer>.6)setState('Execute','Ячейка работает');
  if(S.packml==='Execute')S.stats.run+=dt;
+ shiftTick(dt);scenTick(dt);
+ if($('tab-oee').classList.contains('on')){S.oeeT=(S.oeeT||0)+dt;if(S.oeeT>.5){S.oeeT=0;renderOEE();}}
  S.robots.forEach(r=>robotTick(r,dt));
  if(S.packml==='Execute'){if(!S.tasks.t3&&S.flags.lcTripped)done('t3');if(!S.tasks.t6&&S.flags.estopTripped)done('t6');if(!S.tasks.t9&&S.flags.vfdTripped)done('t9');if(!S.tasks.t8&&c.conveyors.length>=2&&S.flags.typesPlaced.size>=2)done('t8');if(!S.tasks.t17&&S.flags.agentSeen.has('amr')&&S.stats.exch>0)done('t17');}
  render();}
+// ---------- смена, простои, OEE ----------
+// Учёт идёт от первого пуска: до него ячейка ещё не «в смене» и простой не копится.
+function newShift(){return{on:false,obs:0,by:{run:0,fault:0,starve:0,chg:0,idle:0},log:[],cur:null,t:0};}
+function shiftTick(dt){const O=S.oee;
+ if(!O.on){if(S.packml==='Starting'||S.packml==='Execute'){O.on=true;log('Учёт смены начат: время, простои и OEE считаются с этой секунды');}else return;}
+ const cat=dtCat(S.packml),why=S.why||S.packml;
+ if(!O.cur||O.cur.state!==S.packml||O.cur.why!==why){
+  if(O.cur)O.log.push(O.cur);
+  O.cur={state:S.packml,why,cat,t0:O.t,dur:0};}
+ O.cur.dur+=dt;O.by[cat]+=dt;O.obs+=dt;O.t+=dt;}
+function shiftRows(){const O=S.oee;return O.cur?O.log.concat([O.cur]):O.log.slice();}
+function shiftReset(){S.oee=newShift();S.stats={placed:0,run:0,pallets:0,dropped:0,missed:0,exch:0,refills:0,sheets:0,setPallets:0};
+ S.scen={key:$('scenSel').value,t:0,i:0,on:false};
+ log(`Счётчики смены сброшены. Сценарий: ${SCEN[S.scen.key].n.toLowerCase()}`);renderOEE();}
+// Сценарий тревог: события отсчитываются от пуска и разыгрываются теми же кнопками пульта.
+function scenTick(dt){const sc=S.scen,S0=SCEN[sc.key];if(!S0||!S0.ev.length)return;
+ if(!sc.on){if(S.packml!=='Execute'&&S.packml!=='Starting')return;sc.on=true;
+  log(`Сценарий «${S0.n}» запущен: ${S0.ev.length} событ${S0.ev.length===1?'ие':'ий'} по ходу смены`,'warn');}
+ sc.t+=dt;
+ while(sc.i<S0.ev.length&&sc.t>=S0.ev[sc.i].t){const e=S0.ev[sc.i++];
+  log(`Сценарий, ${f0(e.t)} с: ${e.n}`,'warn');scenFire(e.b);
+  if(sc.i===S0.ev.length)log(`Сценарий «${S0.n}» отработан — разберите журнал простоев на вкладке «Смена и OEE»`,'warn');}}
+function scenFire(b){
+ if(b==='pal'){const s=S.st.find(x=>x.present&&!x.agent);if(s)dispatch('pallet',s,CFG.exch.out);return;}
+ const el=document.querySelector(`#tab-sim [data-b="${b}"]`);if(el){el.click();return;}
+ simEvent(b);}
 // ---------- пульт ----------
 $('bStart').onclick=()=>{if(S.packml!=='Idle'||DD.reachStatus==='bad')return;S.timer=0;runDrives();allPower(true);setState('Starting','Разгон конвейеров, включение роботов');};
 $('bStop').onclick=()=>{if(!['Execute','Suspended','Held','Starting'].includes(S.packml))return;stopDrives(false);if(S.packml==='Held'){allPower(false);S.safetyStop=false;S.autoResume=false;setState('Stopped','Остановлено из Held');return;}allPower(true);setState('Stopping','Роботы завершают операции, конвейеры тормозят');};
@@ -593,7 +622,8 @@ $('bReset').onclick=()=>{
 $('bEstop').onclick=()=>{S.estop=!S.estop;$('bEstop').classList.toggle('pressed',S.estop);if(S.estop){S.flags.estopTripped=true;abort('Аварийный стоп S1 нажат');}else log('Аварийный стоп отпущен. Для возобновления требуется сброс','warn');};
 $('tScale').onchange=e=>{S.timeScale=+e.target.value;};
 $('ovr').oninput=e=>{S.override=+e.target.value/100;$('ovrV').textContent=e.target.value+' %';};
-$('tab-sim').addEventListener('click',e=>{const b=e.target.dataset.b;if(!b)return;const i=e.target.dataset.i;
+$('tab-sim').addEventListener('click',e=>{const b=e.target.dataset.b;if(!b)return;simEvent(b,e.target.dataset.i);});
+function simEvent(b,i){
  if(b==='box'){const cv=S.conv[+i];if(cv.boxes.some(x=>x.p<.13)){log(`Место на входе конвейера ${+i+1} занято (B${+i+1}5=1)`,'warn');return;}cv.boxes.push({p:0,id:S.nextId++});cv.fed++;}
  if(b==='refill'){const m=S.mags.find(x=>x.id===i);if(!m||m.agent){log('Пополнение уже идёт','warn');return;}dispatch('sheets',m,CFG.exch.sheetsBy==='amr'?'amr':'person');}
  if(b==='stack'){S.stacks.forEach(p=>p.n=CFG.exch.stack);log('Стопка паллет пополнена погрузчиком через проём S8 (B5=1)');}
@@ -611,8 +641,62 @@ $('tab-sim').addEventListener('click',e=>{const b=e.target.dataset.b;if(!b)retur
  if(b==='pal'){const s=S.st.find(x=>x.id===i);if(s.agent){log(`У станции ${i} уже работает ${AGENT[s.agent.kind].name}`,'warn');return;}if(!s.present&&CFG.exch.in!=='vehicle'){log('Станция пуста: паллету поставит '+(CFG.exch.in==='robot'?'робот из стопки':'диспенсер'),'warn');return;}dispatch('pallet',s,CFG.exch.out);}
  if(b==='vac'){const r=S.robots[0];if(r.carryKind==='box'){S.stats.dropped+=r.carry;r.carry=0;r.carryKind=null;hold(GRIPPERS[CFG.grip.type].vac?'Потеря вакуума в переносе: PS1=0 — коробка упала, робот остановлен':'Захват раскрылся в переносе: датчик S_GR1=0 — коробка упала');}else log('Отказ имитируется во время переноса коробки роботом 1','warn');}
  if(b==='vfd'){const cv=S.conv[0];if(cv.type==='mdr'){log('На мотор-роликах нет ЧП: отказ зоны сообщит контроллер зоны по шине','warn');return;}if(cv.vfd.fault)return;cv.vfd.fault=true;S.flags.vfdTripped=true;hold('ЧП 1: авария F0001 перегрузка по току (заклинил ролик)');}
- if(b==='stuck'){S.conv[0].stuck=true;log('Датчик B11 залип в «1» (загрязнён отражатель) — ждите реакции робота','warn');}});
+ if(b==='stuck'){S.conv[0].stuck=true;log('Датчик B11 залип в «1» (загрязнён отражатель) — ждите реакции робота','warn');}}
 $('drives').addEventListener('input',e=>{const i=e.target.dataset.acc;if(i===undefined)return;S.conv[+i].vfd.accel=+e.target.value;$('vAccV'+i).textContent=f1(+e.target.value)+' с';});
+// ---------- вкладка «Смена и OEE» ----------
+const mmss=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
+const hhmm=t=>t>=3600?`${Math.floor(t/3600)} ч ${Math.round(t%3600/60)} мин`:`${Math.round(t/60)} мин`;
+function oeeBarSVG(K){
+ const W=884,x0=8,y=26,hgt=54;let x=x0,s='';
+ if(K.obs<=0)return `<text x="${W/2}" y="${y+hgt/2+5}" text-anchor="middle" font-size="13" fill="var(--muted)">Смена ещё не начата — нажмите «Пуск» на вкладке «Симуляция»</text>`;
+ K.parts.forEach(p=>{const w=(W-x0)*p.share;if(w<=0)return;
+  s+=`<rect x="${x}" y="${y}" width="${w}" height="${hgt}" fill="var(${DT_CAT[p.k].col})" opacity="${p.k==='run'?.85:.7}"/>`;
+  if(w>44)s+=`<text x="${x+w/2}" y="${y+hgt/2+5}" text-anchor="middle" font-size="12" font-weight="600" fill="#fff">${f0(p.share*100)} %</text>`;
+  s+=`<text x="${x+w/2}" y="${y+hgt+18}" text-anchor="middle" font-size="11" fill="var(--muted)">${w>54?mmss(p.t):''}</text>`;
+  x+=w;});
+ s+=`<text x="${x0}" y="${y-8}" font-size="11.5" fill="var(--muted)">Наблюдаемое время ${mmss(K.obs)} · работа ${mmss(K.run)} · готовность ${f0(K.A*100)} %</text>`;
+ return s;}
+function renderOEE(){
+ if(typeof S==='undefined'||!S||!S.oee)return;
+ const c=CFG,D=DD,K=oeeCalc(S.oee,S.stats,D),bd=(s,t)=>`<span class="badge ${s}">${t}</span>`;
+ const pct=v=>f0(v*100)+' %',grade=v=>v>=.85?'ok':v>=.6?'warn':'bad';
+ $('oeeCards').innerHTML=[
+  ['Готовность A',pct(K.A),`работа ${mmss(K.run)} из ${mmss(K.obs)}`,grade(K.A)],
+  ['Производительность P',pct(K.P),`идеал ${f0(K.work)} с из ${f0(K.run)} с работы`,grade(K.P)],
+  ['Качество Q',pct(K.Q),`${K.good} годных из ${K.total}`,grade(K.Q)],
+  ['OEE',pct(K.oee),'A × P × Q',grade(K.oee)]]
+  .map(x=>`<div class="card"><span>${x[0]}</span><b style="color:var(--${x[3]==='ok'?'okfg':x[3]==='warn'?'warnfg':'badfg'})">${x[1]}</b><span>${x[2]}</span></div>`).join('');
+ $('oeeNote').innerHTML=K.obs<=0?'Смена не начата. Выберите сценарий тревог на вкладке «Симуляция», нажмите «Начать смену», затем «Пуск» — учёт пойдёт с первого пуска.'
+  :`Окно наблюдения ${mmss(K.obs)}; уложено ${K.good}, уронено ${S.stats.dropped}, промахов ${S.stats.missed}, паллет ${S.stats.pallets}. Сценарий: ${SCEN[S.scen.key].n.toLowerCase()}${S.scen.on?`, событий разыграно ${S.scen.i} из ${SCEN[S.scen.key].ev.length}`:''}.`;
+ $('oeeBar').innerHTML=oeeBarSVG(K);
+ $('oeeLeg').innerHTML=`<div class="oeeleg">${DT_ORDER.map(k=>`<span><i style="background:var(${DT_CAT[k].col})"></i>${DT_CAT[k].n} — ${mmss(S.oee.by[k]||0)}<small style="color:var(--muted)"> · ${DT_CAT[k].d}</small></span>`).join('')}</div>`;
+ const P=dtPareto(S.oee);
+ $('oeePar').innerHTML='<tr><th>Причина</th><th>Категория</th><th>Раз</th><th>Всего</th><th>Доля</th><th>Накопленная</th></tr>'
+  +(P.rows.length?P.rows.slice(0,12).map(r=>`<tr><td>${r.why}</td><td class="tag">${DT_CAT[r.cat].n}</td><td>${r.n}</td><td>${mmss(r.t)}</td>
+   <td class="nw"><div style="background:var(${DT_CAT[r.cat].col});height:9px;width:${Math.max(6,r.share*70)}px;border-radius:2px;display:inline-block"></div> ${f0(r.share*100)} %</td><td style="color:var(--muted)">${f0(r.cum*100)} %</td></tr>`).join('')
+   :'<tr><td colspan="6" style="color:var(--muted)">Простоев пока нет.</td></tr>');
+ const SH=shiftProj(K,c.shift,D);
+ $('oeeShift').innerHTML=K.obs<=0?'<p class="note">Появится, когда пойдёт смена.</p>'
+  :`<div class="check"><div>За смену при такой работе<small>плановое время ${hhmm(SH.plan)} = ${c.shift.len} ч минус ${c.shift.breaks} мин плановых остановок</small></div>${bd(grade(K.oee),`${f0(SH.pallets)} паллет · ${f0(SH.boxes)} коробок`)}</div>
+  <div class="check"><div>Потолок без потерь<small>если бы OEE был 100 %: ${f0(SH.ideal)} коробок</small></div>${bd('ok',`недобор ${f0(SH.ideal-SH.boxes)} кор.`)}</div>
+  ${SH.lost.filter(x=>x.t>0).map(x=>`<div class="check"><div>${DT_CAT[x.k].n}<small>${DT_CAT[x.k].d}</small></div>${bd(x.k==='fault'?'bad':'warn',hhmm(x.t)+' за смену')}</div>`).join('')}`;
+ $('shLen').value=c.shift.len;$('shBrk').value=c.shift.breaks;
+ const rows=shiftRows().filter(x=>x.cat!=='run');
+ $('oeeLog').innerHTML='<tr><th>От начала</th><th>Состояние</th><th>Категория</th><th>Причина</th><th>Длительность</th></tr>'
+  +(rows.length?rows.slice(-40).reverse().map(x=>`<tr><td class="tag">${mmss(x.t0)}</td><td class="tag">${x.state}</td><td>${DT_CAT[x.cat].n}</td><td>${x.why}</td><td>${mmss(x.dur)}</td></tr>`).join('')
+   :'<tr><td colspan="5" style="color:var(--muted)">Записей нет.</td></tr>');
+ $('oeeText').innerHTML=`<h3>Как считается</h3>
+<p><b>Готовность A</b> = время работы ÷ наблюдаемое время. Работа — это состояние Execute; всё остальное время ячейка стоит, и причина у простоя всегда есть. Категории соответствуют PackML: Held и Aborted — отказ оборудования (материал есть, виновата машина), Suspended — нехватка материала или обмен (машина исправна, виноват поток), Starting, Stopping и Resetting — переходы, Stopped и Idle — простой без задания.</p>
+<p><b>Производительность P</b> = идеальное время сделанной работы ÷ время работы. Идеальное время считается по тому, что ячейка действительно сделала: ${K.total} циклов с тарой по ${f2(K.tIdeal)} с${S.stats.sheets?`, ${S.stats.sheets} циклов с листом по ${f1(D.tSheet)} с`:''}${S.stats.setPallets?`, ${S.stats.setPallets} циклов с пустой паллетой по ${f1(D.tPallet)} с`:''} — итого ${f0(K.work)} с против ${f0(K.run)} с фактической работы. Такт берётся расчётный (${f2(D.tCycle)} с на цикл — геометрия ${f2(D.tCycleModel)} с и норматив робота ${f2(D.tCycleNorm)} с, берётся больший). Значение ограничено сверху единицей: там, где такт задан нормативом робота, фазовая модель движений идёт на несколько процентов быстрее расчёта, и P упирается в потолок — норматив в движения не заложен. Если подача медленнее робота, это видно именно здесь — ячейка работает, но ждёт коробку.</p>
+<p><b>Качество Q</b> = уложенное ÷ всё, что ячейка взяла в работу. В знаменателе уложенные, уронённые и промахи захвата: уронённая коробка — брак, промах — тара, которая ушла с конвейера мимо паллеты. Для паллетизации это и есть «качество»: доля тары, доехавшей до слоя без потерь.</p>
+<p><b>OEE</b> = A × P × Q. Мировой ориентир для упаковочных линий — 85 %, и достигается он не за счёт одного множителя: 90 % × 95 % × 99 % ≈ 85 %. Поэтому смотреть надо на Парето причин, а не на итоговое число.</p>
+<h3>Что попробовать</h3>
+<ul><li>Прогоните «Спокойную смену» и «Тяжёлую смену» на одной и той же конфигурации: конструкция не менялась, а OEE отличается вдвое — это и есть цена надёжности захвата и приводов.</li>
+<li>Поставьте одну станцию вместо двух и посмотрите, как растёт категория «ожидание материала и обмена»: каждый обмен паллеты робот простаивает целиком.</li>
+<li>Поставьте ручную подачу и сравните P с готовностью: подача медленнее робота не роняет A, она роняет именно производительность.</li>
+<li>После серии отказов посмотрите Парето: одна причина обычно даёт больше половины простоя, и чинить надо её, а не всё сразу.</li></ul>`;}
+$('tab-oee').addEventListener('input',e=>{const k=e.target.dataset.s;if(!k)return;const v=+e.target.value;
+ if(!isFinite(v))return;CFG.shift[k]=v;normalize(CFG);saveCfg();renderOEE();});
 // ---------- отрисовка ----------
 function armPts(r){const L=DD.rob.reach/2,dx=r.x-r.base.x,dy=r.y-r.base.y;let d=Math.hypot(dx,dy);d=clamp(d,1,2*L-1);const a=Math.atan2(dy,dx),c=Math.acos(d/(2*L)),ex=r.base.x+L*Math.cos(a-c),ey=r.base.y+L*Math.sin(a-c);const P=GG.P,[bx,by]=P(r.base.x,r.base.y),[px,py]=P(ex,ey),[tx,ty]=P(r.x,r.y);return`${bx},${by} ${px.toFixed(1)},${py.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;}
 function palSvg(s){const pal=DD.pal,sc=GG.sc,b=boxOf(CFG,s.bi),col=boxColor(s.bi);if(!s.present)return'';
@@ -655,7 +739,7 @@ function render(){
  LIVE_DO.forEach(d=>{const e=$('do-'+d[0]);if(!e)return;e.classList.toggle('on',!!d[2]());if(d[3])e.classList.toggle(d[3],true);});
  S.conv.forEach((cv,i)=>{const v=cv.vfd;if(cv.type==='mdr'){$('vS'+i).textContent=v.run?'Работа':'Готов';$('vR'+i).textContent=v.run?'да':'нет';const z=$('zn'+i);const zones=z.children.length;const occ=new Set(cv.boxes.map(b=>Math.min(zones-1,Math.floor(b.p*zones))));[...z.children].forEach((el,j)=>el.classList.toggle('on',occ.has(j)));}
   else{$('vT'+i).textContent=f1(v.target)+' Гц';$('vA'+i).textContent=f1(v.actual)+' Гц';$('vS'+i).textContent=v.fault?'АВАРИЯ F0001':v.sto?'Заблокирован':v.actual>0&&v.actual<v.target?'Разгон':v.actual>v.target?'Торможение':v.run?'Работа':'Готов';$('vSTO'+i).textContent=v.sto?'активно':'снято';$('vBar'+i).style.width=(v.actual/50*100)+'%';}});
- const st=S.stats,hrs=st.run/3600;$('stats').innerHTML=`<div>Уложено<b>${st.placed}</b></div><div>Паллет<b>${st.pallets}</b></div><div>Факт кор/ч<b>${st.run>20?f0(st.placed/hrs):'—'}</b></div><div>Расчёт кор/ч<b>${f0(D.bottleneck)}</b></div><div>Время Execute<b>${f0(st.run)} с</b></div><div>Уронено<b>${st.dropped}</b></div><div>Промахов<b>${st.missed}</b></div><div>Обменов паллет<b>${st.exch}</b></div><div>Пополнений листов<b>${st.refills}</b></div>`;
+ const st=S.stats,hrs=st.run/3600;$('stats').innerHTML=`<div>Уложено<b>${st.placed}</b></div><div>Паллет<b>${st.pallets}</b></div><div>Факт кор/ч<b>${st.run>20?f0(st.placed/hrs):'—'}</b></div><div>Расчёт кор/ч<b>${f0(D.bottleneck)}</b></div><div>Время Execute<b>${f0(st.run)} с</b></div><div>Уронено<b>${st.dropped}</b></div><div>Промахов<b>${st.missed}</b></div><div>Обменов паллет<b>${st.exch}</b></div><div>Пополнений листов<b>${st.refills}</b></div>${(()=>{const K=oeeCalc(S.oee,S.stats,D);return K.obs>20?`<div>Готовность<b>${f0(K.A*100)} %</b></div><div>OEE<b>${f0(K.oee*100)} %</b></div>`:'';})()}`;
  $('bStart').disabled=S.packml!=='Idle'||D.reachStatus==='bad';
  $('bStop').disabled=!['Execute','Suspended','Held','Starting'].includes(S.packml);
  $('bReset').disabled=!['Aborted','Stopped','Held'].includes(S.packml);
@@ -689,9 +773,13 @@ function initHelp(){
  $('gloss').innerHTML=GLOSS.map(g=>`<dt>${g[0]}</dt><dd>${g[1]}</dd>`).join('');
  $('stdText').innerHTML=`<h3>Нормы, к которым привязан тренажёр</h3><ul><li>ГОСТ Р ИСО 12100 — оценка рисков.</li><li>ГОСТ Р ИСО 13849-1/-2 — PL, категории архитектуры, валидация.</li><li>ГОСТ Р МЭК 60204-1 — электрооборудование машин, категории стопов.</li><li>ГОСТ Р ИСО 10218-1/-2, ISO/TS 15066 — роботы, коллаборативные режимы.</li><li>ГОСТ ИСО 13855, 13857, 14119, ISO 14120 — расстояния, ограждения, блокировки.</li><li>EN 415-4 — безопасность паллетайзеров; ISO 3691-4 — безопасность беспилотных транспортных средств (AMR/AGV).</li><li>ISA-TR88.00.02 (PackML), МЭК 60848 (GRAFCET), МЭК 61131-3, МЭК 61439-1.</li><li>Методика расчёта вакуумных захватов — по рекомендациям производителей присосок (три расчётных случая, коэффициент запаса 1,5–2).</li><li>Методика оценки производительности паллетайзера по циклам на паллету (REDCARGO PRO130).</li></ul><h3>Что упрощено в модели</h3><p>Схемы укладки — из семейства сетка / две зоны / пинвил без перевязки внутри слоя; конвейер — установившийся режим; цикл робота — по расстояниям в плане с нормативом циклов; поля сканеров — круги; тележки и люди идут по прямой к проёму; расход через картон и время набора вакуума — оценочные. Все параметры каталога подлежат проверке по паспорту.</p>`;}
 // ======================= ИНИЦИАЛИЗАЦИЯ =======================
-function showTab(t){if(t==='pl')renderPL();if(t==='risk')renderRisk();document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));if(t==='3d'&&typeof resize3D==='function')resize3D();}
+function showTab(t){if(t==='pl')renderPL();if(t==='risk')renderRisk();if(t==='oee')renderOEE();document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));if(t==='3d'&&typeof resize3D==='function')resize3D();}
 $('tabs').addEventListener('click',e=>{const t=e.target.dataset.tab;if(t)showTab(t);});
-initHelp();renderCfg();renderPL();renderRisk();if(typeof init3D==='function')init3D();buildSim();renderArch();
+$('scenSel').innerHTML=SCEN_ORDER.map(k=>`<option value="${k}">${SCEN[k].n}</option>`).join('');
+$('scenSel').onchange=()=>{S.scen={key:$('scenSel').value,t:0,i:0,on:false};$('scenNote').textContent=SCEN[S.scen.key].note;log(`Выбран сценарий: ${SCEN[S.scen.key].n.toLowerCase()}. Он начнётся с ближайшего пуска`,'warn');};
+$('scenNote').textContent=SCEN.none.note;
+$('bShift').onclick=()=>shiftReset();
+initHelp();renderCfg();renderPL();renderRisk();if(typeof init3D==='function')init3D();buildSim();renderArch();renderOEE();
 let last=performance.now();
 function loop(now){const dt=Math.min(.1,(now-last)/1000)*(S.timeScale||1);last=now;tick(dt);if(typeof render3D==='function'&&$('tab-3d').classList.contains('on'))render3D();requestAnimationFrame(loop);}
 requestAnimationFrame(loop);

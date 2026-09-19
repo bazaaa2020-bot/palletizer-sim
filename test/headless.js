@@ -359,6 +359,88 @@ check('вкладка PL отрисовывается', (() => { w.eval('showTab
 check('раздел PL попадает в отчёт', w.eval(`reportHTML(CFG,derive(CFG),null)`).indexOf('Performance Level') > 0);
 w.eval('showTab("sim")');
 
+console.log('Смена, простои и OEE (п. 7)');
+// прогон смены: оператор реагирует на остановки сбросом и пуском
+const shift = (scen, sec, extra) => {
+  w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.conveyors[0].feed='rate';CFG.conveyors[0].rate=25;
+   CFG.exch.reaction=4;${extra || ''}renderCfg();buildSim();`);
+  d.getElementById('scenSel').value = scen;
+  d.getElementById('scenSel').dispatchEvent(new w.Event('change'));
+  d.getElementById('bShift').click();
+  click('#bReset'); run(2); click('#bStart');
+  for (let k = 0; k < sec / 10; k++) { run(10);
+    const st = w.eval('S.packml');
+    if (['Held', 'Aborted', 'Stopped'].includes(st)) {
+      if (w.eval('S.door') === 'open') click('#tab-sim [data-b="door"]');
+      click('#bReset'); run(4);
+      if (w.eval('S.packml') === 'Idle') click('#bStart'); } }
+  return w.eval('oeeCalc(S.oee,S.stats,DD)'); };
+
+check('до пуска учёт смены не идёт', w.eval(`(()=>{buildSim();return S.oee.on===false&&S.oee.obs===0;})()`));
+const K0 = shift('none', 240);
+check('после прогона наблюдаемое время накоплено', K0.obs > 200, `${K0.obs.toFixed(0)} с`);
+check('сумма категорий равна наблюдаемому времени',
+  Math.abs(w.eval(`DT_ORDER.reduce((a,k)=>a+S.oee.by[k],0)`) - K0.obs) < 1e-6);
+check('без сценария почти всё время — работа', K0.A > 0.9 && K0.oee > 0.5, `A=${(K0.A * 100).toFixed(0)} %`);
+check('все три множителя в пределах от нуля до единицы',
+  [K0.A, K0.P, K0.Q].every(v => v >= 0 && v <= 1) && Math.abs(K0.oee - K0.A * K0.P * K0.Q) < 1e-9);
+check('производительность не превышает единицу даже при быстрой подаче',
+  shift('none', 120, `CFG.conveyors[0].rate=60;`).P <= 1);
+check('качество считает уронённое и промахи',
+  w.eval(`(()=>{const st={placed:90,dropped:5,missed:5},K=oeeCalc({obs:100,by:{run:100}},st,DD);
+   return Math.abs(K.Q-0.9)<1e-9&&K.total===100;})()`));
+
+const KH = shift('hard', 300);
+check('сценарий разыгрывает ровно те события, чьё время наступило',
+  w.eval('S.scen.i') > 1 && w.eval('S.scen.i') === w.eval(`SCEN.hard.ev.filter(e=>e.t<=S.scen.t).length`),
+  `${w.eval('S.scen.i')} из ${w.eval('SCEN.hard.ev.length')} к ${w.eval('S.scen.t').toFixed(0)} с`);
+check('отказы попадают в свою категорию времени', w.eval('S.oee.by.fault') > 0, `${w.eval('S.oee.by.fault').toFixed(1)} с`);
+check('отказы роняют готовность против смены без сценария', KH.A < K0.A, `${(K0.A * 100).toFixed(0)} % → ${(KH.A * 100).toFixed(0)} %`);
+check('и роняют OEE', KH.oee < K0.oee, `${(K0.oee * 100).toFixed(1)} → ${(KH.oee * 100).toFixed(1)}`);
+{ const P = w.eval('dtPareto(S.oee)');
+  check('Парето отсортирован по убыванию и накопленная доля доходит до 100 %',
+    P.rows.length > 1 && P.rows.every((r, i) => i === 0 || r.t <= P.rows[i - 1].t) &&
+    Math.abs(P.rows[P.rows.length - 1].cum - 1) < 1e-9);
+  check('в Парето нет строки «работа»', P.rows.every(r => r.cat !== 'run'));
+  check('причина простоя — это текст состояния, а не код', P.rows[0].why.length > 5, P.rows[0].why.slice(0, 50)); }
+check('журнал простоев не содержит рабочих интервалов',
+  w.eval(`shiftRows().filter(x=>x.cat!=='run').length`) > 0 &&
+  w.eval(`shiftRows().every(x=>x.dur>0)`));
+check('состояния разнесены по категориям по PackML',
+  w.eval(`dtCat('Execute')`) === 'run' && w.eval(`dtCat('Held')`) === 'fault' &&
+  w.eval(`dtCat('Suspended')`) === 'starve' && w.eval(`dtCat('Stopping')`) === 'chg' &&
+  w.eval(`dtCat('Stopped')`) === 'idle');
+
+check('«спокойная смена» стоит времени, но не отказов', (() => {
+  const K = shift('calm', 300);
+  return w.eval('S.oee.by.fault') === 0 && K.A < 1; })(), `A=${(shift('calm', 120).A * 100).toFixed(0)} %`);
+
+// проекция и настройки смены
+{ const K = shift('none', 200), SH = w.eval(`shiftProj(oeeCalc(S.oee,S.stats,DD),CFG.shift,DD)`);
+  check('проекция на смену вычитает плановые остановки',
+    Math.abs(SH.plan - (w.eval('CFG.shift.len') * 3600 - w.eval('CFG.shift.breaks') * 60)) < 1e-9);
+  check('проекция не обгоняет потолок без потерь', SH.boxes <= SH.ideal + 1e-6 && SH.boxes > 0);
+  check('паллеты в проекции согласованы с коробками',
+    Math.abs(SH.pallets * w.eval('DD.stations[0].pat.total') - SH.boxes) < 1e-6); }
+w.eval(`CFG.shift.len=12;CFG.shift.breaks=60;normalize(CFG);`);
+check('длительность смены нормализуется', w.eval(`(()=>{CFG.shift.len=99;CFG.shift.breaks=-5;normalize(CFG);
+  return CFG.shift.len===24&&CFG.shift.breaks===0;})()`));
+
+// вкладка и выгрузка
+w.eval('showTab("oee")');
+check('вкладка смены отрисовывается',
+  d.getElementById('oeeCards').innerHTML.length > 200 && d.getElementById('oeeBar').innerHTML.length > 100 &&
+  d.getElementById('oeeLog').innerHTML.length > 100 && d.getElementById('oeeText').innerHTML.length > 500);
+check('смена выгружается в CSV со сводкой, категориями и журналом', (() => {
+  const t = w.eval(`csvBuild('oee').text`);
+  return t.indexOf('OEE') > 0 && t.indexOf('Категории времени') > 0 && t.indexOf('Журнал простоев') > 0; })());
+check('кнопка «начать смену» обнуляет счётчики',
+  (() => { d.getElementById('bShift').click();
+    return w.eval('S.oee.obs') === 0 && w.eval('S.stats.placed') === 0 && w.eval('S.scen.i') === 0; })());
+check('до начала смены выгрузка не падает, а говорит об этом',
+  w.eval(`csvBuild('oee').text`).indexOf('не запускалась') > 0);
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();showTab('sim');`);
+
 console.log('Оценка риска по ISO 12100 (п. 5)');
 const PL_ORD = ['a', 'b', 'c', 'd', 'e'];
 const rk = extra => w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));${extra || ''}normalize(CFG);
@@ -471,7 +553,7 @@ w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.name='Тестовая ячей�
  renderCfg();buildSim();renderArch();$('csvSep').value=';';`);
 
 const keys = w.eval('CSV_ORDER');
-check('таблиц на выгрузку — восемь', keys.length === 8, keys.join(','));
+check('таблиц на выгрузку — девять', keys.length === 9, keys.join(','));
 let ragged = 0, noBom = 0, empty = 0;
 keys.forEach(k => { const t = csvOf(k), n = t.rows[0].length;
   if (!t.bom) noBom++;

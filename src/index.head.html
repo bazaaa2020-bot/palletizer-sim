@@ -24,7 +24,7 @@ main{max-width:1400px;margin:0 auto;padding:14px 22px 40px}
 .tab{display:none}.tab.on{display:grid;gap:14px}
 #tab-sim{grid-template-columns:minmax(0,1.55fr) minmax(330px,1fr)}
 #tab-cfg{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}
-#tab-arch,#tab-help,#tab-algo,#tab-3d,#tab-pl,#tab-risk{grid-template-columns:1fr}
+#tab-arch,#tab-help,#tab-algo,#tab-3d,#tab-pl,#tab-risk,#tab-oee{grid-template-columns:1fr}
 #v3wrap{position:relative;width:100%;height:600px;background:linear-gradient(#dfe5ea,#f3f5f7);border-radius:6px;overflow:hidden;touch-action:none}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #v3wrap{background:linear-gradient(#1c2229,#2a313a)}}
 :root[data-theme="dark"] #v3wrap{background:linear-gradient(#1c2229,#2a313a)}
@@ -102,10 +102,14 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 .row.tara{grid-template-columns:1.1fr 1fr 2.2fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
 .row.base{grid-template-columns:1.3fr 1.5fr 2.4fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
 .fitn{font-size:11px;color:var(--muted)}.fitn.warn{color:var(--warnfg)}.fitn.bad{color:var(--badfg)}
+.oeeleg{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:12.5px}
+.oeeleg span{display:flex;align-items:center;gap:5px}
+.oeeleg i{width:12px;height:12px;border-radius:3px;display:inline-block}
 .est{display:grid;grid-template-columns:repeat(4,auto);gap:3px;justify-content:start}
 .est select{padding:1px 2px;font-size:12px}
 .est b{font-size:10px;color:var(--muted);text-align:center}
 #rkTable td,#rkTable th{font-size:12.5px}
+#oeePar td.nw,#oeeLog td{white-space:nowrap}
 #rkTable .ms{color:var(--muted);font-size:11.5px;margin:0 0 3px;padding-left:14px;text-indent:-14px}
 #rkTable .ms.todo{color:var(--warnfg)}
 .ccf{display:grid;grid-template-columns:auto 1fr auto;gap:5px 9px;align-items:baseline;font-size:13.5px;padding:4px 0;border-bottom:1px solid var(--line)}
@@ -156,7 +160,7 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 <header>
 <h1>Тренажёр РТК паллетизации</h1>
 <p>Соберите ячейку в конфигураторе — роботы, захват, коробки, конвейеры, паллеты, тип защиты. Тренажёр рассчитает укладку с перевязкой, вакуумный захват, досягаемость и производительность, предложит оптимальный вариант, выдаст состав АСУ ТП и опишет алгоритм работы обычным языком, а затем даст управлять ячейкой с пульта.</p>
-<nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="risk">Оценка риска</button><button data-tab="pl">Безопасность и PL</button><button data-tab="rep">Отчёт и обмен</button><button data-tab="help">Задания и справочник</button></nav>
+<nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="oee">Смена и OEE</button><button data-tab="risk">Оценка риска</button><button data-tab="pl">Безопасность и PL</button><button data-tab="rep">Отчёт и обмен</button><button data-tab="help">Задания и справочник</button></nav>
 </header>
 <main>
 <!-- ================= СИМУЛЯЦИЯ ================= -->
@@ -182,6 +186,8 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
   <div class="btns group" id="safBtns"></div>
   <div class="btns group" id="palBtns"></div>
   <div class="btns group" id="faultBtns"></div>
+  <div class="btns group"><span class="h">Сценарий тревог</span><select id="scenSel"></select><button id="bShift">Начать смену (сброс счётчиков)</button></div>
+  <p class="note" id="scenNote"></p>
   <p class="note">Кнопка недоступна, когда переход запрещён машиной состояний PackML. Отказы попадают в Held (внутренняя причина), нехватка материала — в Suspended (внешняя).</p>
  </div>
  <div class="panel"><h2>Показатели</h2><div class="stats" id="stats"></div></div>
@@ -217,6 +223,20 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
  <div class="panel"><h2>Состав АСУ ТП (спецификация)</h2><div class="svgwrap"><table id="bom"></table></div></div>
  <div class="panel"><h2>Сигналы и модули ввода-вывода</h2><div id="ioSummary"></div><div class="svgwrap"><table id="sig"></table></div></div>
  <div class="panel prose" id="archText"></div>
+</section>
+<!-- ================= СМЕНА И OEE ================= -->
+<section id="tab-oee" class="tab">
+ <div class="panel"><h2>OEE за наблюдаемое время</h2><div class="cards" id="oeeCards"></div><p class="note" id="oeeNote"></p></div>
+ <div class="panel"><h2>Куда ушло время смены</h2><div class="svgwrap"><svg id="oeeBar" viewBox="0 0 900 150" xmlns="http://www.w3.org/2000/svg"></svg></div><div id="oeeLeg"></div></div>
+ <div class="two">
+  <div class="panel"><h2>Причины простоя по убыванию (Парето)</h2><div class="svgwrap"><table id="oeePar"></table></div></div>
+  <div class="panel"><h2>Проекция на смену</h2><div id="oeeShift"></div>
+   <div class="field"><label>Длительность смены, ч</label><input type="number" data-s="len" id="shLen" step="0.5" min="1" max="24"></div>
+   <div class="field"><label>Плановые остановки, мин</label><input type="number" data-s="breaks" id="shBrk" step="5" min="0" max="480"></div>
+  </div>
+ </div>
+ <div class="panel"><h2>Журнал простоев</h2><div class="svgwrap"><table id="oeeLog"></table></div></div>
+ <div class="panel prose" id="oeeText"></div>
 </section>
 <!-- ================= ОЦЕНКА РИСКА ================= -->
 <section id="tab-risk" class="tab">

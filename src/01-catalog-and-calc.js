@@ -146,9 +146,10 @@ const DEF={name:'Ячейка паллетизации',robots:1,robot:'cb20',cu
  vision:{mode:'none'},
  palletHandling:'forklift',safety:'fence',fieldbus:'PROFINET',tStop:0.5,
  pl:{S:2,F:2,P:1,arch:'cat3',edm:true,dop:240,hop:16,opsES:2,opsLC:30,opsDoor:6,ccf:['sep','over','well','fmea','train','emc','env']},
- risk:{org:['train','manual','sign','ppe','permit'],est:{}},opt:{target:400,allowCobot:true,maxRobots:2}};
+ risk:{org:['train','manual','sign','ppe','permit'],est:{}},
+ shift:{len:8,breaks:30},opt:{target:400,allowCobot:true,maxRobots:2}};
 let CFG=deep(DEF);
-try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.vision=Object.assign(deep(DEF.vision),s.vision||{});CFG.pl=Object.assign(deep(DEF.pl),s.pl||{});CFG.risk=Object.assign(deep(DEF.risk),s.risk||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.vision=Object.assign(deep(DEF.vision),s.vision||{});CFG.pl=Object.assign(deep(DEF.pl),s.pl||{});CFG.risk=Object.assign(deep(DEF.risk),s.risk||{});CFG.shift=Object.assign(deep(DEF.shift),s.shift||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
 function saveCfg(){try{localStorage.setItem('pal-sim-cfg4',JSON.stringify(CFG));}catch(e){}}
 function robotOf(c){const r=ROBOTS.find(x=>x.id===c.robot)||ROBOTS[3];if(r.id==='custom')return{id:'custom',name:'Свой робот',cls:c.custom.cls,payload:+c.custom.payload,reach:+c.custom.reach,v:c.custom.cls==='cobot'?1:2,cpm:+c.custom.cpm||8,cost:2,ex:''};return r;}
 function safetyMode(c,rob){if(rob.cls!=='cobot')return'fence';return c.safety==='auto'?'cobot':c.safety;}
@@ -163,6 +164,8 @@ function normalize(c){if(c.exch.out==='conveyor')c.exch.in='dispenser';else if(c
  PL.dop=clamp(Math.round(+PL.dop||240),1,365);PL.hop=clamp(Math.round(+PL.hop||16),1,24);
  ['opsES','opsLC','opsDoor'].forEach(k=>{PL[k]=clamp(Math.round(+PL[k]||1),0,500);});
  if(!Array.isArray(PL.ccf))PL.ccf=[];
+ if(!c.shift)c.shift=deep(DEF.shift);
+ c.shift.len=clamp(+c.shift.len||8,1,24);c.shift.breaks=clamp(Math.round(+c.shift.breaks)||0,0,480);
  if(!c.risk)c.risk=deep(DEF.risk);
  if(!Array.isArray(c.risk.org))c.risk.org=[];c.risk.org=c.risk.org.filter(k=>ORG[k]);
  if(!c.risk.est||typeof c.risk.est!=='object')c.risk.est={};
@@ -374,7 +377,10 @@ function derive(c,light){
  const cyc=pat0?pat0.groupsPerPallet:1,nSh=pat0?pat0.sheets:0,total=pat0?pat0.total:1;
  D.shiftsPerPallet=pat0?pat0.shifts:0;D.tShiftPallet=D.shiftsPerPallet*D.tShift;D.adjUsed=pat0?!!pat0.adjUsed:false;D.rowGroups=pat0?pat0.rowGroups:cyc;
  D.cyclesPerPallet=cyc+nSh+(c.exch.in==='robot'?1:0);D.tPerPallet=cyc*D.tCycle+D.tShiftPallet+nSh*D.tSheet+D.tPallet+(c.stations===1?tEx:0);
- D.exLoss=c.stations===1?tEx/D.tPerPallet:0;D.tPerBox=D.tPerPallet/total;D.capRobot=3600/D.tPerBox*nR;D.kEff=kEff;D.palPerHour=D.capRobot/total;
+ D.exLoss=c.stations===1?tEx/D.tPerPallet:0;D.tPerBox=D.tPerPallet/total;D.capRobot=3600/D.tPerBox*nR;
+ // «чистый» такт без простоя на обмен: в учёте смены ожидание обмена — это Suspended, а не работа,
+ // поэтому идеальный такт для OEE берётся без него, иначе производительность упирается в потолок.
+ D.tBoxNet=(D.tPerPallet-(c.stations===1?tEx:0))/total;D.capNet=3600/D.tBoxNet*nR;D.kEff=kEff;D.palPerHour=D.capRobot/total;
  D.convs=c.conveyors.map(cv=>convCalc(cv,boxOf(c,cv.box),k));
  D.capFeed=D.convs.reduce((a,x)=>a+x.feedPerMin,0)*60;D.capConv=Math.min(...D.convs.map(x=>x.capPerMin))*60*Math.min(n,nR*Math.ceil(n/nR));
  D.bottleneck=Math.min(D.capRobot,D.capFeed,D.capConv);D.bnName=D.bottleneck===D.capRobot?(nR>1?'роботы':'робот'):D.bottleneck===D.capFeed?(c.conveyors.every(x=>x.feed==='manual')?'подача (ручная загрузка)':'подача коробок'):'конвейер';
