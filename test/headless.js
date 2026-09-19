@@ -359,6 +359,80 @@ check('вкладка PL отрисовывается', (() => { w.eval('showTab
 check('раздел PL попадает в отчёт', w.eval(`reportHTML(CFG,derive(CFG),null)`).indexOf('Performance Level') > 0);
 w.eval('showTab("sim")');
 
+console.log('Выгрузка таблиц в CSV (п. 3)');
+// разбор CSV обратно в строки — так проверяем и кавычки, и целость строк
+const csvParse = (txt, sep) => {
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < txt.length; i++) { const ch = txt[i];
+    if (q) { if (ch === '"') { if (txt[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === sep) { row.push(cell); cell = ''; }
+    else if (ch === '\r') { }
+    else if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += ch; }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows; };
+const csvOf = key => { const r = w.eval(`csvBuild('${key}')`);
+  return { file: r.file, bom: r.text.charCodeAt(0) === 0xFEFF, rows: csvParse(r.text.slice(1), w.eval('csvSep()')) }; };
+
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.name='Тестовая ячейка';CFG.robot='pl130';CFG.grip.pick=4;
+ CFG.boxes.push({name:'Бутылки; в плёнке',l:280,w:190,h:330,m:9.5,rate:400,layers:0,shape:'shrink',mat:'film'});
+ CFG.boxes[0].rate=600;CFG.conveyors.push(JSON.parse(JSON.stringify(CFG.conveyors[0])));CFG.conveyors[1].box=1;
+ renderCfg();buildSim();renderArch();$('csvSep').value=';';`);
+
+const keys = w.eval('CSV_ORDER');
+check('таблиц на выгрузку — семь', keys.length === 7, keys.join(','));
+let ragged = 0, noBom = 0, empty = 0;
+keys.forEach(k => { const t = csvOf(k), n = t.rows[0].length;
+  if (!t.bom) noBom++;
+  if (t.rows.length < 2) empty++;
+  if (t.rows.some(r => r.length !== n)) ragged++; });
+check('все таблицы идут с BOM — Excel не портит кириллицу', noBom === 0);
+check('во всех таблицах колонок поровну в каждой строке', ragged === 0);
+check('ни одна таблица не пустая', empty === 0);
+
+const bom = csvOf('bom'), sig = csvOf('sig');
+check('строк спецификации столько же, сколько позиций', bom.rows.length === w.eval('DD.bom.length') + 1,
+  `${bom.rows.length - 1} против ${w.eval('DD.bom.length')}`);
+check('строк сигналов столько же, сколько сигналов', sig.rows.length === w.eval('DD.sig.length') + 1);
+check('имя файла берётся из названия ячейки', /Тестовая-ячейка_спецификация_/.test(bom.file), bom.file);
+check('тип сигнала расшифрован словами', sig.rows.slice(1).every(r => r[2].length > 5) &&
+  sig.rows.some(r => r[1] === 'SI' && /безопасн/i.test(r[2])));
+
+// точка с запятой внутри ячейки не должна рвать строку
+const sku = csvOf('sku');
+check('точка с запятой в названии тары не рвёт строку',
+  sku.rows.some(r => r[0] === 'Бутылки; в плёнке') && sku.rows.every(r => r.length === sku.rows[0].length));
+check('в артикулах строка на каждую тару', sku.rows.length === w.eval('CFG.boxes.length') + 1);
+
+const num = (rows, name) => (rows.find(r => r[1] === name) || [])[2];
+const pRu = csvOf('params');
+check('с разделителем «;» дробные числа идут с запятой', /^\d+,\d+$/.test(num(pRu.rows, 'Такт робота')), num(pRu.rows, 'Такт робота'));
+check('разрядов в числах нет — Excel прочтёт их как числа',
+  pRu.rows.slice(1).every(r => !/ | /.test(r[2])));
+w.eval(`$('csvSep').value=','`);
+const pEn = csvParse(w.eval(`csvBuild('params')`).text.slice(1), ',');
+check('с разделителем «,» дробные числа идут с точкой', /^\d+\.\d+$/.test(num(pEn, 'Такт робота')), num(pEn, 'Такт робота'));
+w.eval(`$('csvSep').value=';'`);
+
+const plT = csvOf('pl');
+check('в таблице PL строка на каждую подсистему',
+  plT.rows.length === w.eval('DD.pl.sf.reduce((a,f)=>a+f.res.length,0)') + 1);
+check('требуемый и достигнутый PL попали в выгрузку',
+  plT.rows[1][2] === w.eval('DD.pl.plr') && plT.rows[1][3] === w.eval('DD.pl.sf[0].pl'));
+
+const all = w.eval('csvBuildAll()');
+check('все таблицы одним файлом: каждая со своим заголовком',
+  keys.every(k => all.text.indexOf(w.eval(`CSV_TABLES['${k}'].name`)) > 0), all.file);
+check('сводный файл длиннее любой отдельной таблицы', all.text.length > w.eval(`csvBuild('sig').text`).length);
+
+// кнопки: в jsdom скачивание недоступно, значит должен сработать запасной путь с текстом
+w.eval(`csvShow('');$('csvText').hidden=true;`);
+d.querySelector('#csvBtns button[data-csv="sig"]').click();
+check('кнопка таблицы работает и при запрете скачивания показывает текст',
+  !d.getElementById('csvText').hidden && d.getElementById('csvText').value.indexOf('Тег') > 0);
+check('после кнопки сообщение объясняет, что делать', d.getElementById('csvMsg').textContent.length > 20);
+
 w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();`);
 
 check('нет ошибок выполнения', errs.length === 0, errs.join('; '));

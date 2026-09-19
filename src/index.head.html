@@ -90,6 +90,7 @@ input[type=range]{flex:1}
 .note{font-size:13px;color:var(--muted);margin:6px 0 0}
 .legend{font-size:12.5px;color:var(--muted);margin-top:6px}
 .legend i{display:inline-block;width:10px;height:10px;margin:0 4px 0 10px;vertical-align:middle;border-radius:2px}
+.field.wide{grid-template-columns:1fr 230px}
 .field{display:grid;grid-template-columns:1fr 140px;gap:5px 10px;align-items:center;font-size:13.5px;margin-bottom:5px}
 .field label{color:var(--muted)}
 .field small{color:var(--muted);grid-column:1/-1;margin-top:-3px}
@@ -128,7 +129,7 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 .tsel{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-left:auto}
 .opt{font-size:13.5px}.opt b{font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-#cfgText{width:100%;height:170px;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);padding:8px;resize:vertical;margin-top:10px}
+#cfgText,#csvText{width:100%;height:170px;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);padding:8px;resize:vertical;margin-top:10px}
 .rep h2{margin:0 0 2px;font-size:20px}
 .rep h3{margin:20px 0 6px;font-size:15px;border-bottom:1px solid var(--line);padding-bottom:4px}
 .rep table{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0}
@@ -244,6 +245,13 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
   <div class="btns"><button id="bMakeRep" class="b-apply">Сформировать отчёт</button><button id="bDlRep">Скачать отчёт (.html)</button><button id="bPrintRep">Печать / PDF</button></div>
   <p class="note">В отчёт входят исходные данные, результаты расчёта, схема участка с габаритными размерами, 3D-компоновка, спецификация, список сигналов и замечания расчёта. Чтобы в отчёт попал 3D-вид, откройте вкладку «3D-вид» хотя бы раз — картинка снимается с работающей сцены.</p>
  </div>
+ </div>
+ <div class="panel"><h2>Таблицы в CSV — для ТКП, Excel и проекта</h2>
+  <div class="field wide"><label>Формат файла</label><select id="csvSep"></select><small>Файл идёт с BOM, поэтому кириллица открывается в Excel без «кракозябр»; числа — без разделителя разрядов, чтобы Excel принял их за числа</small></div>
+  <div class="btns" id="csvBtns"></div>
+  <div class="btns"><button id="bCsvAll" class="b-apply">Все таблицы одним файлом</button><button id="bCsvShow">Показать и скопировать</button></div>
+  <p class="note" id="csvMsg">Каждая кнопка скачивает свою таблицу отдельным файлом. «Все таблицы» — один файл, где таблицы идут блоками с заголовками. Если скачивание в этом окне запрещено, текст появится ниже — его можно вставить в Excel как есть.</p>
+  <textarea id="csvText" hidden spellcheck="false"></textarea>
  </div>
  <div class="panel" id="repOut"></div>
 </section>

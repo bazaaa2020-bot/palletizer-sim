@@ -23,6 +23,116 @@ function repMsg(t,cls){const e=$('cfgMsg');if(!e)return;e.textContent=t;e.style.
 function fileStamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');
  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;}
 function safeName(s){return s.replace(/[^\wа-яёА-ЯЁ.-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60)||'cell';}
+// ======================= ВЫГРУЗКА ТАБЛИЦ В CSV =======================
+// Excel с русской локалью ждёт разделитель «;» и запятую в дробях, RFC 4180 — «,» и точку.
+// Числа в CSV идут без разделителя разрядов, иначе Excel примет их за текст.
+const CSV_SEPS={';':'Excel, русская локаль',',':'RFC 4180'};
+const CSV_SEP_NOTE={';':'Разделитель «;», запятая в дробях — так ждёт Excel с русской локалью.',
+ ',':'Разделитель «,», точка в дробях — RFC 4180 и англоязычный Excel.'};
+function csvSep(){const e=$('csvSep');return e&&CSV_SEPS[e.value]?e.value:';';}
+function csvText(head,rows,sep){
+ const q=v=>{const s=(v===null||v===undefined)?'':String(v);
+  return (s.indexOf(sep)>=0||s.indexOf('"')>=0||/[\r\n]/.test(s))?'"'+s.replace(/"/g,'""')+'"':s;};
+ return [head].concat(rows).map(r=>r.map(q).join(sep)).join('\r\n')+'\r\n';}
+function csvNum(v,dec,sep){if(v===null||v===undefined||!isFinite(v))return'';
+ const s=(+v).toFixed(dec===undefined?0:dec);return sep===';'?s.replace('.',','):s;}
+const SIG_KIND={DI:'Дискретный вход ПЛК',DO:'Дискретный выход ПЛК',
+ SI:'Безопасный вход контроллера безопасности',SO:'Безопасный выход контроллера безопасности',
+ BUS:'Обмен по промышленной сети'};
+// Каждая таблица знает свой заголовок, имя файла и как собраться из расчёта.
+const CSV_TABLES={
+ bom:{name:'Спецификация',file:'спецификация',build:(c,D,s)=>({
+  head:['№','Группа','Позиция','Кол-во','Ед.','Назначение и подключение'],
+  rows:D.bom.map((b,i)=>[i+1,b.g,b.n,csvNum(b.q,0,s),'шт.',b.p])})},
+ sig:{name:'Сигналы и ввод-вывод',file:'сигналы',build:(c,D,s)=>({
+  head:['№','Тип','Расшифровка типа','Тег','Сигнал','Источник','Подключение'],
+  rows:D.sig.map((x,i)=>[i+1,x.k,SIG_KIND[x.k]||x.k,x.t,x.nm,x.src,x.how])})},
+ params:{name:'Сводка параметров',file:'параметры',build:(c,D,s)=>{
+  const R=[],a=(g,n,v,u)=>R.push([g,n,v,u||'']),rob=D.rob,pat=D.stations.length?D.stations[0].pat:null;
+  a('Робот','Модель',`${c.robots} × ${rob.name}`);
+  a('Робот','Грузоподъёмность',csvNum(rob.payload,0,s),'кг');
+  a('Робот','Досягаемость',csvNum(rob.reach,0,s),'мм');
+  a('Робот','Требуемый вылет',csvNum(D.rReq,0,s),'мм');
+  a('Робот','Нагрузка на фланец',csvNum(D.mReq,1,s),'кг');
+  a('Робот','Использование грузоподъёмности',csvNum(D.util*100,0,s),'%');
+  a('Робот','Высота постамента',csvNum(c.baseH,0,s),'мм');
+  a('Захват','Тип',GRIPPERS[c.grip.type].name);
+  a('Захват','Единиц тары за ход',csvNum(c.grip.pick,0,s),'шт.');
+  a('Захват','Требуемая сила удержания',csvNum(D.grip.Fth,0,s),'Н');
+  a('Захват','Сила захвата',csvNum(D.grip.Fcap,0,s),'Н');
+  a('Захват','Масса захвата',csvNum(D.grip.mass,1,s),'кг');
+  a('Захват','Время захвата',csvNum(D.grip.tGrip,2,s),'с');
+  if(pat){a('Укладка','Схема',pat.name);
+   a('Укладка','Коробок в слое',csvNum(pat.n,0,s),'шт.');
+   a('Укладка','Слоёв',csvNum(pat.layers,0,s),'шт.');
+   a('Укладка','Коробок на паллете',csvNum(pat.total,0,s),'шт.');
+   a('Укладка','Заполнение слоя',csvNum(pat.fill*100,0,s),'%');
+   a('Укладка','Высота стопы с паллетой',csvNum(pat.stackH,0,s),'мм');
+   a('Укладка','Масса паллеты брутто',csvNum(pat.mass,0,s),'кг');}
+  a('Производительность','Такт робота',csvNum(D.tCycle,2,s),'с');
+  a('Производительность','Циклов в минуту',csvNum(D.cpm,1,s),'цикл/мин');
+  a('Производительность','Циклов на паллету',csvNum(D.cyclesPerPallet,0,s),'шт.');
+  a('Производительность','Выпуск',csvNum(D.bottleneck,0,s),'кор/ч');
+  a('Производительность','Паллет в час',csvNum(D.palletsPerHour,2,s),'палл/ч');
+  a('Производительность','Ограничивает',D.bnName);
+  a('Компоновка','Габарит участка по ограждению, длина',csvNum(D.F.x1-D.F.x0,0,s),'мм');
+  a('Компоновка','Габарит участка по ограждению, ширина',csvNum(D.F.y1-D.F.y0,0,s),'мм');
+  a('Компоновка','Периметр ограждения',csvNum(D.fencePerim,0,s),'мм');
+  a('Компоновка','Радиус расстановки позиций',csvNum(D.LY.R,0,s),'мм');
+  a('Компоновка','Станций / магазинов у робота',`${c.stations} / ${c.magazines}`,'шт.');
+  a('Безопасность','Режим защиты',D.safety==='fence'?'Ограждение со световыми завесами':'Лазерные сканеры, коллаборативный режим');
+  a('Безопасность','Время останова робота',csvNum(c.tStop,2,s),'с');
+  a('Безопасность','Расстояние установки по ISO 13855',csvNum(D.safety==='fence'?D.Slc:D.Ssc,0,s),'мм');
+  a('Безопасность','Требуемый Performance Level',D.pl.plr);
+  a('Безопасность','Достигнутый Performance Level',D.pl.worst||'не определён');
+  a('Безопасность','Меры против отказов по общей причине',csvNum(D.pl.ccf,0,s),'баллов');
+  a('АСУ ТП','Промышленная сеть',c.fieldbus);
+  a('АСУ ТП','Дискретных входов / выходов',`${D.io.DI} / ${D.io.DO}`,'шт.');
+  a('АСУ ТП','Безопасных входов / выходов',`${D.io.SI} / ${D.io.SO}`,'шт.');
+  a('АСУ ТП','Объектов обмена по сети',csvNum(D.io.BUS,0,s),'шт.');
+  return{head:['Раздел','Параметр','Значение','Ед.'],rows:R};}},
+ sku:{name:'Артикулы и схемы укладки',file:'артикулы',build:(c,D,s)=>({
+  head:['Артикул','Форма','Материал','Д (Ø), мм','Ш, мм','В, мм','Масса, кг','Выпуск, шт/ч','Схема укладки',
+   'В слое','Слоёв','На паллете','Заполнение, %','Перевязка','Ходов на паллету','Листов','Циклов на паллету',
+   'Паллета приходит за, мин','Требуется циклов/мин','Загрузка робота, %'],
+  rows:D.plan.rows.map(r=>[r.b.name,SHAPES[r.b.shape].name,MATS[r.b.mat].name,
+   csvNum(r.b.l,0,s),csvNum(r.b.w,0,s),csvNum(r.b.h,0,s),csvNum(r.b.m,1,s),r.b.rate?csvNum(r.b.rate,0,s):'',
+   r.p.name,csvNum(r.p.n,0,s),csvNum(r.p.layers,0,s),csvNum(r.p.total,0,s),csvNum(r.p.fill*100,0,s),
+   r.p.interlock?'да':'нет',csvNum(r.p.groupsPerPallet,0,s),csvNum(r.p.sheets,0,s),csvNum(r.cyc,0,s),
+   r.tPal?csvNum(r.tPal,1,s):'',r.reqCpm?csvNum(r.reqCpm,2,s):'',r.reqCpm?csvNum(r.reqCpm/D.plan.capCpm*100,0,s):''])})},
+ pl:{name:'Функции безопасности и Performance Level',file:'PL-13849',build:(c,D,s)=>({
+  head:['Функция','Наименование','Требуемый PL','PL функции','Подсистема','Категория','MTTFd канала, лет',
+   'DCavg, %','PL подсистемы','Состав канала','Замечание'],
+  rows:D.pl.sf.flatMap(f=>f.res.map((r,i)=>[f.id,i?'':f.name,f.plr,i?'':(f.pl||'не определён'),r.name,r.cat,
+   csvNum(Math.min(100,r.mttfd),1,s),csvNum(r.dcavg,0,s),r.pl||'',
+   r.comp.map(k=>`${k.q>1?k.q+' × ':''}${k.n}`).join('; '),r.issues.join('; ')]))})},
+ base:{name:'Базирование тары и зрение',file:'базирование',build:(c,D,s)=>({
+  head:['Конвейер','Тип','Длина, м','Скорость, м/мин','Подача','Направляющие','После направляющих, ±мм',
+   'После направляющих, ±°','С учётом зрения, ±мм','Допуск захвата, ±мм','Допуск захвата, ±°','Вывод'],
+  rows:D.base.map(x=>[x.i+1,CONV_TYPES[x.cv.type].name,csvNum(x.cv.len,1,s),csvNum(x.cv.speed,0,s),
+   INFEED[x.cv.infeed].name,ALIGN[x.cv.align].name,csvNum(x.gx,0,s),x.round?'':csvNum(x.ga,1,s),
+   csvNum(x.dx,0,s),csvNum(x.tol.dx,0,s),x.round?'':csvNum(x.tol.da,1,s),
+   x.ok?'в допуске':visionOK(c.vision.mode,x.need)?'позу даёт камера':`не в допуске — нужно ${VISION[x.need].name.toLowerCase()}`])})},
+ warn:{name:'Замечания расчёта',file:'замечания',build:(c,D,s)=>({
+  head:['№','Замечание'],rows:D.warnings.map((w,i)=>[i+1,w])})}};
+const CSV_ORDER=['bom','sig','params','sku','pl','base','warn'];
+let CSV_LAST='bom';
+// Один «лист» на файл; вариант «все таблицы» кладёт их блоками с заголовками.
+function csvBuild(key){const c=normalize(CFG),D=derive(c),s=csvSep(),T=CSV_TABLES[key];
+ const t=T.build(c,D,s);
+ return{file:`${safeName(cfgTitle())}_${T.file}_${fileStamp()}.csv`,text:'﻿'+csvText(t.head,t.rows,s)};}
+function csvBuildAll(){const c=normalize(CFG),D=derive(c),s=csvSep();
+ const parts=CSV_ORDER.map(k=>{const T=CSV_TABLES[k],t=T.build(c,D,s);
+  return csvText([T.name],[],s)+csvText(t.head,t.rows,s);});
+ return{file:`${safeName(cfgTitle())}_таблицы_${fileStamp()}.csv`,text:'﻿'+parts.join('\r\n')};}
+function csvMsg(t,cls){const e=$('csvMsg');if(!e)return;e.textContent=t;e.style.color=cls==='bad'?'var(--badfg)':cls==='ok'?'var(--okfg)':'';}
+function csvShow(txt){const t=$('csvText');if(!t)return;t.hidden=false;t.value=txt;t.focus();t.select();}
+function csvSave(key){try{
+  const r=key==='*'?csvBuildAll():csvBuild(key);if(key!=='*')CSV_LAST=key;
+  const rows=r.text.split('\r\n').length-1;
+  if(download(r.file,'text/csv;charset=utf-8',r.text))csvMsg(`${r.file} — ${rows} строк.`,'ok');
+  else{csvShow(r.text);csvMsg('Скачивание недоступно в этом окне — таблица ниже, скопируйте её в Excel.','bad');}}
+ catch(e){csvMsg('Не удалось собрать таблицу: '+e.message,'bad');}}
 // ======================= 2D-СХЕМА УЧАСТКА С ГАБАРИТАМИ =======================
 function planSVG(c,D,W){
  const LY=D.LY,pal=D.pal,F=D.F,r0=LY.robots[0];
@@ -222,6 +332,15 @@ function initReport(){
    catch(err){repMsg('Не удалось загрузить: '+err.message,'bad');}};
   rd.onerror=()=>repMsg('Файл не читается.','bad');
   rd.readAsText(f);e.target.value='';};
+ const sp=$('csvSep');if(sp){sp.innerHTML=Object.entries(CSV_SEPS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+  sp.onchange=()=>csvMsg(CSV_SEP_NOTE[csvSep()]+' Числа идут без разделителя разрядов, файл — с BOM.','');}
+ const cb=$('csvBtns');if(cb){cb.innerHTML=CSV_ORDER.map(k=>`<button data-csv="${k}">${CSV_TABLES[k].name}</button>`).join('');
+  cb.onclick=e=>{const k=e.target.dataset.csv;if(k)csvSave(k);};}
+ $('bCsvAll').onclick=()=>csvSave('*');
+ $('bCsvShow').onclick=()=>{try{const r=csvBuild(CSV_LAST);csvShow(r.text);
+   try{navigator.clipboard.writeText(r.text);csvMsg(`«${CSV_TABLES[CSV_LAST].name}» скопирована в буфер обмена.`,'ok');}
+   catch(e){csvMsg(`«${CSV_TABLES[CSV_LAST].name}» — текст ниже, скопируйте вручную.`,'');}}
+  catch(e){csvMsg('Не удалось собрать таблицу: '+e.message,'bad');}};
  $('bMakeRep').onclick=()=>{renderReport();};
  $('bDlRep').onclick=()=>{const {c,D,png}=renderReport();
   const html=reportStandalone(c,D,png);
