@@ -151,7 +151,7 @@ function build3D(){
   const hb=D.heaviest,pw=c.grip.pick*hb.l*mm-0.01,pd=hb.w*mm-0.01;
   const carry=new THREE.Group();carry.position.y=-c.gripH*mm;gw.add(carry);
   const plate=box3(pw,0.05,pd,0x4a525b);plate.position.y=0.025;carry.add(plate);
-  const cb=new THREE.Group();for(let j=0;j<c.grip.pick;j++){const b=box3(hb.l*mm-0.01,hb.h*mm,hb.w*mm-0.01,COL3.box[0]);b.position.set((j-(c.grip.pick-1)/2)*hb.l*mm,-hb.h*mm/2,0);cb.add(b);}cb.visible=false;carry.add(cb);
+  const cb=new THREE.Group();for(let j=0;j<c.grip.pick;j++){const b=taraMesh(hb,COL3.box[0],0);b.position.set((j-(c.grip.pick-1)/2)*hb.l*mm,-hb.h*mm/2,0);cb.add(b);}cb.visible=false;carry.add(cb);
   const cs=box3(pal.W*mm,0.01,pal.L*mm,COL3.sheet);cs.position.y=-0.005;cs.visible=false;carry.add(cs);const cp=palletMesh(pal);cp.position.y=-pal.h*mm;cp.visible=false;carry.add(cp);
   V3.robots.push({r,g0,g1,g2,gw,carry,plate,cb,cs,cp,L,pw,pd,hb});});
  LY.robots.forEach(r=>r.slots.forEach(sl=>{const g=new THREE.Group();g.position.set(sl.cx*mm,0,sl.cy*mm);g.rotation.y=-sl.ang*Math.PI/180;R.add(g);
@@ -163,12 +163,17 @@ function build3D(){
   if(sl.kind==='st'){const st=new THREE.Group();g.add(st);V3.stations[sl.id]={g:st,outer:g,sl};}
   if(sl.kind!=='ps'&&!(sl.kind==='st'&&c.exch.out==='conveyor')){const pad=new THREE.Mesh(new THREE.PlaneGeometry(1.6,1.6),mat(0xc5ccd3,{transparent:true,opacity:0.5}));pad.rotation.x=-Math.PI/2;pad.position.set(sl.park.x*mm,0.003,sl.park.y*mm);R.add(pad);}}));
  V3.gridSig='';home3D();}
+// Геометрия единицы тары: круглая — цилиндром, остальное — параллелепипедом.
+function taraGeom(b,rot){const mm=1/1000;
+ if(SHAPES[b.shape||'box'].round)return new THREE.CylinderGeometry(b.l*mm/2-0.006,b.l*mm/2-0.006,b.h*mm-0.004,18);
+ return new THREE.BoxGeometry((rot?b.w:b.l)*mm-0.008,b.h*mm-0.004,(rot?b.l:b.w)*mm-0.008);}
+function taraMesh(b,col,rot){return new THREE.Mesh(taraGeom(b,rot),mat(col));}
 function palletMesh(pal){const g=new THREE.Group(),mm=1/1000,W=pal.W*mm,Lz=pal.L*mm,h=pal.h*mm;const m=mat(COL3.pallet);
  [-1,0,1].forEach(k=>{const b=new THREE.Mesh(new THREE.BoxGeometry(W,h*0.3,0.1),m);b.position.set(0,h*0.15,k*(Lz/2-0.06));g.add(b);});
  const top=new THREE.Mesh(new THREE.BoxGeometry(W,h*0.2,Lz),m);top.position.y=h*0.9;g.add(top);
  [-1,0,1].forEach(k=>{const b=new THREE.Mesh(new THREE.BoxGeometry(0.1,h*0.5,Lz),m);b.position.set(k*(W/2-0.06),h*0.55,0);g.add(b);});return g;}
 function buildStation3(s){const c=CFG,pal=DD.pal,mm=1/1000,b=boxOf(c,s.bi),col=COL3.box[s.bi%4],g=V3.stations[s.id].g;clear3(g);if(!s.present)return;
- g.add(palletMesh(pal));const geo={0:new THREE.BoxGeometry(b.l*mm-0.008,b.h*mm-0.004,b.w*mm-0.008),1:new THREE.BoxGeometry(b.w*mm-0.008,b.h*mm-0.004,b.l*mm-0.008)},m=mat(col);
+ g.add(palletMesh(pal));const geo={0:taraGeom(b,0),1:taraGeom(b,1)},m=mat(col);
  const sheetsBelow=j=>s.sheetLayers.filter(x=>x<=j).length*4;
  const addLayer=(cells,idx,j)=>{const y=(pal.h+j*b.h+sheetsBelow(j))*mm;idx.forEach(i=>{const cl=cells[i];const mesh=new THREE.Mesh(geo[cl.rot],m);mesh.position.set(cl.x*mm,y+b.h*mm/2,cl.y*mm);g.add(mesh);});};
  for(let j=0;j<s.layer;j++){const cells=(s.pat.interlock&&j%2)?s.pat.cellsB:s.pat.cells;addLayer(cells,cells.map((x,i)=>i),j);}
@@ -210,7 +215,7 @@ function render3D(){
     if(j<r.carry)m.position.set((j%nc-(nc-1)/2)*hb.l*mm,-hb.h*mm/2,(Math.floor(j/nc)-(nr-1)/2)*hb.w*mm);});
    R.plate.scale.set((nc*hb.l*mm-0.01)/R.pw,1,(nr*hb.w*mm-0.01)/R.pd);}
   else R.plate.scale.set(1,1,1);});
- D.LY.convs.forEach((cv,i)=>{const key='cv'+i;if(!V3.pools[key])V3.pools[key]=[];const pool=V3.pools[key],b=cv.b,col=COL3.box[cv.bi%4];S.conv[i].boxes.forEach((bx,j)=>{if(!pool[j]){pool[j]=box3(b.l*mm-0.01,b.h*mm,b.w*mm-0.01,col);dyn.add(pool[j]);}const m=pool[j];m.visible=true;m.position.set((cv.x0+b.l/2+bx.p*(cv.len-b.l))*mm,(c.convH+b.h/2)*mm,cv.y*mm);});for(let j=S.conv[i].boxes.length;j<pool.length;j++)pool[j].visible=false;});
+ D.LY.convs.forEach((cv,i)=>{const key='cv'+i;if(!V3.pools[key])V3.pools[key]=[];const pool=V3.pools[key],b=cv.b,col=COL3.box[cv.bi%4];S.conv[i].boxes.forEach((bx,j)=>{if(!pool[j]){pool[j]=taraMesh(b,col,0);dyn.add(pool[j]);}const m=pool[j];m.visible=true;m.position.set((cv.x0+b.l/2+bx.p*(cv.len-b.l))*mm,(c.convH+b.h/2)*mm,cv.y*mm);});for(let j=S.conv[i].boxes.length;j<pool.length;j++)pool[j].visible=false;});
  V3.gw=new Map();
  S.st.forEach(s=>{const st=V3.stations[s.id];if(!st)return;const sig=`${s.present}|${s.layer}|${s.placed.length}|${s.parity}|${s.sheetLayers.length}|${s.complete}`;if(V3.cache[s.id]!==sig){V3.cache[s.id]=sig;buildStation3(s);}
   const off=s.phase==='out'?s.out*(pal.W+600):0;st.outer.position.set((s.slot.cx+s.slot.cos*off)*mm,0,(s.slot.cy+s.slot.sin*off)*mm);

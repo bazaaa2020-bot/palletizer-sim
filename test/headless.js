@@ -257,6 +257,58 @@ check('отдельный файл отчёта — валидный html', rep.
 
 w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();`);
 
+console.log('Тара произвольной формы и подбор захвата (п. 11)');
+const fit = (shape, mat, type) => w.eval(`gripFit({name:'x',l:300,w:300,h:200,m:10,shape:'${shape}',mat:'${mat}'},'${type}').s`);
+check('решётчатый верх вакуумом не взять', fit('crate', 'plastic', 'cups') === 'bad' && fit('crate', 'plastic', 'foam') === 'bad');
+check('термоусадка вакуумом — с оговоркой', fit('shrink', 'film', 'cups') === 'warn');
+check('магнит только по стали', fit('box', 'metal', 'mag') === 'ok' && fit('box', 'carton', 'mag') === 'bad' && fit('box', 'alu', 'mag') === 'bad');
+check('лист с боков не зажать', fit('plate', 'metal', 'clamp') === 'bad');
+check('подбор предлагает годный захват', w.eval(`(()=>{const b={name:'x',l:600,w:400,h:300,m:12,shape:'crate',mat:'plastic'};
+ const best=gripBest(b);return best.length>0&&best.every(t=>gripFit(b,t).s==='ok');})()`));
+check('цилиндр описывается квадратом со стороной диаметра', w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));
+ CFG.boxes[0]=Object.assign(CFG.boxes[0],{l:320,w:180,h:120,shape:'cyl',mat:'metal'});normalize(CFG);return CFG.boxes[0].w===320;})()`));
+const mag = w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));CFG.robot='pl130';
+ CFG.boxes[0]={name:'Лист',l:600,w:400,h:4,m:7.5,rate:0,layers:0,shape:'plate',mat:'metal'};
+ CFG.grip.type='mag';renderCfg();DD=derive(CFG);
+ const t=DD.grip;CFG.boxes[0].h=10;normalize(CFG);const t2=gripCalc(CFG,robotOf(CFG),CFG.boxes[0]);
+ return{status:t.status,F:t.Fcap,Fth:t.Fth,p1:t.pMag,p2:t2.pMag};})()`);
+check('магнитный захват считается по толщине металла', mag.p2 > mag.p1 && mag.F > 0 && mag.Fth > 0, `${mag.p1} → ${mag.p2} Н/мм²`);
+
+console.log('Направляющие, центрирование и зрение (п. 10 и 12)');
+const base = (infeed, align, vision, extra) => w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));CFG.robot='pl130';
+ ${extra || ''}CFG.conveyors[0].infeed='${infeed}';CFG.conveyors[0].align='${align}';CFG.vision.mode='${vision}';
+ renderCfg();DD=derive(CFG);const x=DD.base[0];
+ return{gx:x.gx,ga:x.ga,dx:x.dx,da:x.da,tol:x.tol,ok:x.ok,need:x.need,visOK:DD.visOK,tVis:DD.tVision,model:DD.tCycleModel};})()`);
+const b1 = base('oriented', 'stop', 'none');
+check('ориентированная подача с упором укладывается в допуск', b1.ok && b1.need === 'none', `±${b1.gx} мм при допуске ±${b1.tol.dx.toFixed(0)}`);
+const b2 = base('random', 'none', 'none');
+check('без направляющих разброс выходит за допуск', !b2.ok && b2.need === '2d', `need=${b2.need}`);
+check('и это видно как невыполненное требование к зрению', b2.visOK === false);
+const b3 = base('random', 'none', '2d');
+check('2D-камера доводит позу до допуска', b3.ok && b3.visOK, `±${b3.dx} мм`);
+check('кадр камеры входит в такт', b3.tVis > 0 && b3.model > b2.model, `${b2.model.toFixed(2)} → ${b3.model.toFixed(2)} с`);
+const b4 = base('multi', 'guides', 'none');
+check('переменная высота требует 3D', b4.need === '3d', b4.need);
+const b5 = base('random', 'none', 'none', `CFG.boxes[0].mat='glass';`);
+check('прозрачная тара требует структурированного света', b5.need === 'struct', b5.need);
+const b6 = base('random', 'guides', 'none', `CFG.boxes[0]=Object.assign(CFG.boxes[0],{shape:'cyl',mat:'metal',l:300,w:300});`);
+check('для круглой тары угол не ограничивает', b6.ga === 0 && b6.da === 0);
+
+const miss = w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));CFG.robot='pl130';
+ CFG.conveyors[0].infeed='random';CFG.conveyors[0].align='none';CFG.vision.mode='none';
+ CFG.conveyors[0].feed='rate';CFG.conveyors[0].rate=40;renderCfg();buildSim();
+ document.getElementById('bReset').click();for(let i=0;i<40;i++)tick(0.05);
+ document.getElementById('bStart').click();for(let i=0;i<4000;i++)tick(0.05);
+ const bad=S.stats.missed;
+ CFG.conveyors[0].align='center';renderCfg();buildSim();
+ document.getElementById('bReset').click();for(let i=0;i<40;i++)tick(0.05);
+ document.getElementById('bStart').click();for(let i=0;i<4000;i++)tick(0.05);
+ return{bad,good:S.stats.missed,placed:S.stats.placed};})()`);
+check('без центрирования робот промахивается', miss.bad > 0, `промахов ${miss.bad}`);
+check('с центрированием промахов нет', miss.good === 0 && miss.placed > 10, `промахов ${miss.good}, уложено ${miss.placed}`);
+
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();`);
+
 check('нет ошибок выполнения', errs.length === 0, errs.join('; '));
 console.log(failed ? `\nПровалено проверок: ${failed}` : '\nВсе проверки пройдены');
 process.exit(failed ? 1 : 0);

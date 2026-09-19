@@ -17,13 +17,95 @@ const ROBOTS=[
  {id:'pl130',name:'Паллетайзер 130 кг · 2400 мм, 6 циклов/мин',cls:'industrial',payload:130,reach:2400,v:2.0,cpm:6,cost:4.4,ex:'по методике оценки REDCARGO PRO130 — 6 циклов укладки в минуту; досягаемость уточнить по паспорту'},
  {id:'pl185',name:'Паллетайзер 185 кг · 3140 мм',cls:'industrial',payload:185,reach:3143,v:2.0,cpm:15,cost:5.0,ex:'класс FANUC M-410iC/185, KUKA KR 180 R3200 PA'},
  {id:'custom',name:'Свой робот — ввести параметры',cls:'custom',payload:10,reach:1300,v:1.0,cpm:8,cost:2.0,ex:''}];
+// Форма тары: чем она отличается для захвата. seal — доля площади, которая реально
+// уплотняется вакуумом (у решётчатого верха нечему уплотняться, у плёнки складки подсасывают).
+const SHAPES={box:{name:'Коробка (параллелепипед)',seal:1,round:false},
+ shrink:{name:'Термоусадка: бутылки в плёнке',seal:.6,round:false},
+ cyl:{name:'Цилиндр: банка, круглая заготовка',seal:1,round:true},
+ plate:{name:'Лист или плоская деталь',seal:1,round:false},
+ crate:{name:'Ящик с решётчатым верхом',seal:0,round:false}};
+// Материал: предельное трение о присоску, утечка через поверхность, магнитится ли.
+const MATS={carton:{name:'Картон',muCap:.7,leak:.25,mag:false},
+ film:{name:'Полимерная плёнка',muCap:.35,leak:.08,mag:false},
+ plastic:{name:'Жёсткий пластик',muCap:.45,leak:.02,mag:false},
+ metal:{name:'Сталь',muCap:.35,leak:.01,mag:true},
+ alu:{name:'Алюминий / нержавейка',muCap:.35,leak:.01,mag:false},
+ glass:{name:'Стекло',muCap:.35,leak:.01,mag:false}};
+const TARA_DEF={shape:'box',mat:'carton'};
 const BOX_PRESETS=[{name:'Малая',l:300,w:200,h:150,m:3,rate:0,layers:0},{name:'Средняя',l:400,w:300,h:250,m:8,rate:0,layers:0},{name:'Крупная',l:600,w:400,h:300,m:15,rate:0,layers:0},{name:'Тяжёлая',l:500,w:350,h:200,m:22,rate:0,layers:0},
- {name:'М5П',l:300,w:200,h:105,m:5,rate:900,layers:11},{name:'М12_УП',l:334,w:215,h:196,m:12,rate:458,layers:7},{name:'С180',l:381,w:206,h:145,m:9,rate:400,layers:7},{name:'М180',l:306,w:246,h:143,m:9,rate:400,layers:4},{name:'С450',l:326,w:264,h:123,m:8.1,rate:379,layers:4},{name:'М20П',l:377,w:250,h:242,m:20,rate:275,layers:4},{name:'М8',l:335,w:204,h:150,m:7.5,rate:267,layers:7},{name:'Б380',l:357,w:258,h:136,m:6.08,rate:263,layers:9},{name:'МС2',l:392,w:294,h:109,m:10,rate:140,layers:10},{name:'МС10',l:314,w:152,h:243,m:10,rate:240,layers:5}];
+ {name:'М5П',l:300,w:200,h:105,m:5,rate:900,layers:11},{name:'М12_УП',l:334,w:215,h:196,m:12,rate:458,layers:7},{name:'С180',l:381,w:206,h:145,m:9,rate:400,layers:7},{name:'М180',l:306,w:246,h:143,m:9,rate:400,layers:4},{name:'С450',l:326,w:264,h:123,m:8.1,rate:379,layers:4},{name:'М20П',l:377,w:250,h:242,m:20,rate:275,layers:4},{name:'М8',l:335,w:204,h:150,m:7.5,rate:267,layers:7},{name:'Б380',l:357,w:258,h:136,m:6.08,rate:263,layers:9},{name:'МС2',l:392,w:294,h:109,m:10,rate:140,layers:10},{name:'МС10',l:314,w:152,h:243,m:10,rate:240,layers:5},
+ {name:'Бутылки в термоусадке 6×1,5 л',l:280,w:190,h:330,m:9.5,rate:0,layers:0,shape:'shrink',mat:'film'},
+ {name:'Банка металлическая Ø200',l:200,w:200,h:250,m:6,rate:0,layers:0,shape:'cyl',mat:'metal'},
+ {name:'Заготовка стальная Ø300',l:300,w:300,h:120,m:28,rate:0,layers:0,shape:'cyl',mat:'metal'},
+ {name:'Лист стальной 600×400×4',l:600,w:400,h:4,m:7.5,rate:0,layers:0,shape:'plate',mat:'metal'},
+ {name:'Ящик решётчатый',l:600,w:400,h:300,m:12,rate:0,layers:0,shape:'crate',mat:'plastic'}];
 const PALLETS={'EUR 1200×800':{L:1200,W:800,h:144,m:25},'FIN 1200×1000':{L:1200,W:1000,h:144,m:30},'1000×1000':{L:1000,W:1000,h:150,m:28},'1100×1100':{L:1100,W:1100,h:150,m:30}};
 const CONV_TYPES={belt:{name:'Ленточный (гладкое полотно, один привод)',mu:.30,mBelt:8,vfd:true},roller:{name:'Рольганг приводной (цепной/ремённый, один привод)',mu:.06,mBelt:0,vfd:true},mdr:{name:'Рольганг на мотор-роликах 24 В (ZPA, привод в каждой зоне)',mu:.06,mBelt:0,vfd:false}};
 const FIELDBUS=['PROFINET','EtherNet/IP','Modbus TCP','Дискретные сигналы'];
-const GRIPPERS={cups:{name:'Вакуумный на присосках',vac:true,base:3.5,perBox:0.8},foam:{name:'Вакуумная пенная рамка (площадной)',vac:true,base:5,perBox:2.5},clamp:{name:'Клещевой (пневмозажим с боков)',vac:false,base:10,perBox:4},fork:{name:'Вилочный (подхват снизу + прижим)',vac:false,base:12,perBox:5}};
+const GRIPPERS={cups:{name:'Вакуумный на присосках',vac:true,multi:true,base:3.5,perBox:0.8},
+ foam:{name:'Вакуумная пенная рамка (площадной)',vac:true,multi:true,base:5,perBox:2.5},
+ mag:{name:'Магнитный (электропостоянный)',vac:false,multi:true,base:8,perBox:3},
+ clamp:{name:'Клещевой (пневмозажим с боков)',vac:false,multi:false,base:10,perBox:4},
+ fork:{name:'Вилочный (подхват снизу + прижим)',vac:false,multi:false,base:12,perBox:5}};
+// Годится ли захват под эту тару. Возвращает степень пригодности и причину.
+function gripFit(b,type){const sh=SHAPES[b.shape||'box'],mt=MATS[b.mat||'carton'],G=GRIPPERS[type];
+ if(type==='mag')return mt.mag?{s:'ok',n:''}:{s:'bad',n:`${mt.name} не магнитится — магнитный захват не удержит`};
+ if(G.vac){
+  if(sh.seal===0)return{s:'bad',n:'Решётчатый верх не уплотняется — вакуум не создать, нужен подхват снизу или боковой обжим'};
+  if(sh.seal<1)return{s:'warn',n:'Термоусадка: складки плёнки подсасывают воздух, полезная площадь уплотнения меньше; надёжнее боковой обжим или вилки'};
+  if(sh.round&&type==='cups')return{s:'warn',n:'Круглая крышка: присоски надо вписать в окружность — проверьте, помещается ли выбранное число'};
+  if(mt.muCap<0.4)return{s:'warn',n:`${mt.name}: скользкая поверхность, удержание трением хуже — решает горизонтальный случай`};
+  return{s:'ok',n:''};}
+ if(type==='clamp'){
+  if(b.shape==='plate')return{s:'bad',n:'Лист не за что взять с боков — вакуум с уплотнительной панелью или магнит'};
+  if(sh.round)return{s:'warn',n:'Цилиндр в плоских губках проворачивается — нужны призматические губки'};
+  return{s:'ok',n:''};}
+ if(type==='fork'){
+  if(b.shape==='plate')return{s:'warn',n:'Лист подхватом снизу — только если под ним есть зазор под вилки'};
+  return{s:'ok',n:''};}
+ return{s:'ok',n:''};}
+function gripBest(b){const ok=Object.keys(GRIPPERS).filter(t=>gripFit(b,t).s==='ok');
+ return ok.length?ok:Object.keys(GRIPPERS).filter(t=>gripFit(b,t).s==='warn');}
 const CUPS={bellows:{name:'Сильфонная, 1,5 складки',mu:.5,vacMax:60,note:'компенсирует неровности и наклон картона'},flat:{name:'Плоская',mu:.5,vacMax:80,note:'гладкие жёсткие поверхности; на картоне течёт'},flatrib:{name:'Плоская с рёбрами (высокое трение)',mu:.7,vacMax:80,note:'горизонтальные ускорения при быстрых переносах'},oval:{name:'Овальная',mu:.5,vacMax:60,note:'узкие рёбра жёсткости, длинные коробки'}};
+// Как тара приходит на конвейер: отсюда исходный разброс положения и угла.
+const INFEED={oriented:{name:'Ориентированно, по одной в ряд',dx:10,da:2,multi:false},
+ random:{name:'Произвольный поворот, один слой',dx:60,da:180,multi:false},
+ multi:{name:'Переменная высота или несколько слоёв',dx:60,da:180,multi:true},
+ bulk:{name:'Навалом',dx:150,da:180,multi:true,bulk:true}};
+// Направляющие и центрирование: до какой остаточной погрешности доводят позу.
+const ALIGN={none:{name:'Без направляющих',dx:1e9,da:1e9},
+ guides:{name:'Боковые направляющие',dx:5,da:3},
+ stop:{name:'Направляющие и торцевой упор',dx:3,da:2},
+ center:{name:'Направляющие, упор и центрирующие прижимы',dx:2,da:0.5}};
+// Техническое зрение: точность позы и время кадра.
+const VISION={none:{name:'Без технического зрения',dx:1e9,da:1e9,t:0},
+ '2d':{name:'2D-камера: положение и угол в плоскости',dx:1.5,da:0.5,t:0.15},
+ '3d':{name:'3D: стереопара, ToF или лазерный профилометр',dx:3,da:1,t:0.35},
+ struct:{name:'3D со структурированным светом (прозрачная и блестящая тара)',dx:2,da:0.7,t:0.5}};
+const VIS_ORDER=['none','2d','3d','struct'];
+// Допуск захвата на промах по положению и углу.
+function pickTol(c,b,G){const t=c.grip.type,mn=Math.min(b.l,b.w);
+ if(t==='cups'){const d=(G&&G.cupD)||50,n=(G&&G.nPerBox)||4,span=(d+25)*Math.ceil(Math.sqrt(n));
+  return{dx:Math.max(3,(mn-span)/2),da:5};}
+ if(t==='foam')return{dx:Math.max(5,mn*0.12),da:5};
+ if(t==='mag')return{dx:Math.max(5,mn*0.12),da:6};
+ if(t==='clamp')return{dx:10,da:3};
+ return{dx:15,da:3};}
+// Базирование по каждому конвейеру: что осталось от разброса и хватает ли этого захвату.
+function baseCalc(c,G){const V=VISION[c.vision.mode]||VISION.none;
+ return c.conveyors.map((cv,i)=>{const b=boxOf(c,cv.box),IN=INFEED[cv.infeed]||INFEED.oriented,AL=ALIGN[cv.align]||ALIGN.none;
+  const round=SHAPES[b.shape||'box'].round,mt=MATS[b.mat||'carton'];
+  const gx=Math.min(IN.dx,AL.dx),ga=round?0:Math.min(IN.da,AL.da);      // только направляющие
+  const dx=Math.min(gx,V.dx),da=round?0:Math.min(ga,V.da);              // с учётом зрения
+  const tol=pickTol(c,b,G);
+  // Направляющие правят положение в плане, но не высоту: при переменной высоте или
+  // нескольких слоях робот не знает Z, и без 3D он опускается не туда.
+  const needVis=(gx>tol.dx||ga>tol.da||IN.multi);
+  const hard=(b.mat==='glass'||b.mat==='film'||(round&&(b.mat==='metal'||b.mat==='alu')));
+  const need=!needVis?'none':hard?'struct':IN.multi?'3d':'2d';
+  const zOK=!IN.multi||visionOK(c.vision.mode,'3d');
+  return{i,cv,b,IN,AL,gx,ga,dx,da,tol,need,zOK,ok:dx<=tol.dx&&da<=tol.da&&zOK,bulk:!!IN.bulk,round};});}
+function visionOK(mode,need){return VIS_ORDER.indexOf(mode)>=VIS_ORDER.indexOf(need);}
 const FEEDS={manual:'Ручная (оператор кладёт)',interval:'Автомат: коробка каждые N секунд',rate:'Автомат: N коробок в минуту'};
 const SHEET_MODES={none:'Без листов',bottom:'Один лист на поддоне (снизу)',between:'Лист между каждым слоем',everyN:'Лист через каждые N слоёв'};
 const EXCH_OUT={jack:'Человек с рохлей (ручная гидравлическая тележка)',forklift:'Погрузчик (кар)',amr:'Роботизированная тележка (AMR/AGV)',conveyor:'Цепной конвейер паллет + диспенсер'};
@@ -60,10 +142,11 @@ const DEF={name:'Ячейка паллетизации',robots:1,robot:'cb20',cu
  motion:{vZ:900,vPlace:150,hAppr:60,tJerk:0.15,wSpeed:180},
  exch:{out:'jack',in:'vehicle',sheetsBy:'person',auto:true,reaction:20,stack:8},
  boxes:[{name:'Средняя',l:400,w:300,h:250,m:8,rate:0,layers:0}],
- conveyors:[{type:'roller',len:3,speed:12,accum:true,box:0,feed:'manual',interval:10,rate:6}],
+ conveyors:[{type:'roller',len:3,speed:12,accum:true,box:0,feed:'manual',interval:10,rate:6,infeed:'oriented',align:'guides'}],
+ vision:{mode:'none'},
  palletHandling:'forklift',safety:'fence',fieldbus:'PROFINET',tStop:0.5,opt:{target:400,allowCobot:true,maxRobots:2}};
 let CFG=deep(DEF);
-try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.vision=Object.assign(deep(DEF.vision),s.vision||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
 function saveCfg(){try{localStorage.setItem('pal-sim-cfg4',JSON.stringify(CFG));}catch(e){}}
 function robotOf(c){const r=ROBOTS.find(x=>x.id===c.robot)||ROBOTS[3];if(r.id==='custom')return{id:'custom',name:'Свой робот',cls:c.custom.cls,payload:+c.custom.payload,reach:+c.custom.reach,v:c.custom.cls==='cobot'?1:2,cpm:+c.custom.cpm||8,cost:2,ex:''};return r;}
 function safetyMode(c,rob){if(rob.cls!=='cobot')return'fence';return c.safety==='auto'?'cobot':c.safety;}
@@ -72,7 +155,11 @@ function boxColor(i){return['var(--box)','var(--box2)','var(--box3)','var(--box4
 function normalize(c){if(c.exch.out==='conveyor')c.exch.in='dispenser';else if(c.exch.in==='dispenser')c.exch.in='vehicle';c.palletHandling=c.exch.out==='conveyor'?'conveyor':'forklift';
  const extra=(c.exch.in==='robot'?1:0);if(c.stations+c.magazines+extra>6)c.magazines=Math.max(0,6-c.stations-extra);if(c.sheet.mode==='none')c.magazines=0;if(c.sheet.mode!=='none'&&c.magazines===0)c.magazines=1;
  const M=c.motion;M.vZ=clamp(+M.vZ||900,100,2000);M.vPlace=clamp(+M.vPlace||150,20,400);M.hAppr=clamp(+M.hAppr||60,5,400);M.tJerk=clamp(+M.tJerk||0,0,1);M.wSpeed=clamp(+M.wSpeed||180,20,720);c.sheet.sect=clamp(Math.round(+c.sheet.sect||1),1,8);
- if(!GRIPPERS[c.grip.type].vac)c.grip.pick=1;if(c.grip.pitch!=='adj'||c.grip.pick<2)c.grip.pitch='fixed';c.grip.tShift=clamp(+c.grip.tShift||0,0,10);
+ if(!c.vision||!VISION[c.vision.mode])c.vision={mode:'none'};
+ c.conveyors.forEach(v=>{if(!INFEED[v.infeed])v.infeed='oriented';if(!ALIGN[v.align])v.align='guides';});
+ c.boxes.forEach(b=>{if(!SHAPES[b.shape])b.shape='box';if(!MATS[b.mat])b.mat='carton';
+  if(b.shape==='cyl')b.w=b.l;});                       // цилиндр описываем квадратом со стороной Ø
+ if(!GRIPPERS[c.grip.type].multi)c.grip.pick=1;if(c.grip.pitch!=='adj'||c.grip.pick<2)c.grip.pitch='fixed';c.grip.tShift=clamp(+c.grip.tShift||0,0,10);
  while(c.conveyors.length<c.robots)c.conveyors.push(deep(c.conveyors[0]));return c;}
 function sheetsPerPallet(mode,layers,N){return mode==='none'?0:mode==='bottom'?1:mode==='between'?Math.max(0,layers-1):Math.floor((layers-1)/Math.max(1,N));}
 // ======================= ПРОФИЛЬ ПЕРЕМЕЩЕНИЯ =======================
@@ -139,12 +226,14 @@ function sheetAfterLayer(sheet,layer,layers){if(layer>=layers)return false;if(sh
 // ======================= ЗАХВАТ =======================
 function gripCalc(c,rob,box){
  const g=c.grip,k=g.pick,G=GRIPPERS[g.type],m=box.m*k,vEff=rob.v*c.speedPct/100,a=Math.min(8,vEff/0.25),S=2.0,notes=[];
+ const shp=SHAPES[box.shape||'box'],mt=MATS[box.mat||'carton'],fit=gripFit(box,g.type);
+ if(fit.n)notes.push(fit.n);
  const R={type:g.type,k,a,S,vEff,status:'ok',tGrip:.5,tRel:.3,air:0,notes};
  R.mass=g.mass>0?g.mass:G.base+k*G.perBox;
- if(G.vac){const cup=CUPS[g.cup];const mu=g.type==='foam'?.6:cup.mu;
+ if(G.vac){const cup=CUPS[g.cup];const mu=Math.min(g.type==='foam'?.6:cup.mu,mt.muCap);R.mu=mu;R.shape=shp.name;R.mat=mt.name;
   R.F1=m*(9.81+a)*S;R.F2=m*(9.81+a/mu)*S;R.Fth=Math.max(R.F1,R.F2);R.case=R.F2>R.F1?'горизонтальный перенос (трение)':'вертикальный подъём';
   const vac=Math.min(g.vac,g.type==='foam'?50:cup.vacMax);R.vac=vac;if(g.vac>vac)notes.push(`Уровень вакуума ограничен ${vac} кПа для этого типа: выше картон расслаивается, присоска «проваливается»`);
-  if(g.type==='foam'){R.A=0.55*box.l*box.w*k/100;R.Fcap=vac*1000*R.A/1e4;R.qLeak=R.A*0.15;R.Q=Math.max(200,Math.ceil(R.qLeak*1.8/50)*50);R.tGrip=0.25+0.15*k;R.tRel=0.25;R.air=0;R.pump='вакуумный насос/нагнетатель '+f0(R.Q)+' л/мин';
+  if(g.type==='foam'){R.A=0.55*box.l*box.w*k/100*shp.seal;R.Fcap=vac*1000*R.A/1e4;R.qLeak=R.A*mt.leak*0.6;R.Q=Math.max(200,Math.ceil(R.qLeak*1.8/50)*50);R.tGrip=0.25+0.15*k;R.tRel=0.25;R.air=0;R.pump='вакуумный насос/нагнетатель '+f0(R.Q)+' л/мин';
    if(R.Fcap<R.Fth){R.status='bad';notes.push(`Пенной рамке не хватает силы: ${f0(R.Fcap)} Н при площади ${f0(R.A)} см² против ${f0(R.Fth)} Н — снизьте скорость робота, уменьшите число коробок за захват или перейдите на присоски`);}
    else if(R.Fcap<R.Fth*1.2){R.status='warn';notes.push('Запас пенной рамки меньше 20 %: при ослабленном картоне возможны потери');}
    R.mass=g.mass>0?g.mass:G.base+k*G.perBox+R.A*0.004;}
@@ -152,15 +241,24 @@ function gripCalc(c,rob,box){
    for(const d of(g.cupD>0?[g.cupD]:CUP_D)){const Fcup=vac*1000*Math.PI*Math.pow(d/2000,2);const n=Math.max(nMin,Math.ceil(Fbox*1.1/Fcup));const grid=Math.floor(box.l/(d+25))*Math.floor(box.w/(d+25));const okFit=n<=grid;if(okFit&&(!sel||n<=6&&sel.n>6)){sel={d,Fcup,n,grid};if(n<=6)break;}if(!sel&&g.cupD>0)sel={d,Fcup,n,grid};}
    if(!sel){const d=CUP_D[CUP_D.length-1],Fcup=vac*1000*Math.PI*Math.pow(d/2000,2);sel={d,Fcup,n:Math.max(nMin,Math.ceil(Fbox*1.1/Fcup)),grid:0};}
    R.cupD=sel.d;R.Fcup=sel.Fcup;R.nPerBox=sel.n;R.nCups=sel.n*k;R.Fcap=R.nCups*sel.Fcup;R.cupA=Math.PI*Math.pow(sel.d/20,2);
-   if(sel.n>sel.grid){R.status='bad';notes.push(`На крышке ${box.l}×${box.w} не помещается ${sel.n} присосок Ø${sel.d}: нужна пенная рамка или больший диаметр с меньшим числом`);}
-   R.qLeak=R.nCups*R.cupA*0.25;R.Q=[15,30,60,100,150,200,300,500].find(q=>q>=R.qLeak*2+10)||500;R.pump='эжектор '+R.Q+' л/мин';R.air=Math.round(R.Q*0.6);
+   const grid2=shp.round?Math.floor(Math.PI*Math.pow(box.l/2-sel.d/2,2)/Math.pow(sel.d+25,2)):sel.grid;
+   if(sel.n>Math.max(1,grid2)){R.status='bad';notes.push(`На ${shp.round?'круглой крышке Ø'+box.l:'крышке '+box.l+'×'+box.w} не помещается ${sel.n} присосок Ø${sel.d}: нужна пенная рамка или больший диаметр с меньшим числом`);}
+   R.Fcap*=shp.seal;R.qLeak=R.nCups*R.cupA*mt.leak;R.Q=[15,30,60,100,150,200,300,500].find(q=>q>=R.qLeak*2+10)||500;R.pump='эжектор '+R.Q+' л/мин';R.air=Math.round(R.Q*0.6);
    const V=R.nCups*Math.PI*Math.pow(sel.d/2,2)*sel.d/3/1e6+0.3;const Qeff=Math.max(5,R.Q-R.qLeak);R.tGrip=0.15+V/(Qeff/60)*Math.log(101/(101-vac))*1.3;R.tRel=0.15;
    if(g.pressure<4)notes.push('Давление ниже 4 бар: эжектор не выходит на паспортный вакуум, время захвата растёт');
    R.mass=g.mass>0?g.mass:G.base+k*G.perBox+R.nCups*0.12;}
   if(box.m*k>40&&g.type==='cups')notes.push('Тяжёлые коробки на присосках: рассмотрите вилочный/клещевой захват или пенную рамку с прижимом');}
+ else if(g.type==='mag'){R.Fth=m*(9.81+a)*S;R.case='магнитное притяжение через полюса';
+  const t=box.shape==='plate'?box.h:Math.min(box.h,8);
+  R.pMag=0.8*clamp(t/5,0.15,1);R.Amag=box.l*box.w*0.45*k;R.Fcap=R.pMag*R.Amag;
+  R.tGrip=.3;R.tRel=.45;R.air=0;R.pump='электропостоянный магнит, импульс намагничивания';
+  notes.push(`Электропостоянный магнит: держит ${f2(R.pMag)} Н/мм² при толщине ${f0(t)} мм, на тонком металле усилие падает пропорционально. Нужен импульс размагничивания, иначе остаточное поле тянет соседнюю деталь.`);
+  R.mass=g.mass>0?g.mass:G.base+k*G.perBox;}
  else if(g.type==='clamp'){const mu=.4;R.Fth=m*(9.81+a)*S/(2*mu);R.case='зажим с боков, удержание трением';R.cylD=[32,40,50,63,80,100,125].find(d=>g.pressure*1e5*Math.PI*Math.pow(d/2000,2)>=R.Fth)||125;R.Fcap=g.pressure*1e5*Math.PI*Math.pow(R.cylD/2000,2);R.tGrip=.4;R.tRel=.3;R.air=Math.round(2*Math.PI*Math.pow(R.cylD/2000,2)*0.1*(g.pressure+1)*1000*8);R.pump='пневмоцилиндр Ø'+R.cylD;
   notes.push('Зажим с боков требует зазора между коробками на паллете ≈ 20–30 мм и не подходит для мягких коробок');}
  else{R.Fth=m*(9.81+a);R.case='подхват снизу';R.Fcap=R.Fth*3;R.tGrip=.6;R.tRel=.5;R.pump='пневмоцилиндры вилок и прижима';R.air=60;notes.push('Вилочный захват требует конвейера с провалом под коробкой (зона вил) и зазора при укладке');}
+ if(fit.s==='bad')R.status='bad';else if(fit.s==='warn'&&R.status==='ok')R.status='warn';
+ R.fit=fit.s;R.best=gripBest(box);
  if(c.exch.in==='robot')notes.push('Робот берёт паллеты из стопки: на захвате нужны откидные крюки/вилки под паллету (+6 кг) и вакуумная зона под лист');
  R.util=R.Fth/(R.Fcap||1);if(R.status==='ok'&&R.util>.95)R.status='warn';if(c.exch.in==='robot'&&g.mass===0)R.mass+=6;return R;}
 // ======================= КОНВЕЙЕР =======================
@@ -236,6 +334,8 @@ function derive(c,light){
  D.pats=pats;D.stations=LY.robots.flatMap(r=>r.slots.filter(s=>s.kind==='st'));D.mags=LY.robots.flatMap(r=>r.slots.filter(s=>s.kind==='mg'));D.stacks=LY.robots.flatMap(r=>r.slots.filter(s=>s.kind==='ps'));
  const usedBoxes=[...new Set(stBoxIdx)].map(i=>boxOf(c,i));const heaviest=usedBoxes.reduce((a,b)=>b.m>a.m?b:a,usedBoxes[0]);
  D.grip=gripCalc(c,rob,heaviest);const gripM=D.grip.mass;D.aMax=D.grip.a;
+ D.base=baseCalc(c,D.grip);D.visNeed=VIS_ORDER[Math.max(...D.base.map(x=>VIS_ORDER.indexOf(x.need)))];
+ D.visOK=visionOK(c.vision.mode,D.visNeed);D.tVision=(VISION[c.vision.mode]||VISION.none).t;
  let rReq=0,rWhere='';const upd=(d,tag)=>{if(d>rReq){rReq=d;rWhere=tag;}};
  const r0=LY.robots[0];r0.slots.forEach(s=>{if(s.kind==='st'){const p=s.pat,b=boxOf(c,s.bi),zTop=pal.h+p.layers*b.h+c.gripH,zBot=pal.h+b.h+c.gripH;[p.cells,p.cellsB].forEach(cs=>cs.forEach(cell=>{const w=LY.cw(s,cell),dh=Math.hypot(w.x-r0.base.x,w.y-r0.base.y);upd(Math.hypot(dh,zTop-c.baseH),`верхний слой станции ${s.id}`);upd(Math.hypot(dh,zBot-c.baseH),`нижний слой станции ${s.id}`);}));}
   else if(s.kind==='mg')upd(Math.hypot(Math.hypot(s.cx-r0.base.x,s.cy-r0.base.y),pal.h+400+c.gripH-c.baseH),`магазин ${s.id}`);
@@ -253,7 +353,7 @@ function derive(c,light){
  const lay0=pat0?pat0.layers:1,zPick=c.convH+heaviest.h,zPl=pal.h+lay0/2*heaviest.h+heaviest.h;
  const tXY=mt(dAvg,vEff);D.tAppr=mt(M.hAppr/1000,vPl);D.tClear=mt((heaviest.h+M.hAppr)/1000,vZ);
  D.tCycleModel=Math.max(tXY,mt(Math.abs(zPl-zPick)/1000,vZ))+Math.max(tXY,mt(Math.abs(zPick-zPl-heaviest.h)/1000,vZ))+3*D.tAppr+D.tClear+D.grip.tGrip+D.grip.tRel;
- D.tCycleNorm=60/(rob.cpm*c.speedPct/100);D.tCycle=Math.max(D.tCycleModel,D.tCycleNorm);D.cpm=60/D.tCycle;
+ D.tCycleModel+=D.tVision;D.tCycleNorm=60/(rob.cpm*c.speedPct/100);D.tCycle=Math.max(D.tCycleModel,D.tCycleNorm);D.cpm=60/D.tCycle;
  const vSheet=vEff*c.sheet.speedPct/100,tTurn=Math.max(...sts0.map(s=>Math.abs(s.ang)),0)/M.wSpeed;D.tTurn=tTurn;
  D.tRelSheet=c.sheet.sect*D.grip.tRel;
  D.tSheet=c.magazines>0&&c.sheet.mode!=='none'?Math.max(2*Math.max(mt(LY.R/1000,vSheet),tTurn)+3*D.tAppr+D.tClear+c.sheet.tGrip+D.tRelSheet,D.tCycleNorm):0;
@@ -281,11 +381,23 @@ function derive(c,light){
  if(D.payStatus==='bad')w.push(`Перегрузка: ${f1(D.mReq)} кг > ${rob.payload} кг${c.exch.in==='robot'&&pal.m+gripM>heaviest.m*k+gripM?' (пустая паллета '+pal.m+' кг + захват)':''}.`);
  else if(D.payStatus==='warn')w.push('Нагрузка выше 80 % грузоподъёмности: проверьте момент инерции захвата и снижение скорости по паспорту.');
  if(D.grip.status==='bad')w.push('Захват не удерживает груз: '+D.grip.notes[0]);
+ {const tb=[...new Set(c.boxes.map(b=>b.shape+'|'+b.mat))];
+  c.boxes.forEach(b=>{const fi=gripFit(b,c.grip.type);if(fi.s==='ok')return;
+   const best=gripBest(b).map(t=>GRIPPERS[t].name.toLowerCase()).join(' или ')||'подхват снизу';
+   w.push(`«${b.name}» (${SHAPES[b.shape].name.toLowerCase()}, ${MATS[b.mat].name.toLowerCase()}) и ${GRIPPERS[c.grip.type].name.toLowerCase()}: ${fi.n} Под эту тару просится ${best}.`);});
+  if(tb.length>1)w.push(`На комплексе ${tb.length} разных видов тары по форме и материалу — один захват на все не подберёте, закладывайте быстросменную оснастку или отдельные линии.`);}
  if(rob.cls==='cobot'&&heaviest.m*k>10)w.push('Коллаборативный перенос груза тяжелее 10 кг: по ISO/TS 15066 контакт допустим только на низкой скорости; практически — сканер со снижением скорости и частичное ограждение.');
  if(rob.cls!=='cobot'&&c.safety==='cobot')w.push('Промышленный робот без ограждения не допускается — режим переключён на ограждение со световыми завесами.');
  if(D.tCycleModel>D.tCycleNorm)w.push(`Узкое место — геометрия цикла, а не норматив робота: модель даёт ${f1(D.tCycleModel)} с против ${f1(D.tCycleNorm)} с по паспорту. Только подвод и отрыв на ${f0(c.motion.vPlace)} мм/с стоят ${f1(3*D.tAppr)} с. Поднимите скорость подвода, уменьшите высоту точки подхода (${f0(c.motion.hAppr)} мм) или проверьте расстановку.`);
  if(D.tCycleNorm>D.tCycleModel*1.15)w.push(`Такт ограничен нормативом робота ${f1(rob.cpm*c.speedPct/100)} циклов/мин (${f1(D.tCycleNorm)} с), геометрический расчёт даёт ${f1(D.tCycleModel)} с — норматив учитывает подходы, отходы и снижение скорости у паллеты.`);
  Object.values(pats).forEach(p=>{if(p.fill<0.7)w.push(`Слой заполнен на ${f0(p.fill*100)} % (${p.name}) — попробуйте другую паллету или размер коробки.`);if(!p.interlock&&c.patternMode!=='column'&&p.n>1)w.push(`Для этой коробки перевязка невозможна на ${c.pallet}: слои будут колоннами (${p.name}). Стопу держат уголки и стрейч.`);if(p.loss>0)w.push(`Перевязка стоит ${p.loss} коробок в слое (${p.n} вместо ${p.bestN}) — плата за устойчивость.`);if(p.stackH>1800)w.push(`Высота стопы ${f0(p.stackH)} мм > 1800 мм — проверьте устойчивость и ворота склада.`);if(k>1&&p.kEff<k*0.75)w.push(`Групповой захват по ${k}: в схеме укладки только ${f1(p.kEff)} коробки за цикл в среднем — часть ходов будет с неполной группой.`);if(p.planAdj&&!p.adjUsed)w.push(`Регулируемый шаг зон на схеме «${p.name}» не окупается: блоки сократили бы ходы с ${p.rowGroups} до ${p.planAdj.groups} на паллету, но ${p.planAdj.shifts} перестроений по ${f1(p.tShift)} с стоят дороже. Уменьшите время перестроения или оставьте балку с фиксированным шагом.`);if(p.adjUsed)w.push(`Подбор групп по форме слоя («${p.name}»): формы ${p.shapes} — ${p.groupsPerPallet} ходов на паллету вместо ${p.rowGroups} рядами, ценой ${p.shifts} перестроений захвата (${f1(p.shifts*p.tShift)} с).`);if(p.layers!==p.layersAuto&&p.stackH>c.maxStack)w.push(`Заданное число слоёв (${p.layers}) даёт стопу ${f0(p.stackH)} мм — выше лимита ${c.maxStack} мм.`);});
+ D.base.forEach(x=>{const n=x.i+1;
+  if(x.bulk)w.push(`Конвейер ${n}: тара приходит навалом. Разбор навала (bin picking) — отдельная задача: нужен 3D-сканер, планировщик подхода и проверка столкновений; тренажёр её не моделирует, считайте эту подачу как требующую предварительной раскладки.`);
+  if(!x.zOK)w.push(`Конвейер ${n}: тара приходит с переменной высотой (${INFEED[x.cv.infeed].name.toLowerCase()}), а высоту захвата никакие направляющие не задают — робот опустится не туда. Нужно ${VISION['3d'].name.toLowerCase()}.`);
+  else if(!x.ok&&!visionOK(c.vision.mode,x.need))w.push(`Конвейер ${n}: после ${ALIGN[x.cv.align].name.toLowerCase()} остаётся разброс ±${f0(x.gx)} мм и ±${f1(x.ga)}° при допуске захвата ±${f0(x.tol.dx)} мм и ±${f1(x.tol.da)}°. Нужно либо центрирование жёстче, либо ${VISION[x.need].name.toLowerCase()}.`);
+  else if(!x.ok&&visionOK(c.vision.mode,x.need))w.push(`Конвейер ${n}: направляющие сами не выводят тару в допуск, позу даёт ${VISION[c.vision.mode].name.toLowerCase()} — робот доворачивается по кадру. Такт вырос на ${f2(D.tVision)} с.`);
+  if(x.cv.align==='none'&&x.IN.dx>x.tol.dx)w.push(`Конвейер ${n}: направляющих нет, тара приходит с разбросом ±${f0(x.IN.dx)} мм — центрировать нечем.`);});
+ if(c.vision.mode!=='none'&&D.visNeed==='none')w.push(`Техническое зрение включено, но направляющие и так выводят тару в допуск захвата. Камера здесь только добавляет ${f2(D.tVision)} с к такту — оставьте её, если нужен контроль или разные артикулы в потоке.`);
  if(D.capFeed<D.capRobot*0.6)w.push(`Узкое место — подача (${f0(D.capFeed)} кор/ч против ${f0(D.capRobot)} у ${nR>1?'роботов':'робота'}): автоматическая подача, второй конвейер или накопитель.`);
  if(n<nR)w.push('Роботов больше, чем конвейеров: у второго робота нет подачи — добавьте конвейер.');
  if(c.magazines===0&&c.sheet.mode!=='none')w.push('Листы заданы, но магазинов нет.');
@@ -311,6 +423,10 @@ function signals(c,D){
   a('DI',`B${n}1`,`Коробка в позиции захвата ${n}`,'Фотодатчик рефлекторный, PNP NO','3-пров. → DI; в робот передаётся через ПЛК');
   if(k>1)a('DI',`B${n}2`,`Группа из ${k} коробок собрана в зоне захвата ${n}`,'Фотодатчик на дальней границе зоны','3-пров. → DI');
   if(cv.feed!=='manual'){a('DI',`UP${n}.RQ`,`Подающая машина ${n}: коробка отправлена`,'Сухой контакт упаковщика/накопителя','→ DI');a('DO',`UP${n}.OK`,`Разрешение подачи на конвейер ${n}`,'DO → вход упаковщика','реле развязки');}
+ {const bs=D.base[i];if(bs.cv.align==='center'){
+   a('DO',`Y${n}C`,`Конвейер ${n}: свести центрирующие прижимы`,'Пневмораспределитель 5/2','DO ПЛК → катушка');
+   a('DI',`B${n}C1`,`Конвейер ${n}: прижимы сведены`,'Индуктивный датчик цилиндра','→ DI');
+   a('DI',`B${n}C2`,`Конвейер ${n}: прижимы разведены`,'Индуктивный датчик','→ DI: без этого робот не заходит');}}
   if(cv.type==='mdr')a('BUS',`ZC${n}.1…${cc.zones}`,`Зоны мотор-роликов ${n}: датчик, мотор, ошибка`,'Контроллеры зон','Шина зон → шлюз → '+(disc?'Ethernet':fb));
   else{if(cv.accum)for(let z=1;z<=cc.zones;z++)a('DI',`B${n}${10+z}`,`Конвейер ${n}: зона ${z} занята`,'Фотодатчик диффузный','3-пров. → DI');
    if(disc){a('DO',`K${n}1`,`ЧП${n}: пуск вперёд`,'DO → DI1 ЧП','через реле развязки');a('DO',`K${n}2`,`ЧП${n}: фиксированная скорость`,'DO → DI2 ЧП','');a('DI',`ЧП${n}.RDY`,`ЧП${n}: готов / нет аварии`,'Релейный выход ЧП','сухой контакт → DI');}
@@ -335,6 +451,11 @@ function signals(c,D){
   a('SI',`${p}R.ES`,`Аварийный стоп с пульта обучения робота ${r}`,'Безопасный выход контроллера','2 канала → КБ');
   a('SO',`${p}R.PS`,`Защитная остановка робота ${r}`,'Безопасный вход контроллера','2 канала от КБ');a('SO',`${p}R.EM`,`Аварийный стоп робота ${r}`,'Безопасный вход','2 канала от КБ');
   if(safety==='cobot')a('SO',`${p}R.RS`,`Робот ${r}: снижение скорости (Reduced Mode)`,'Безопасный вход','2 канала от КБ');}
+ if(c.vision.mode!=='none')c.conveyors.forEach((cv,i)=>{const n=i+1;
+  a('DO',`CAM${n}.TRG`,`Камера ${n}: запуск съёмки`,'Триггер камеры (или фотодатчик напрямую)','DO ПЛК → вход камеры');
+  a('DI',`CAM${n}.RDY`,`Камера ${n}: готова / результат получен`,'Выход камеры','→ DI');
+  a('BUS',`CAM${n}.POSE`,`Камера ${n}: поза тары (x, y, z, углы) и класс формы`,'Контроллер зрения','Ethernet → ПЛК → робот');
+  a('DI',`CAM${n}.ERR`,`Камера ${n}: тара не распознана`,'Выход камеры','→ DI: брак или остановка подачи');});
  ['Пуск','Стоп','Сброс','Запрос доступа','Режим Авто','Режим Ручной','Тест ламп'].forEach((b,i)=>a('DI',`SB${i+1}`,`Кнопка «${b}»`,'Пульт оператора',b==='Стоп'?'НЗ контакт → DI':'НО контакт → DI'));
  [['H1','красная'],['H2','жёлтая'],['H3','зелёная'],['HA','звуковой сигнал']].forEach(x=>a('DO',x[0],`Колонна: ${x[1]}`,'Светосигнальная колонна','DO → лампа 24 В'));
  const est=safety==='fence'?3:2;['пульт','шкаф/ввод','зона обмена паллет'].slice(0,est).forEach((w,i)=>a('SI',`S1.${i+1}`,`Аварийный стоп — ${w}`,'Грибок, 2 НЗ контакта','2 канала → КБ, тест-импульсы'));
@@ -380,6 +501,10 @@ function bom(c,D){
   if(k>1)a('Механика',`Конвейер ${n}: зона сбора группы из ${k} коробок с торцевым упором`,1,`Длина зоны ${f0(k*(b.l+20))} мм; коробки собираются вплотную для группового захвата`);
   if(cv.feed!=='manual')a('Механика',`Интерфейс подачи от упаковочной машины / накопителя, конвейер ${n}`,1,`Автоподача: ${cv.feed==='interval'?'каждые '+cv.interval+' с':cv.rate+' кор/мин'}; сигналы «готов принять» / «коробка отправлена»`);
   a('Датчики',`Фотоэлектрические датчики конвейера ${n}`,cc.sensors,'PNP NO; рефлекторные на проходе, диффузные на зонах');
+  {const bs=D.base[i];if(bs.cv.align!=='none'){
+   a('Механика',`Конвейер ${n}: ${ALIGN[bs.cv.align].name.toLowerCase()}`,1,`Сужающиеся боковые планки${bs.cv.align!=='guides'?', торцевой упор':''}${bs.cv.align==='center'?', пневмоприжимы центрирования':''}; остаточная погрешность ±${f0(bs.AL.dx)} мм и ±${f1(bs.AL.da)}°`);
+   if(bs.cv.align==='center'){a('Привод',`Центрирующие прижимы конвейера ${n}: пневмоцилиндры с датчиками`,2,'Дожим тары к оси перед захватом');
+    a('Датчики',`Датчики положения прижимов ${n}`,4,'Подтверждение «сведено / разведено» для ПЛК');}}}
   a('Механика',`${CONV_TYPES[cv.type].name}, L = ${cv.len} м, ширина ${b.w+120} мм`,1,`Шаг роликов 75 мм (${cc.rollers} шт.), концевой упор в зоне захвата`);});
  if(ex.out==='conveyor')a('Привод','Цепной конвейер паллет с диспенсером (магазин 15 паллет), 0,75 кВт + ЧП с STO',D.stations.length,'Автоматический обмен паллет');
  else{a('Механика','Стол/направляющие паллеты с центрирующими упорами'+(ex.out==='jack'?' и заездными пандусами под рохлю':''),D.stations.length,'Повторяемость позиции ±10 мм');
@@ -397,6 +522,12 @@ function bom(c,D){
  else if(gt==='clamp')a('Робот',`Клещевой захват ${f1(G.mass)} кг: 2 × цилиндр Ø${G.cylD}, губки с резиной`,nR,`Усилие зажима ${f0(G.Fth)} Н при ${c.grip.pressure} бар, μ = 0,4`);
  else a('Робот',`Вилочный захват ${f1(G.mass)} кг с прижимом сверху`,nR,'Подхват снизу — не зависит от состояния картона');
  a('Робот','Пневмоподготовка: фильтр-регулятор, клапан мягкого пуска и сброса, реле давления',nR,'Сброс давления при аварийном стопе по оценке риска');
+ if(c.vision.mode!=='none'){const V=VISION[c.vision.mode],n2=c.conveyors.length;
+  a('Зрение',`${V.name}`,n2,`Погрешность позы ±${f0(V.dx)} мм и ±${f1(V.da)}°, кадр ${f2(V.t)} с`);
+  a('Зрение','Объектив и светофильтр под рабочее расстояние',n2,'Подбирается по полю зрения и глубине резкости');
+  a('Зрение',c.vision.mode==='struct'?'Проектор структурированного света':'Осветитель светодиодный (кольцевой или на просвет)',n2,c.vision.mode==='struct'?'Прозрачная и блестящая тара: обычная стереопара не находит текстуру':'Стабильная освещённость важнее мегапикселей');
+  a('Зрение','Контроллер зрения или ПК с ПО',1,'Выдаёт позу и класс формы роботу по Ethernet');
+  a('Зрение','Калибровочная мишень hand-eye',1,'Привязка системы координат камеры к базе робота; повторять после ударов и ремонта');}
  a('Сеть','Коммутатор промышленный Ethernet '+(nR>1||nVfd>3?'16':'8')+' портов',1,'ПЛК, HMI, роботы, ЧП, шлюзы'+(ex.out==='amr'?', флот-менеджер AMR (Wi-Fi через точку доступа)':''));
  a('Сеть','Кабели: силовые экранированные, сигнальные 24 В, Ethernet',1,'Разделение трасс ≥ 100 мм, экран 360° на вводе');
  return B;}

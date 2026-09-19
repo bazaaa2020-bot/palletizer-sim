@@ -18,7 +18,7 @@ function renderCfg(){
  ${c.grip.type==='cups'?`<div class="field"><label>Тип присосок</label>${sel('grip.cup',Object.entries(CUPS).map(([k,v])=>[k,v.name]),c.grip.cup)}<small>${CUPS[c.grip.cup].note}; μ = ${CUPS[c.grip.cup].mu}, вакуум до ${CUPS[c.grip.cup].vacMax} кПа</small></div>
  <div class="field"><label>Диаметр присоски</label>${sel('grip.cupD',[[0,'авто (подбор)']].concat(CUP_D.map(d=>[d,'Ø'+d+' мм'])),c.grip.cupD)}</div>`:''}
  ${vac?`<div class="field"><label>Уровень вакуума, кПа (−)</label>${num('grip.vac',c.grip.vac,5,20,90)}<small>Картон: 40–60 кПа; выше — расслоение и «продавливание»</small></div><div class="field"><label>Давление сжатого воздуха, бар</label>${num('grip.pressure',c.grip.pressure,.5,2,8)}<small>Эжектору нужно 4–6 бар; при пенной рамке — насос/нагнетатель</small></div>`:`<div class="field"><label>Давление сжатого воздуха, бар</label>${num('grip.pressure',c.grip.pressure,.5,2,8)}</div>`}
- <div class="field"><label>Коробок за один захват</label>${sel('grip.pick',[1,2,3,4,5,6,7,8].map(x=>[x,String(x)]),c.grip.pick,!vac)}<small>${vac?'Группа собирается у упора конвейера вплотную; каждая коробка — своя вакуумная зона':'Групповой захват — только для вакуумных типов'}</small></div>
+ <div class="field"><label>Коробок за один захват</label>${sel('grip.pick',[1,2,3,4,5,6,7,8].map(x=>[x,String(x)]),c.grip.pick,!GRIPPERS[c.grip.type].multi)}<small>${GRIPPERS[c.grip.type].multi?'Группа собирается у упора конвейера вплотную; каждая единица тары — своя зона захвата':'Групповой захват — только для вакуумных и магнитных типов'}</small></div>
  ${vac&&c.grip.pick>1?`<div class="field"><label>Шаг зон захвата</label>${sel('grip.pitch',[['fixed','Фиксированный: балка, группа — только ряд'],['adj','Регулируемый: зоны разводятся, группа — блок']],c.grip.pitch)}<small>Регулируемый шаг даёт подбор групп по форме слоя: 14 коробок берутся не рядами, а блоками 4+4+2+4</small></div>
  <div class="field"><label>Время перестроения зон, с</label>${num('grip.tShift',c.grip.tShift,.1,0,10)}<small>На каждый блок два перестроения: развести после захвата с конвейера и собрать обратно в ряд перед следующим</small></div>
  ${(()=>{const P=Object.values(D.pats)[0];if(!P)return'';return`<div class="check"><div>Группы по форме слоя<small>${P.adjUsed?`формы ${P.shapes}; ${P.shifts} перестроений на паллету (${f1(P.shifts*P.tShift)} с)`:`только ряды${P.planAdj?`; блоки дали бы ${P.planAdj.groups} ходов против ${P.rowGroups}, но не окупают ${P.planAdj.shifts} перестроений`:''}`}</div><span class="badge ${P.adjUsed?'ok':'warn'}">${P.groupsPerPallet} ходов на паллету</span></div>`;})()}`:''}
@@ -31,16 +31,22 @@ function renderCfg(){
  <div class="field"><label>Макс. высота стопы с паллетой, мм</label>${num('maxStack',c.maxStack,50,300,2400)}</div>
  <div class="field"><label>Станций паллет у каждого робота</label>${sel('stations',[[1,'1'],[2,'2'],[3,'3'],[4,'4']],c.stations)}<small>Позиции вокруг робота: станции + магазины${ex.in==='robot'?' + стопка паллет':''} ≤ 6</small></div>
  <div class="field"><label>Схема укладки</label>${sel('patternMode',[['auto','Авто: максимум коробок, перевязка если возможна'],['interlock','Перекрёстная (перевязка обязательна)'],['column','Колонная (простая сетка)']],c.patternMode)}</div>
- <div class="row box h"><span>Коробка</span><span>L, мм</span><span>W, мм</span><span>H, мм</span><span>кг</span><span>выпуск шт/ч</span><span>слоёв</span><span></span></div>
- ${c.boxes.map((b,i)=>`<div class="row box"><input type="text" data-k="boxes.${i}.name" value="${b.name}">${num(`boxes.${i}.l`,b.l,10,100,1200)}${num(`boxes.${i}.w`,b.w,10,100,1000)}${num(`boxes.${i}.h`,b.h,10,50,800)}${num(`boxes.${i}.m`,b.m,.5,0.1,150)}${num(`boxes.${i}.rate`,b.rate,10,0,5000,'производительность выпуска, шт/ч (0 — не задана)')}${num(`boxes.${i}.layers`,b.layers,1,0,30,'0 — авто по высоте стопы')}<button data-act="delBox" data-i="${i}" title="Удалить" ${c.boxes.length<2?'disabled':''}>×</button></div>`).join('')}
+ <div class="row box h"><span>Тара</span><span>L (Ø), мм</span><span>W, мм</span><span>H, мм</span><span>кг</span><span>выпуск шт/ч</span><span>слоёв</span><span></span></div>
+ ${c.boxes.map((b,i)=>`<div class="row box"><input type="text" data-k="boxes.${i}.name" value="${b.name}">${num(`boxes.${i}.l`,b.l,10,100,1200)}${num(`boxes.${i}.w`,b.w,10,100,1000)}${num(`boxes.${i}.h`,b.h,10,2,800)}${num(`boxes.${i}.m`,b.m,.5,0.1,150)}${num(`boxes.${i}.rate`,b.rate,10,0,5000,'производительность выпуска, шт/ч (0 — не задана)')}${num(`boxes.${i}.layers`,b.layers,1,0,30,'0 — авто по высоте стопы')}<button data-act="delBox" data-i="${i}" title="Удалить" ${c.boxes.length<2?'disabled':''}>×</button></div>
+ <div class="row tara">${sel(`boxes.${i}.shape`,Object.entries(SHAPES).map(([k,v])=>[k,v.name]),b.shape)}${sel(`boxes.${i}.mat`,Object.entries(MATS).map(([k,v])=>[k,v.name]),b.mat)}<span class="fitn ${gripFit(b,c.grip.type).s==='ok'?'':gripFit(b,c.grip.type).s}">${(()=>{const fi=gripFit(b,c.grip.type);return fi.s==='ok'?`${GRIPPERS[c.grip.type].name.toLowerCase()} подходит`:`${fi.n} Просится: ${gripBest(b).map(t=>GRIPPERS[t].name.toLowerCase()).join(' или ')||'подхват снизу'}`;})()}</span></div>`).join('')}
  <div class="btns"><select id="boxPreset">${BOX_PRESETS.map((b,i)=>`<option value="${i}">${b.name} ${b.l}×${b.w}×${b.h}, ${b.m} кг${b.rate?', '+b.rate+' шт/ч':''}</option>`).join('')}</select><button data-act="addBox">Добавить коробку</button></div>
  <p class="note">Артикулы М5П … МС10 — из оценки производительности REDCARGO PRO130 (выпуск и число слоёв по документу). «Слоёв» 0 — авто по лимиту высоты.</p>
  ${Object.values(D.pats).map(p=>`<div class="check"><div>${p.name}<small>${p.stability}${p.loss>0?`; перевязка стоит ${p.loss} шт. в слое`:''}; ${p.groupsPerPallet} ходов${p.sheets?` + ${p.sheets} листов`:''} на паллету${p.adjUsed?`; группы ${p.shapes}, ${p.shifts} перестроений`:''}</small></div><span class="badge ${p.interlock?'ok':'warn'}">${p.n} в слое · ${p.layers} слоёв · ${p.total} шт.</span></div>`).join('')}`;
  $('cfgConv').innerHTML=`<div class="row conv h"><span>Тип</span><span>L, м</span><span>м/мин</span><span>Накопление</span><span>Коробка</span><span></span></div>
  ${c.conveyors.map((cv,i)=>`<div class="row conv">${sel(`conveyors.${i}.type`,Object.entries(CONV_TYPES).map(([k,v])=>[k,v.name]),cv.type)}${num(`conveyors.${i}.len`,cv.len,.5,1,12)}${num(`conveyors.${i}.speed`,cv.speed,1,3,60)}${sel(`conveyors.${i}.accum`,[['true','да'],['false','нет']],cv.accum,cv.type==='mdr')}${sel(`conveyors.${i}.box`,c.boxes.map((b,j)=>[j,b.name]),cv.box)}<button data-act="delConv" data-i="${i}" ${c.conveyors.length<2?'disabled':''}>×</button></div>
- <div class="row feed"><span>${sel(`conveyors.${i}.feed`,Object.entries(FEEDS),cv.feed)}</span>${cv.feed==='interval'?`<span>каждые ${num(`conveyors.${i}.interval`,cv.interval,1,2,120)} с</span>`:cv.feed==='rate'?`<span>${num(`conveyors.${i}.rate`,cv.rate,.5,0.5,60)} кор/мин</span>`:`<span>оператор ≈ ${num(`conveyors.${i}.rate`,cv.rate,.5,0.5,30)} кор/мин</span>`}<span class="h">→ робот ${i%c.robots+1}</span></div>`).join('')}
+ <div class="row feed"><span>${sel(`conveyors.${i}.feed`,Object.entries(FEEDS),cv.feed)}</span>${cv.feed==='interval'?`<span>каждые ${num(`conveyors.${i}.interval`,cv.interval,1,2,120)} с</span>`:cv.feed==='rate'?`<span>${num(`conveyors.${i}.rate`,cv.rate,.5,0.5,60)} кор/мин</span>`:`<span>оператор ≈ ${num(`conveyors.${i}.rate`,cv.rate,.5,0.5,30)} кор/мин</span>`}<span class="h">→ робот ${i%c.robots+1}</span></div>
+ <div class="row base">${sel(`conveyors.${i}.infeed`,Object.entries(INFEED).map(([k,v])=>[k,v.name]),cv.infeed)}${sel(`conveyors.${i}.align`,Object.entries(ALIGN).map(([k,v])=>[k,v.name]),cv.align)}<span class="fitn ${(()=>{const x=D.base[i];return x.ok?'':visionOK(c.vision.mode,x.need)?'warn':'bad';})()}">${(()=>{const x=D.base[i];
+  return x.ok?`остаётся ±${f0(x.dx)} мм${x.round?'':` и ±${f1(x.da)}°`} при допуске ±${f0(x.tol.dx)} мм — центрирования хватает`
+   :visionOK(c.vision.mode,x.need)?`направляющие дают ±${f0(x.gx)} мм, позу доводит ${VISION[c.vision.mode].name.split(':')[0].toLowerCase()}`
+   :`±${f0(x.gx)} мм${x.round?'':` и ±${f1(x.ga)}°`} больше допуска ±${f0(x.tol.dx)} мм — нужно ${VISION[x.need].name.split(':')[0].toLowerCase()}`;})()}</span></div>`).join('')}
  <div class="btns"><button data-act="addConv" ${c.conveyors.length>=4?'disabled':''}>Добавить конвейер</button></div>
  <div class="field"><label>Высота конвейера, мм</label>${num('convH',c.convH,50,300,1200)}</div>
+ <div class="field"><label>Техническое зрение</label>${sel('vision.mode',Object.entries(VISION).map(([k,v])=>[k,v.name]),c.vision.mode)}<small>${D.visNeed==='none'?'По базированию камера не требуется — направляющие выводят тару в допуск захвата':`Требуется минимум: ${VISION[D.visNeed].name.toLowerCase()}`}${c.vision.mode!=='none'?`; кадр добавляет ${f2(D.tVision)} с к такту`:''}</small></div>
  <p class="note">Один конвейер кормит все станции своего робота одной коробкой; второй конвейер — следующие станции другой коробкой.</p>`;
  $('cfgSheet').innerHTML=`<div class="field"><label>Режим прокладок</label>${sel('sheet.mode',Object.entries(SHEET_MODES),sh.mode)}</div>
  ${sh.mode==='everyN'?`<div class="field"><label>Лист через каждые N слоёв</label>${num('sheet.everyN',sh.everyN,1,1,10)}</div>`:''}
@@ -79,6 +85,14 @@ function renderChecks(D){
   ['Грузоподъёмность',bd(D.payStatus,`${f1(D.mReq)} / ${D.rob.payload} кг · ${f0(D.util*100)} %`),`${c.grip.pick>1?c.grip.pick+' × ':''}${D.heaviest.m} кг + захват ${f1(D.gripM)} кг${c.exch.in==='robot'?'; паллета '+D.pal.m+' кг':''}`],
   ['Захват',bd(D.grip.status,`${f0(D.grip.Fth)} / ${f0(D.grip.Fcap)} Н · ${f0(D.grip.util*100)} %`),`${GRIPPERS[c.grip.type].name}; ${D.grip.case}; захват ${f2(D.grip.tGrip)} с`]];
  if(c.grip.pick>1)Object.values(D.pats).forEach(p=>rows.push(['Группы захвата',bd(p.adjUsed?'ok':'warn',`${p.groupsPerPallet} ходов на паллету${p.adjUsed?` · ${p.shapes}`:' · только ряды'}`),p.adjUsed?`Регулируемый шаг зон: рядами было бы ${p.rowGroups} ходов; ${p.shifts} перестроений по ${f1(p.tShift)} с = ${f1(p.shifts*p.tShift)} с на паллету`:`Фиксированный шаг зон — группа только ряд вплотную; ${f1(p.kEff)} коробки за ход из ${c.grip.pick}`]));
+ {const bad=D.base.filter(x=>!x.ok&&!visionOK(c.vision.mode,x.need)),vis=D.base.filter(x=>!x.ok&&visionOK(c.vision.mode,x.need));
+  rows.push(['Базирование тары',bd(bad.length?'bad':vis.length?'warn':'ok',bad.length?`не в допуске: ${bad.length} конв.`:vis.length?'позу даёт камера':'центрирования хватает'),
+   D.base.map(x=>`конв. ${x.i+1}: ${INFEED[x.cv.infeed].name.toLowerCase()}, ${ALIGN[x.cv.align].name.toLowerCase()} → ±${f0(x.dx)} мм при допуске ±${f0(x.tol.dx)} мм`).join('; ')]);
+  rows.push(['Техническое зрение',bd(D.visOK?'ok':'bad',c.vision.mode==='none'?'не используется':VISION[c.vision.mode].name.split(':')[0]),
+   D.visNeed==='none'?'По базированию не требуется: направляющие выводят тару в допуск':`Требуется минимум ${VISION[D.visNeed].name.toLowerCase()}; ${D.visOK?'выбранное подходит':'выбранное не закрывает задачу'}`]);}
+ {const fits=c.boxes.map(b=>({b,f:gripFit(b,c.grip.type)})),bad=fits.filter(x=>x.f.s==='bad'),wrn=fits.filter(x=>x.f.s==='warn');
+  rows.push(['Захват под тару',bd(bad.length?'bad':wrn.length?'warn':'ok',bad.length?`не годится для ${bad.length}`:wrn.length?`с оговорками для ${wrn.length}`:'подходит для всей тары'),
+   fits.map(x=>`${x.b.name}: ${SHAPES[x.b.shape].name.toLowerCase()}, ${MATS[x.b.mat].name.toLowerCase()} — ${x.f.s==='ok'?'годится':x.f.s==='warn'?'с оговоркой':'не годится'}`).join('; ')]);}
  {const sl=D.LY.robots.flatMap(r=>r.slots),bl=D.LY.blocked.length;
   const fmt=s=>`${s.id}: ${s.route.length>1?'через проезд':'напрямую'}`;
   rows.push(['Подъезд к позициям',bd(bl?'bad':'ok',bl?`заперто ${bl}`:`${sl.length} позиц. · коридор ${f0(D.LY.veh.w)} мм`),
@@ -93,7 +107,7 @@ function renderChecks(D){
  $('checks').innerHTML=rows.map(r=>`<div class="check"><div>${r[0]}<small>${r[2]}</small></div>${r[1]}</div>`).join('');
  $('warnings').innerHTML=D.warnings.length?D.warnings.map(w=>`<li>${w}</li>`).join(''):'<li style="color:var(--muted)">Замечаний нет.</li>';}
 function setPath(obj,path,val){const p=path.split('.');let o=obj;for(let i=0;i<p.length-1;i++)o=o[p[i]];o[p[p.length-1]]=val;}
-const STRUCT=/^(robot|robots|custom\.cls|grip\.(type|cup|pick|pitch|tShift)|stations|magazines|patternMode|pallet|safety|sheet\.mode|exch\.(out|in|sheetsBy|auto)|conveyors\.\d+\.(type|feed|box))$/;
+const STRUCT=/^(robot|robots|custom\.cls|grip\.(type|cup|pick|pitch|tShift)|boxes\.\d+\.(shape|mat)|vision\.mode|conveyors\.\d+\.(infeed|align)|stations|magazines|patternMode|pallet|safety|sheet\.mode|exch\.(out|in|sheetsBy|auto)|conveyors\.\d+\.(type|feed|box))$/;
 $('tab-cfg').addEventListener('input',e=>{const k=e.target.dataset.k;if(!k)return;let v=e.target.value;
  if(e.target.type==='number'){v=+v;if(isNaN(v))return;}else if(v==='true'||v==='false')v=v==='true';else if(/^-?\d+(\.\d+)?$/.test(v)&&!k.endsWith('name'))v=+v;
  setPath(CFG,k,v);if(k==='stations'||k==='exch.in'){const extra=CFG.exch.in==='robot'?1:0;if(CFG.stations+CFG.magazines+extra>6)CFG.magazines=Math.max(0,6-CFG.stations-extra);}
@@ -179,7 +193,7 @@ function buildSim(){
   st:DD.stations.map(s=>Object.assign(newPal(c.exch.in!=='robot'),{id:s.id,robot:s.robot,slot:s,bi:s.bi,pat:s.pat})),
   mags:DD.mags.map(m=>({id:m.id,robot:m.robot,slot:m,sheets:c.sheet.cap,loading:false,waitT:0,agent:null})),
   stacks:DD.stacks.map(p=>({id:p.id,robot:p.robot,slot:p,n:c.exch.stack})),
-  agents:[],stats:{placed:0,run:0,pallets:0,dropped:0,exch:0,refills:0},nextId:1,timer:0,tasks:TASKSTATE,
+  agents:[],stats:{placed:0,run:0,pallets:0,dropped:0,missed:0,exch:0,refills:0},nextId:1,timer:0,tasks:TASKSTATE,
   flags:{lcTripped:false,estopTripped:false,palletDone:false,palletRemoved:false,vfdTripped:false,typesPlaced:new Set(),optApplied:prevOpt,agentSeen:new Set()}};
  if(c.sheet.mode==='bottom')S.st.forEach(s=>{if(s.present)s.needSheet=S.mags.length>0;});
  $('ovr').value=c.speedPct;$('ovrV').textContent=c.speedPct+' %';
@@ -343,9 +357,15 @@ function robotTick(r,dt){
   case 'grip':r.dwell-=dt;if(r.dwell<=0){const cv=S.conv[r.job.conv],have=cv.boxes.filter(x=>x.p>=1-(r.job.g-1)*gapOf(r.job.conv)-0.01).length;
    if(have<r.job.g){hold(`PS1 = 0: захват не подтверждён — коробок нет, хотя B${r.job.conv+1}1 = 1 (залип датчик)`);break;}
    if(DD.util>1){hold(`Ошибка робота ${r.i+1}: перегрузка — ${f1(DD.mReq)} кг > ${DD.rob.payload} кг`);break;}
+   {const bs=DD.base[r.job.conv];
+    // доля случаев, когда тара пришла вне допуска: считаем разброс равномерным
+    const pMiss=bs?clamp(1-Math.min(1,bs.tol.dx/Math.max(1,bs.dx))*(bs.da>0?Math.min(1,bs.tol.da/bs.da):1)*(bs.zOK?1:0.2),0,0.9):0;
+    if(bs&&!bs.ok&&Math.random()<pMiss){
+     S.stats.missed+=r.job.g;cv.boxes.splice(0,r.job.g);r.miss=true;r.step='upPick';
+     log(`Промах захвата на конвейере ${r.job.conv+1}: тара пришла со смещением больше допуска ±${f0(bs.tol.dx)} мм — ${CFG.vision.mode==='none'?'нужны центрирование или камера':'проверьте калибровку камеры'}`,'alarm');break;}}
    if(DD.grip.status==='bad'){hold(`Потеря груза при подъёме: сила захвата ${f0(DD.grip.Fcap)} Н < требуемых ${f0(DD.grip.Fth)} Н`);S.stats.dropped+=r.job.g;cv.boxes.splice(0,r.job.g);break;}
    cv.boxes.sort((a,x)=>x.p-a.p);cv.boxes.splice(0,r.job.g);r.carry=r.job.g;r.carryKind='box';r.carryBi=DD.LY.convs[r.job.conv].bi;r.step='upPick';}break;
-  case 'upPick':if(moveZ(r,r.zRel+M.hAppr,M.vPlace,dt)){if(DD.tShift>0&&r.job.group&&r.job.group.nr>1){r.step='shift';r.dwell=DD.tShift;}else r.step='toPlace';}break;
+  case 'upPick':if(moveZ(r,r.zRel+M.hAppr,M.vPlace,dt)){if(r.miss){r.miss=false;r.step='home';}else if(DD.tShift>0&&r.job.group&&r.job.group.nr>1){r.step='shift';r.dwell=DD.tShift;}else r.step='toPlace';}break;
   case 'shift':r.dwell-=dt;if(r.dwell<=0)r.step='toPlace';break;
   case 'unshift':r.dwell-=dt;if(r.dwell<=0)r.step='home';break;
   case 'toPlace':{if(s.agent||!s.present){r.step='wait';r.carryKind=null;r.carry=0;break;}
@@ -517,7 +537,7 @@ function render(){
  LIVE_DO.forEach(d=>{const e=$('do-'+d[0]);if(!e)return;e.classList.toggle('on',!!d[2]());if(d[3])e.classList.toggle(d[3],true);});
  S.conv.forEach((cv,i)=>{const v=cv.vfd;if(cv.type==='mdr'){$('vS'+i).textContent=v.run?'Работа':'Готов';$('vR'+i).textContent=v.run?'да':'нет';const z=$('zn'+i);const zones=z.children.length;const occ=new Set(cv.boxes.map(b=>Math.min(zones-1,Math.floor(b.p*zones))));[...z.children].forEach((el,j)=>el.classList.toggle('on',occ.has(j)));}
   else{$('vT'+i).textContent=f1(v.target)+' Гц';$('vA'+i).textContent=f1(v.actual)+' Гц';$('vS'+i).textContent=v.fault?'АВАРИЯ F0001':v.sto?'Заблокирован':v.actual>0&&v.actual<v.target?'Разгон':v.actual>v.target?'Торможение':v.run?'Работа':'Готов';$('vSTO'+i).textContent=v.sto?'активно':'снято';$('vBar'+i).style.width=(v.actual/50*100)+'%';}});
- const st=S.stats,hrs=st.run/3600;$('stats').innerHTML=`<div>Уложено<b>${st.placed}</b></div><div>Паллет<b>${st.pallets}</b></div><div>Факт кор/ч<b>${st.run>20?f0(st.placed/hrs):'—'}</b></div><div>Расчёт кор/ч<b>${f0(D.bottleneck)}</b></div><div>Время Execute<b>${f0(st.run)} с</b></div><div>Уронено<b>${st.dropped}</b></div><div>Обменов паллет<b>${st.exch}</b></div><div>Пополнений листов<b>${st.refills}</b></div>`;
+ const st=S.stats,hrs=st.run/3600;$('stats').innerHTML=`<div>Уложено<b>${st.placed}</b></div><div>Паллет<b>${st.pallets}</b></div><div>Факт кор/ч<b>${st.run>20?f0(st.placed/hrs):'—'}</b></div><div>Расчёт кор/ч<b>${f0(D.bottleneck)}</b></div><div>Время Execute<b>${f0(st.run)} с</b></div><div>Уронено<b>${st.dropped}</b></div><div>Промахов<b>${st.missed}</b></div><div>Обменов паллет<b>${st.exch}</b></div><div>Пополнений листов<b>${st.refills}</b></div>`;
  $('bStart').disabled=S.packml!=='Idle'||D.reachStatus==='bad';
  $('bStop').disabled=!['Execute','Suspended','Held','Starting'].includes(S.packml);
  $('bReset').disabled=!['Aborted','Stopped','Held'].includes(S.packml);

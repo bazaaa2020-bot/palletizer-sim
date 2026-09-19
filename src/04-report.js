@@ -126,8 +126,10 @@ function reportHTML(c,D,png){
   ['Исполнение',vac?(c.grip.type==='cups'?`${G.nCups} × Ø${G.cupD} мм ${CUPS[c.grip.cup].name.toLowerCase()}, вакуум −${G.vac} кПа`:`пенная рамка ${f0(G.A)} см², вакуум −${G.vac} кПа`):(c.grip.type==='clamp'?`2 × цилиндр Ø${G.cylD} мм при ${c.grip.pressure} бар`:'вилки с прижимом')],
   ['Вакуумный источник',vac?`${G.pump}; утечка ${f0(G.qLeak)} л/мин, расход ${f0(G.air)} л/мин`:'—'],
   ['Масса захвата',`${f1(G.mass)} кг · захват ${f2(G.tGrip)} с, сброс ${f2(G.tRel)} с`]]));
- H.push(`<h3>Тара и схемы укладки</h3>`+repCols(['Коробка','Д×Ш×В, мм','кг','шт/ч','Слоёв'],
-  c.boxes.map(b=>[b.name,`${b.l}×${b.w}×${b.h}`,String(b.m),b.rate||'—',b.layers||'авто'])));
+ H.push(`<h3>Тара и схемы укладки</h3>`+repCols(['Тара','Форма','Материал','Д×Ш×В, мм','кг','шт/ч','Слоёв','Захват'],
+  c.boxes.map(b=>{const fi=gripFit(b,c.grip.type);
+   return[b.name,SHAPES[b.shape].name,MATS[b.mat].name,`${SHAPES[b.shape].round?'Ø'+b.l:b.l+'×'+b.w}×${b.h}`,String(b.m),b.rate||'—',b.layers||'авто',
+    fi.s==='ok'?'годится':`${fi.s==='warn'?'с оговоркой':'НЕ ГОДИТСЯ'} — просится ${gripBest(b).map(t=>GRIPPERS[t].name.toLowerCase()).join(' или ')||'подхват снизу'}`];})));
  H.push(repCols(['Схема','В слое','Слоёв','Всего','Заполнение','Перевязка','Ходов'],
   Object.values(D.pats).map(p=>[p.name,String(p.n),String(p.layers),String(p.total),f0(p.fill*100)+' %',p.interlock?'да':'нет',String(p.groupsPerPallet)])));
  H.push(`<h3>Паллеты, станции и обмен</h3>`+repTable([
@@ -145,6 +147,14 @@ function reportHTML(c,D,png){
   ['Перенос',`${sh.speedPct} % скорости, захват ${f1(sh.tGrip)} с, сброс по ${sh.sect} секциям за ${f2(D.tRelSheet)} с`],
   ['Цикл с листом',`${f1(D.tSheet)} с; ${pat?pat.sheets:0} листов на паллету`],
   ['Кто пополняет',SHEETS_BY[ex.sheetsBy]]]));
+ H.push(`<h3>Базирование тары и техническое зрение</h3>`+repCols(['Конв.','Подача','Направляющие','Остаток после направляющих','С учётом зрения','Допуск захвата','Вывод'],
+  D.base.map(x=>[String(x.i+1),INFEED[x.cv.infeed].name,ALIGN[x.cv.align].name,
+   `±${f0(x.gx)} мм${x.round?'':` / ±${f1(x.ga)}°`}`,`±${f0(x.dx)} мм${x.round?'':` / ±${f1(x.da)}°`}`,
+   `±${f0(x.tol.dx)} мм / ±${f1(x.tol.da)}°`,
+   x.ok?'в допуске':visionOK(c.vision.mode,x.need)?'позу даёт камера':`НЕ В ДОПУСКЕ — нужно ${VISION[x.need].name.toLowerCase()}`]))
+  +repTable([['Выбранная система зрения',VISION[c.vision.mode].name+(c.vision.mode!=='none'?`; кадр ${f2(D.tVision)} с добавлен в такт`:'')],
+   ['Требуется по базированию',D.visNeed==='none'?'не требуется — направляющие выводят тару в допуск':VISION[D.visNeed].name],
+   ['Вывод',D.visOK?'выбранная система закрывает задачу':'выбранная система задачу не закрывает']]));
  H.push(`<h3>Конвейеры подачи</h3>`+repCols(['№','Тип','L, м','м/мин','Накопление','Коробка','Подача','Привод','Зон'],
   c.conveyors.map((cv,i)=>{const x=D.convs[i];return[String(i+1),CONV_TYPES[cv.type].name,String(cv.len),String(cv.speed),cv.accum?'да':'нет',boxOf(c,cv.box).name,FEEDS[cv.feed],cv.type==='mdr'?`мотор-ролики, БП ${x.psuStd} А`:`${x.Pstd} кВт, ЧП ${f1(x.I)} А`,String(x.zones)];})));
  H.push(`<h3>Безопасность и АСУ ТП</h3>`+repTable([
