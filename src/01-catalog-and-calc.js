@@ -145,9 +145,10 @@ const DEF={name:'Ячейка паллетизации',robots:1,robot:'cb20',cu
  conveyors:[{type:'roller',len:3,speed:12,accum:true,box:0,feed:'manual',interval:10,rate:6,infeed:'oriented',align:'guides'}],
  vision:{mode:'none'},
  palletHandling:'forklift',safety:'fence',fieldbus:'PROFINET',tStop:0.5,
- pl:{S:2,F:2,P:1,arch:'cat3',edm:true,dop:240,hop:16,opsES:2,opsLC:30,opsDoor:6,ccf:['sep','over','well','fmea','train','emc','env']},opt:{target:400,allowCobot:true,maxRobots:2}};
+ pl:{S:2,F:2,P:1,arch:'cat3',edm:true,dop:240,hop:16,opsES:2,opsLC:30,opsDoor:6,ccf:['sep','over','well','fmea','train','emc','env']},
+ risk:{org:['train','manual','sign','ppe','permit'],est:{}},opt:{target:400,allowCobot:true,maxRobots:2}};
 let CFG=deep(DEF);
-try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.vision=Object.assign(deep(DEF.vision),s.vision||{});CFG.pl=Object.assign(deep(DEF.pl),s.pl||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.vision=Object.assign(deep(DEF.vision),s.vision||{});CFG.pl=Object.assign(deep(DEF.pl),s.pl||{});CFG.risk=Object.assign(deep(DEF.risk),s.risk||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
 function saveCfg(){try{localStorage.setItem('pal-sim-cfg4',JSON.stringify(CFG));}catch(e){}}
 function robotOf(c){const r=ROBOTS.find(x=>x.id===c.robot)||ROBOTS[3];if(r.id==='custom')return{id:'custom',name:'Свой робот',cls:c.custom.cls,payload:+c.custom.payload,reach:+c.custom.reach,v:c.custom.cls==='cobot'?1:2,cpm:+c.custom.cpm||8,cost:2,ex:''};return r;}
 function safetyMode(c,rob){if(rob.cls!=='cobot')return'fence';return c.safety==='auto'?'cobot':c.safety;}
@@ -162,6 +163,11 @@ function normalize(c){if(c.exch.out==='conveyor')c.exch.in='dispenser';else if(c
  PL.dop=clamp(Math.round(+PL.dop||240),1,365);PL.hop=clamp(Math.round(+PL.hop||16),1,24);
  ['opsES','opsLC','opsDoor'].forEach(k=>{PL[k]=clamp(Math.round(+PL[k]||1),0,500);});
  if(!Array.isArray(PL.ccf))PL.ccf=[];
+ if(!c.risk)c.risk=deep(DEF.risk);
+ if(!Array.isArray(c.risk.org))c.risk.org=[];c.risk.org=c.risk.org.filter(k=>ORG[k]);
+ if(!c.risk.est||typeof c.risk.est!=='object')c.risk.est={};
+ Object.keys(c.risk.est).forEach(k=>{const e=c.risk.est[k];if(!e||typeof e!=='object'){delete c.risk.est[k];return;}
+  ['s','f','o','a'].forEach(p=>{if(e[p]===undefined)return;e[p]=clamp(Math.round(+e[p])||1,1,p==='s'?4:3);});});
  c.conveyors.forEach(v=>{if(!INFEED[v.infeed])v.infeed='oriented';if(!ALIGN[v.align])v.align='guides';});
  c.boxes.forEach(b=>{if(!SHAPES[b.shape])b.shape='box';if(!MATS[b.mat])b.mat='carton';
   if(b.shape==='cyl')b.w=b.l;});                       // цилиндр описываем квадратом со стороной Ø
@@ -378,7 +384,7 @@ function derive(c,light){
  const Tlc=c.tStop+0.03;let Slc=2000*Tlc+8*(30-14);if(Slc>500)Slc=Math.max(500,1600*Tlc+128);D.Slc=Slc;const Tsc=c.tStop+0.1;D.Ssc=1600*Tsc+(1200-0.4*300);
  D.halfDiag=Math.hypot(heaviest.l*k,heaviest.w)/2;D.rSlow=rob.reach+D.halfDiag+D.Ssc;D.rStop=rob.reach+D.halfDiag+300;
  D.F=LY.F;D.fencePerim=2*((D.F.x1-D.F.x0)+(D.F.y1-D.F.y0));
- D.pl=plCalc(c,D);
+ D.pl=plCalc(c,D);D.risk=riskCalc(c,D);
  D.warnings=[];const w=D.warnings;
  if(LY.blocked.length)w.push(`Нет свободного подъезда к позици${LY.blocked.length>1?'ям':'и'} ${LY.blocked.join(', ')}: коридор шириной ${f0(LY.veh.w)} мм под ${EXCH_OUT[c.exch.out].toLowerCase()} перекрыт соседними паллетами или конвейером. Уменьшите число позиций вокруг робота, увеличьте радиус расстановки или смените способ вывоза.`);
  if(c.robots>1)w.push(`Проезд между роботами ${f0(LY.aisle)} мм — под ${EXCH_OUT[c.exch.out].toLowerCase()}. Станции вынесены на внешние углы, магазины смотрят в проезд: за листами ходит человек, за паллетами заезжает техника.`);
@@ -413,6 +419,11 @@ function derive(c,light){
  if(c.exch.out==='jack'&&D.palletsPerHour>8)w.push(`${f1(D.palletsPerHour)} паллет в час вручную рохлей — оператор будет занят обменом почти постоянно; рассмотрите погрузчик, AMR или конвейер паллет.`);
  if(c.stations===1&&c.exch.out!=='conveyor')w.push(`Одна станция: на каждый обмен паллеты робот простаивает ${f0(tEx)} с (${f0(D.exLoss*100)} % времени). Вторая станция снимает простой.`);
  if(safety==='cobot'&&c.exch.out!=='conveyor')w.push('Обмен паллет в зоне сканеров: при освобождении станции контроллер безопасности переключает набор полей, исключая её сектор — иначе каждая тележка будет останавливать робота.');
+ // ISO 12100: опасности, не сведённые мерами к приемлемому риску, и связь с требуемым PL
+ {const RK=D.risk;
+  RK.bad.forEach(x=>w.push(`Оценка риска, ${x.id} (${x.zone}): ${x.n.charAt(0).toLowerCase()+x.n.slice(1)} — остаточный риск ${RISK_CLS[x.cls]} (${HZ_S[x.res.s].toLowerCase()}). Принятых мер не хватает, нужны дополнительные: либо изменить конструкцию, либо добавить техническое средство, одной инструкцией такой риск не закрывается.`));
+  if(PL_ORDER.indexOf(RK.plr)>PL_ORDER.indexOf(D.pl.plr))
+   w.push(`Реестр опасностей требует от функций безопасности PL ${RK.plr}, а граф рисков на вкладке «Безопасность и PL» выставлен на PL ${D.pl.plr}. Сведите оценки: параметры S, F и P графа должны отвечать самой тяжёлой опасности, которую закрывает функция.`);}
  // ISO 13849-1: расхождение достигнутого PL с требуемым и нарушенные условия категории
  {const PL=D.pl;
   if(!PL.ccfOK)w.push(`Меры против отказов по общей причине набрали ${PL.ccf} баллов из ${CCF_NEED} обязательных (приложение F ISO 13849-1): для категорий 2, 3 и 4 расчёт PL недействителен, пока порог не набран.`);

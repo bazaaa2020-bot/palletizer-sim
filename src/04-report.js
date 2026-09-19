@@ -113,9 +113,18 @@ const CSV_TABLES={
    INFEED[x.cv.infeed].name,ALIGN[x.cv.align].name,csvNum(x.gx,0,s),x.round?'':csvNum(x.ga,1,s),
    csvNum(x.dx,0,s),csvNum(x.tol.dx,0,s),x.round?'':csvNum(x.tol.da,1,s),
    x.ok?'в допуске':visionOK(c.vision.mode,x.need)?'позу даёт камера':`не в допуске — нужно ${VISION[x.need].name.toLowerCase()}`])})},
+ risk:{name:'Реестр опасностей (ISO 12100)',file:'оценка-риска',build:(c,D,s)=>({
+  head:['№','Зона','Вид опасности','Опасность','Этапы','Подвергаются','S','F','O','A','Класс без мер',
+   'Шаг 1: безопасная конструкция','Шаг 2: технические средства','Шаг 3: информация','Не заложено в ячейке',
+   'S ост.','F ост.','O ост.','A ост.','Класс остаточный','Приемлемо','Требуемый PL','Функция безопасности'],
+  rows:D.risk.rows.map(h=>[h.id,h.zone,HZ_TYPE[h.type],h.n,h.stage.map(x=>HZ_STAGE[x]).join(', '),
+   h.who.map(x=>HZ_WHO[x]).join(', '),h.s,h.f,h.o,h.a,RISK_CLS[h.cls0],
+   h.m1.map(x=>x.m.n).join('; '),h.m2.map(x=>x.m.n).join('; '),h.m3.map(x=>x.m.n).join('; '),
+   h.todo.map(k=>MEAS[k].n).join('; '),
+   h.res.s,h.res.f,h.res.o,h.res.a,RISK_CLS[h.cls],h.ok?'да':'нет',h.sf?h.plr:'',h.sf||''])})},
  warn:{name:'Замечания расчёта',file:'замечания',build:(c,D,s)=>({
   head:['№','Замечание'],rows:D.warnings.map((w,i)=>[i+1,w])})}};
-const CSV_ORDER=['bom','sig','params','sku','pl','base','warn'];
+const CSV_ORDER=['bom','sig','params','sku','risk','pl','base','warn'];
 let CSV_LAST='bom';
 // Один «лист» на файл; вариант «все таблицы» кладёт их блоками с заголовками.
 function csvBuild(key){const c=normalize(CFG),D=derive(c),s=csvSep(),T=CSV_TABLES[key];
@@ -274,6 +283,23 @@ function reportHTML(c,D,png){
   ['Промышленная сеть',c.fieldbus],
   ['Сигналы',`${D.io.DI} DI / ${D.io.DO} DO / ${D.io.SI} безопасных входов / ${D.io.SO} безопасных выходов / ${D.io.BUS} объектов по шине`],
   ['Модули ввода-вывода',`${D.io.diMod} × DI16, ${D.io.doMod} × DO16 (с запасом 20 %)`]]));
+ {const R=D.risk;
+  H.push(`<h3>Оценка риска по ISO 12100</h3>`+repTable([
+   ['Опасностей в реестре',`${R.rows.length}; выведены из состава ячейки`],
+   ['Не сведены к приемлемому риску',R.bad.length?`${R.bad.length} — ${R.bad.map(x=>x.id+' («'+x.zone+'»)').join(', ')}`:'нет'],
+   ['Худший остаточный класс',`${RISK_CLS[R.worst]} (приемлемы низкий и средний)`],
+   ['Организационные меры',R.org.length?R.org.map(k=>ORG[k].n).join('; '):'не приняты'],
+   ['Требуемый PL по реестру',`PL ${R.plr}; на вкладке безопасности задан PL ${D.pl.plr}`]]));
+  H.push(repCols(['№','Зона и опасность','Этапы, кто подвергается','Без мер','Меры по трём шагам','Остаточный','PL'],
+   R.rows.map(h=>[h.id,`<b>${h.zone}</b><br>${HZ_TYPE[h.type]}: ${h.n}`,
+    `${h.stage.map(x=>HZ_STAGE[x]).join(', ')}<br>${h.who.map(x=>HZ_WHO[x]).join(', ')}`,
+    `S${h.s} F${h.f} O${h.o} A${h.a}<br>${RISK_CLS[h.cls0]}`,
+    [h.m1.length?'1. '+h.m1.map(x=>x.m.n).join('; '):'',h.m2.length?'2. '+h.m2.map(x=>x.m.n).join('; '):'',
+     h.m3.length?'3. '+h.m3.map(x=>x.m.n).join('; '):'',
+     h.todo.length?'Не заложено: '+h.todo.map(k=>MEAS[k].n).join('; '):''].filter(Boolean).join('<br>'),
+    `S${h.res.s} F${h.res.f} O${h.res.o} A${h.res.a}<br>${RISK_CLS[h.cls]}${h.ok?'':' — НЕ ПРИЕМЛЕМО'}`,
+    h.sf?`PL ${h.plr} (${h.sf})`:'—'])));
+  H.push(`<p class="sub">Шкала: S — тяжесть вреда (1…4), F — частота и время воздействия, O — вероятность возникновения опасного события, A — возможность избежать вреда (по 1…3). Класс риска — по матрице «тяжесть × вероятность вреда»; ISO 12100 числовую шкалу не задаёт, применённая описана в методике. Меры идут тремя шагами п. 6 стандарта: безопасная конструкция, технические средства, информация для пользователя.</p>`);}
  {const P=D.pl;
   H.push(`<h3>Performance Level по ISO 13849-1</h3>`+repTable([
    ['Оценка риска',`${P.risk} → требуемый уровень PL ${P.plr}`],

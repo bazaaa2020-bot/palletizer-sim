@@ -24,7 +24,7 @@ main{max-width:1400px;margin:0 auto;padding:14px 22px 40px}
 .tab{display:none}.tab.on{display:grid;gap:14px}
 #tab-sim{grid-template-columns:minmax(0,1.55fr) minmax(330px,1fr)}
 #tab-cfg{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}
-#tab-arch,#tab-help,#tab-algo,#tab-3d,#tab-pl{grid-template-columns:1fr}
+#tab-arch,#tab-help,#tab-algo,#tab-3d,#tab-pl,#tab-risk{grid-template-columns:1fr}
 #v3wrap{position:relative;width:100%;height:600px;background:linear-gradient(#dfe5ea,#f3f5f7);border-radius:6px;overflow:hidden;touch-action:none}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #v3wrap{background:linear-gradient(#1c2229,#2a313a)}}
 :root[data-theme="dark"] #v3wrap{background:linear-gradient(#1c2229,#2a313a)}
@@ -102,6 +102,12 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 .row.tara{grid-template-columns:1.1fr 1fr 2.2fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
 .row.base{grid-template-columns:1.3fr 1.5fr 2.4fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
 .fitn{font-size:11px;color:var(--muted)}.fitn.warn{color:var(--warnfg)}.fitn.bad{color:var(--badfg)}
+.est{display:grid;grid-template-columns:repeat(4,auto);gap:3px;justify-content:start}
+.est select{padding:1px 2px;font-size:12px}
+.est b{font-size:10px;color:var(--muted);text-align:center}
+#rkTable td,#rkTable th{font-size:12.5px}
+#rkTable .ms{color:var(--muted);font-size:11.5px;margin:0 0 3px;padding-left:14px;text-indent:-14px}
+#rkTable .ms.todo{color:var(--warnfg)}
 .ccf{display:grid;grid-template-columns:auto 1fr auto;gap:5px 9px;align-items:baseline;font-size:13.5px;padding:4px 0;border-bottom:1px solid var(--line)}
 .ccf input{margin:0}.ccf b{color:var(--muted);font-weight:500;white-space:nowrap}
 .plsf{margin-bottom:12px}.plsf table{margin-top:4px}.plsf .hd{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
@@ -150,7 +156,7 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 <header>
 <h1>Тренажёр РТК паллетизации</h1>
 <p>Соберите ячейку в конфигураторе — роботы, захват, коробки, конвейеры, паллеты, тип защиты. Тренажёр рассчитает укладку с перевязкой, вакуумный захват, досягаемость и производительность, предложит оптимальный вариант, выдаст состав АСУ ТП и опишет алгоритм работы обычным языком, а затем даст управлять ячейкой с пульта.</p>
-<nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="pl">Безопасность и PL</button><button data-tab="rep">Отчёт и обмен</button><button data-tab="help">Задания и справочник</button></nav>
+<nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="risk">Оценка риска</button><button data-tab="pl">Безопасность и PL</button><button data-tab="rep">Отчёт и обмен</button><button data-tab="help">Задания и справочник</button></nav>
 </header>
 <main>
 <!-- ================= СИМУЛЯЦИЯ ================= -->
@@ -211,6 +217,16 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
  <div class="panel"><h2>Состав АСУ ТП (спецификация)</h2><div class="svgwrap"><table id="bom"></table></div></div>
  <div class="panel"><h2>Сигналы и модули ввода-вывода</h2><div id="ioSummary"></div><div class="svgwrap"><table id="sig"></table></div></div>
  <div class="panel prose" id="archText"></div>
+</section>
+<!-- ================= ОЦЕНКА РИСКА ================= -->
+<section id="tab-risk" class="tab">
+ <div class="panel"><h2>Протокол оценки риска по ISO 12100</h2><div class="cards" id="rkCards"></div><p class="note" id="rkNote"></p></div>
+ <div class="panel"><h2>Организационные меры (шаг 3: информация для пользователя)</h2><div id="rkOrg"></div></div>
+ <div class="panel"><h2>Реестр опасностей</h2><div class="svgwrap"><table id="rkTable"></table></div>
+  <div class="btns"><button id="bRkReset">Сбросить оценки к типовым</button></div>
+  <p class="note">Оценки S, F, O и A правятся прямо в таблице — это шаблон, а не приговор: под конкретное производство частоту доступа и возможность избежать вреда ставит тот, кто видел площадку. Правки хранятся вместе с конфигурацией и уезжают в файл .json.</p></div>
+ <div class="panel"><h2>Шкалы и матрица</h2><div class="two"><div id="rkScales"></div><div><div class="svgwrap"><table id="rkMatrix"></table></div><p class="note" id="rkMnote"></p></div></div></div>
+ <div class="panel prose" id="rkText"></div>
 </section>
 <!-- ================= БЕЗОПАСНОСТЬ И PL ================= -->
 <section id="tab-pl" class="tab">
@@ -404,9 +420,10 @@ const DEF={name:'Ячейка паллетизации',robots:1,robot:'cb20',cu
  conveyors:[{type:'roller',len:3,speed:12,accum:true,box:0,feed:'manual',interval:10,rate:6,infeed:'oriented',align:'guides'}],
  vision:{mode:'none'},
  palletHandling:'forklift',safety:'fence',fieldbus:'PROFINET',tStop:0.5,
- pl:{S:2,F:2,P:1,arch:'cat3',edm:true,dop:240,hop:16,opsES:2,opsLC:30,opsDoor:6,ccf:['sep','over','well','fmea','train','emc','env']},opt:{target:400,allowCobot:true,maxRobots:2}};
+ pl:{S:2,F:2,P:1,arch:'cat3',edm:true,dop:240,hop:16,opsES:2,opsLC:30,opsDoor:6,ccf:['sep','over','well','fmea','train','emc','env']},
+ risk:{org:['train','manual','sign','ppe','permit'],est:{}},opt:{target:400,allowCobot:true,maxRobots:2}};
 let CFG=deep(DEF);
-try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.vision=Object.assign(deep(DEF.vision),s.vision||{});CFG.pl=Object.assign(deep(DEF.pl),s.pl||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.vision=Object.assign(deep(DEF.vision),s.vision||{});CFG.pl=Object.assign(deep(DEF.pl),s.pl||{});CFG.risk=Object.assign(deep(DEF.risk),s.risk||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
 function saveCfg(){try{localStorage.setItem('pal-sim-cfg4',JSON.stringify(CFG));}catch(e){}}
 function robotOf(c){const r=ROBOTS.find(x=>x.id===c.robot)||ROBOTS[3];if(r.id==='custom')return{id:'custom',name:'Свой робот',cls:c.custom.cls,payload:+c.custom.payload,reach:+c.custom.reach,v:c.custom.cls==='cobot'?1:2,cpm:+c.custom.cpm||8,cost:2,ex:''};return r;}
 function safetyMode(c,rob){if(rob.cls!=='cobot')return'fence';return c.safety==='auto'?'cobot':c.safety;}
@@ -421,6 +438,11 @@ function normalize(c){if(c.exch.out==='conveyor')c.exch.in='dispenser';else if(c
  PL.dop=clamp(Math.round(+PL.dop||240),1,365);PL.hop=clamp(Math.round(+PL.hop||16),1,24);
  ['opsES','opsLC','opsDoor'].forEach(k=>{PL[k]=clamp(Math.round(+PL[k]||1),0,500);});
  if(!Array.isArray(PL.ccf))PL.ccf=[];
+ if(!c.risk)c.risk=deep(DEF.risk);
+ if(!Array.isArray(c.risk.org))c.risk.org=[];c.risk.org=c.risk.org.filter(k=>ORG[k]);
+ if(!c.risk.est||typeof c.risk.est!=='object')c.risk.est={};
+ Object.keys(c.risk.est).forEach(k=>{const e=c.risk.est[k];if(!e||typeof e!=='object'){delete c.risk.est[k];return;}
+  ['s','f','o','a'].forEach(p=>{if(e[p]===undefined)return;e[p]=clamp(Math.round(+e[p])||1,1,p==='s'?4:3);});});
  c.conveyors.forEach(v=>{if(!INFEED[v.infeed])v.infeed='oriented';if(!ALIGN[v.align])v.align='guides';});
  c.boxes.forEach(b=>{if(!SHAPES[b.shape])b.shape='box';if(!MATS[b.mat])b.mat='carton';
   if(b.shape==='cyl')b.w=b.l;});                       // цилиндр описываем квадратом со стороной Ø
@@ -637,7 +659,7 @@ function derive(c,light){
  const Tlc=c.tStop+0.03;let Slc=2000*Tlc+8*(30-14);if(Slc>500)Slc=Math.max(500,1600*Tlc+128);D.Slc=Slc;const Tsc=c.tStop+0.1;D.Ssc=1600*Tsc+(1200-0.4*300);
  D.halfDiag=Math.hypot(heaviest.l*k,heaviest.w)/2;D.rSlow=rob.reach+D.halfDiag+D.Ssc;D.rStop=rob.reach+D.halfDiag+300;
  D.F=LY.F;D.fencePerim=2*((D.F.x1-D.F.x0)+(D.F.y1-D.F.y0));
- D.pl=plCalc(c,D);
+ D.pl=plCalc(c,D);D.risk=riskCalc(c,D);
  D.warnings=[];const w=D.warnings;
  if(LY.blocked.length)w.push(`Нет свободного подъезда к позици${LY.blocked.length>1?'ям':'и'} ${LY.blocked.join(', ')}: коридор шириной ${f0(LY.veh.w)} мм под ${EXCH_OUT[c.exch.out].toLowerCase()} перекрыт соседними паллетами или конвейером. Уменьшите число позиций вокруг робота, увеличьте радиус расстановки или смените способ вывоза.`);
  if(c.robots>1)w.push(`Проезд между роботами ${f0(LY.aisle)} мм — под ${EXCH_OUT[c.exch.out].toLowerCase()}. Станции вынесены на внешние углы, магазины смотрят в проезд: за листами ходит человек, за паллетами заезжает техника.`);
@@ -672,6 +694,11 @@ function derive(c,light){
  if(c.exch.out==='jack'&&D.palletsPerHour>8)w.push(`${f1(D.palletsPerHour)} паллет в час вручную рохлей — оператор будет занят обменом почти постоянно; рассмотрите погрузчик, AMR или конвейер паллет.`);
  if(c.stations===1&&c.exch.out!=='conveyor')w.push(`Одна станция: на каждый обмен паллеты робот простаивает ${f0(tEx)} с (${f0(D.exLoss*100)} % времени). Вторая станция снимает простой.`);
  if(safety==='cobot'&&c.exch.out!=='conveyor')w.push('Обмен паллет в зоне сканеров: при освобождении станции контроллер безопасности переключает набор полей, исключая её сектор — иначе каждая тележка будет останавливать робота.');
+ // ISO 12100: опасности, не сведённые мерами к приемлемому риску, и связь с требуемым PL
+ {const RK=D.risk;
+  RK.bad.forEach(x=>w.push(`Оценка риска, ${x.id} (${x.zone}): ${x.n.charAt(0).toLowerCase()+x.n.slice(1)} — остаточный риск ${RISK_CLS[x.cls]} (${HZ_S[x.res.s].toLowerCase()}). Принятых мер не хватает, нужны дополнительные: либо изменить конструкцию, либо добавить техническое средство, одной инструкцией такой риск не закрывается.`));
+  if(PL_ORDER.indexOf(RK.plr)>PL_ORDER.indexOf(D.pl.plr))
+   w.push(`Реестр опасностей требует от функций безопасности PL ${RK.plr}, а граф рисков на вкладке «Безопасность и PL» выставлен на PL ${D.pl.plr}. Сведите оценки: параметры S, F и P графа должны отвечать самой тяжёлой опасности, которую закрывает функция.`);}
  // ISO 13849-1: расхождение достигнутого PL с требуемым и нарушенные условия категории
  {const PL=D.pl;
   if(!PL.ccfOK)w.push(`Меры против отказов по общей причине набрали ${PL.ccf} баллов из ${CCF_NEED} обязательных (приложение F ISO 13849-1): для категорий 2, 3 и 4 расчёт PL недействителен, пока порог не набран.`);
@@ -988,6 +1015,175 @@ function plCalc(c,D){
  const worst=sf.reduce((x,f)=>{if(!f.pl)return null;return x===null?null:(PL_ORDER.indexOf(f.pl)<PL_ORDER.indexOf(x)?f.pl:x);},'e');
  return{plr,ccf,ccfOK:ccf>=CCF_NEED,arch:A,dcOut,sf,worst,ok:sf.every(f=>f.ok),
   risk:`${RISK_S[P.S]}; ${RISK_F[P.F]}; ${RISK_P[P.P]}`};}
+// ======================= ОЦЕНКА РИСКА ПО ISO 12100 =======================
+// Шаблон протокола: опасности выводятся из самой конфигурации, оцениваются по четырём
+// элементам риска (ISO 12100, п. 5.5.2), затем к каждой применяются меры трёх шагов
+// (п. 6.2 — безопасная конструкция, 6.3 — технические средства, 6.4 — информация) и
+// считается остаточный риск. Числовую шкалу ISO 12100 не задаёт — она описана в
+// docs/methodology.md и здесь явно, а не спрятана в коэффициентах.
+const HZ_S={1:'Ушиб, ссадина — без потери трудоспособности',2:'Травма с временной потерей трудоспособности',
+ 3:'Тяжёлая травма, необратимые последствия',4:'Смертельный исход'};
+const HZ_F={1:'Реже раза в смену, кратковременно',2:'Несколько раз в смену',3:'Постоянно или почти постоянно'};
+const HZ_O={1:'Маловероятно: нужен отказ вместе с нарушением',2:'Возможно: случаи известны на подобном оборудовании',
+ 3:'Вероятно: происходит при обычном ходе работы'};
+const HZ_A={1:'Можно заметить и отойти',2:'Едва возможно: мало времени или обзора',3:'Невозможно: движение быстрее реакции'};
+const HZ_TYPE={mech:'Механическая',el:'Электрическая',pneu:'Накопленная энергия',ergo:'Эргономика',
+ noise:'Шум',mat:'Материалы и осколки',org:'Организация работ'};
+const HZ_STAGE={run:'работа в автомате',setup:'наладка и обучение робота',exch:'обмен паллет и пополнение',
+ clean:'очистка и уборка',maint:'обслуживание и ремонт',fault:'устранение сбоя'};
+const HZ_WHO={op:'оператор',setter:'наладчик',driver:'водитель техники',maint:'слесарь и электрик',pass:'посторонний'};
+const RISK_CLS={1:'низкий',2:'средний',3:'высокий',4:'очень высокий'};
+const RISK_OK=2;                                   // классы 1 и 2 принимаем, 3 и 4 — нет
+// Вероятность причинения вреда складывается из частоты, вероятности события и возможности избежать.
+function pClass(f,o,a){const p=f+o+a;return p<=4?1:p<=6?2:p<=8?3:4;}
+// Матрица «тяжесть × вероятность вреда» — приём ISO/TR 14121-2; тяжесть мерами не снижается,
+// поэтому смертельная опасность даже под ограждением не опускается ниже среднего класса.
+const RISK_M=[[1,1,2,2],[1,2,2,3],[2,2,3,4],[2,3,4,4]];
+function riskClass(s,f,o,a){return RISK_M[clamp(s,1,4)-1][pClass(f,o,a)-1];}
+// Меры: шаг по ISO 12100 и то, какие элементы риска они снижают.
+const MEAS={
+ guard:{step:1,n:'Ограждение по ISO 14120, высота 2000 мм, ячейка сетки под расстояние до опасной зоны',d:{o:-2,a:-1}},
+ lock:{step:2,n:'Дверь с блокировкой и удержанием (ISO 14119), защита от обхода RFID',d:{o:-1,a:-1}},
+ curtain:{step:2,n:'Световая завеса тип 4 в проёме, остановка категории 1',d:{o:-2}},
+ mute:{step:2,n:'Мьютинг проёма по двум датчикам и только при освобождённой станции',d:{o:-1}},
+ scan:{step:2,n:'Лазерный сканер: защитное поле и поле снижения скорости',d:{o:-2}},
+ slow:{step:1,n:'Коллаборативные лимиты скорости и силы по ISO/TS 15066',d:{s:-1,a:-1}},
+ sto:{step:2,n:'STO приводов конвейеров от контроллера безопасности',d:{o:-1}},
+ estop:{step:2,n:'Аварийный стоп по ISO 13850, категория останова 0',d:{a:-1}},
+ drive:{step:1,n:'Кожухи приводных барабанов и зоны натяжения, зазоры по ISO 13854',d:{o:-2}},
+ vacfail:{step:1,n:'Обратный клапан и ресивер вакуума: при падении давления груз удерживается',d:{o:-1}},
+ vacsens:{step:2,n:'Датчик вакуума на каждой зоне: без подтверждения захвата робот не переносит',d:{o:-1}},
+ magfail:{step:1,n:'Магнитный захват с удержанием при пропадании питания и датчиком наличия детали',d:{o:-1}},
+ wrap:{step:1,n:'Обмотка стрейчем и уголки: стопа не рассыпается при перевозке',d:{o:-1}},
+ stackh:{step:1,n:'Ограничение высоты стопы и проверка устойчивости схемы укладки',d:{o:-1}},
+ cab:{step:1,n:'Шкаф IP54, вводной выключатель с запиранием, защитное заземление и УЗО',d:{o:-2}},
+ lockout:{step:2,n:'Отключение и запирание ввода (LOTO) на время обслуживания, ключ у работающего',d:{o:-2,a:-1}},
+ airoff:{step:2,n:'Запираемый пневмоввод с плавным сбросом давления',d:{o:-1}},
+ mechlift:{step:1,n:'Механизация подъёма: тару тяжелее 15 кг оператор вручную не поднимает',d:{s:-1,o:-1}},
+ table:{step:1,n:'Подъёмный стол или наклонный лоток: подача на высоте пояса',d:{s:-1}},
+ muffler:{step:1,n:'Глушители на выхлопе эжектора и кожух насоса',d:{s:-1}},
+ edges:{step:1,n:'Скругление кромок оснастки, магазина и направляющих',d:{s:-1}},
+ route:{step:1,n:'Пешеходный маршрут отделён от проезда техники разметкой и отбойниками',d:{o:-1,a:-1}},
+ amrsafe:{step:2,n:'Сканеры безопасности AMR, звуковая и световая сигнализация движения',d:{o:-1,a:-1}},
+ palconv:{step:2,n:'Тоннель конвейера паллет с завесой в мьютинге на выезд',d:{o:-1,a:-1}},
+ reset:{step:2,n:'Сброс защиты — кнопкой снаружи с обзором всей зоны, а не из зоны',d:{o:-1}}};
+// Организационные меры шага 3 — их выбирает пользователь, они действуют не на все опасности.
+const ORG={
+ train:{n:'Обучение и допуск персонала, отработка действий при сбое',d:{a:-1}},
+ manual:{n:'Руководство по эксплуатации: остаточные риски, порядок наладки и очистки',d:{o:-1}},
+ sign:{n:'Знаки безопасности и разметка опасных зон',d:{a:-1}},
+ ppe:{n:'СИЗ: защитная обувь, перчатки, каска в зоне движения техники',d:{s:-1}},
+ permit:{n:'Наряд-допуск на работы внутри ограждения',d:{o:-1}},
+ rotate:{n:'Ротация и регламентированные перерывы на ручных операциях',d:{f:-1}}};
+const ORG_ORDER=['train','manual','sign','ppe','permit','rotate'];
+// Опасности этой ячейки. Каждая знает свою зону, вид, этапы, кто подвергается, исходную
+// оценку, меры, которые в этой конфигурации уже заложены (meas), и меры, которых в ней нет
+// и которые стоит принять, если остаточный риск не приемлем (todo).
+function hazards(c,D){
+ const H=[],fence=D.safety==='fence',k=c.grip.pick,vac=GRIPPERS[c.grip.type].vac;
+ const ex=c.exch,heavy=D.heaviest,pat=D.stations.length?D.stations[0].pat:null;
+ const zone=fence?'guard':'scan';                  // чем закрыта зона робота в этой конфигурации
+ const add=h=>{h.id='H'+(H.length+1);h.todo=h.todo||[];H.push(h);};
+ add({zone:'Зона досягаемости робота',type:'mech',
+  n:`Удар и раздавливание манипулятором с грузом (${f1(heavy.m*k)} кг на ${c.speedPct} % скорости)`,
+  stage:['run','setup','fault'],who:['op','setter'],
+  s:fence?4:3,f:fence?1:2,o:3,a:3,sf:'SF2',
+  meas:fence?['guard','curtain','lock','estop','reset']:['scan','slow','estop','reset'],
+  org:['train','manual','sign','permit']});
+ add({zone:'Внутри ограждения при наладке',type:'org',
+  n:'Пуск ячейки, когда человек остался в зоне: сброс защиты без осмотра зоны',
+  stage:['setup','maint','fault'],who:['setter','maint'],
+  s:4,f:1,o:2,a:3,sf:'SF3',
+  meas:[fence?'lock':'scan','reset','lockout','estop'],
+  org:['train','permit','manual']});
+ add({zone:'Конвейер подачи',type:'mech',
+  n:'Затягивание и раздавливание в приводном барабане, между роликами и в зоне накопления',
+  stage:['run','clean','maint'],who:['op','maint'],
+  s:3,f:2,o:2,a:2,sf:null,meas:['drive','sto','lockout','estop'],org:['train','manual','sign']});
+ add({zone:'Зона переноса груза',type:'mech',
+  n:vac?'Падение тары при потере вакуума: обрыв шланга, пропадание воздуха, негерметичная тара'
+   :c.grip.type==='mag'?'Падение тары при пропадании питания магнита или отрыве от слоя'
+   :'Падение тары при раскрытии губок или отказе пневматики',
+  stage:['run','exch'],who:['op','driver'],
+  s:3,f:2,o:2,a:3,sf:null,meas:['vacsens',zone],
+  todo:vac?['vacfail']:c.grip.type==='mag'?['magfail']:['airoff'],
+  org:['ppe','manual','sign']});
+ add({zone:'Станция готовой паллеты',type:'mech',
+  n:`Обрушение стопы высотой ${f0(pat?pat.stackH:1500)} мм при обмене и перевозке`,
+  stage:['exch'],who:['op','driver'],
+  s:3,f:2,o:2,a:2,sf:null,meas:['stackh'],todo:['wrap'],org:['train','ppe','sign']});
+ if(ex.out==='conveyor')add({zone:'Конвейер паллет и диспенсер',type:'mech',
+  n:'Защемление между паллетой и рамой конвейера, затягивание в цепь, удар выезжающей паллетой',
+  stage:['run','clean','maint'],who:['op','maint'],
+  s:3,f:1,o:2,a:2,sf:'SF2',meas:['palconv','sto','lockout'],todo:['drive'],org:['train','manual','sign']});
+ else add({zone:'Проезд и зона обмена',type:'mech',
+  n:ex.out==='amr'?'Наезд AMR на человека в проезде, защемление между тележкой и паллетой'
+   :`Наезд техники (${EXCH_OUT[ex.out].toLowerCase()}) на человека, наезд колесом на стопу`,
+  stage:['exch'],who:['driver','op','pass'],
+  s:4,f:2,o:2,a:2,sf:null,
+  meas:(ex.out==='amr'?['amrsafe']:[]).concat(fence?[zone,'mute']:[zone]),
+  todo:['route'],org:['train','sign','ppe']});
+ if(c.conveyors.some(x=>x.feed==='manual'))add({zone:'Загрузка конвейера вручную',type:'ergo',
+  n:`Ручной подъём и перенос тары ${f1(heavy.m)} кг, до ${f0(D.capFeed)} раз в смену`,
+  stage:['run'],who:['op'],
+  s:heavy.m>15?3:2,f:3,o:3,a:3,sf:null,meas:[],todo:['mechlift','table'],org:['rotate']});
+ if(c.sheet.mode!=='none')add({zone:'Магазин прокладок',type:'mat',
+  n:'Порезы кромкой листа и защемление руки при загрузке магазина, опрокидывание пачки листов',
+  stage:['exch'],who:['op'],
+  s:2,f:2,o:2,a:2,sf:fence?'SF2':null,
+  meas:fence?['curtain','mute']:[zone],todo:['edges'],org:['ppe','train','manual']});
+ if(ex.in==='robot')add({zone:'Стопка пустых паллет',type:'mech',
+  n:`Опрокидывание стопки из ${ex.stack} паллет при пополнении и при захвате верхней роботом`,
+  stage:['exch'],who:['op','driver'],
+  s:3,f:1,o:2,a:2,sf:null,meas:['stackh',zone],org:['train','sign','ppe']});
+ add({zone:'Шкаф управления и ввод',type:'el',
+  n:'Поражение током при работе под напряжением, дуга при коммутации, остаточный заряд ЧП',
+  stage:['maint'],who:['maint'],
+  s:4,f:1,o:2,a:3,sf:null,meas:['cab','lockout'],org:['train','permit','manual']});
+ add({zone:'Пневматика захвата',type:'pneu',
+  n:'Выброс груза или движение цилиндров при подаче воздуха после ремонта, удар отсоединённым шлангом',
+  stage:['maint','fault'],who:['maint','setter'],
+  s:3,f:1,o:2,a:2,sf:null,meas:['airoff','lockout'],org:['train','permit','manual']});
+ if(vac)add({zone:'Вакуумный источник',type:'noise',
+  n:'Шум эжектора и выхлопа сжатого воздуха при непрерывной работе',
+  stage:['run'],who:['op'],
+  s:2,f:3,o:3,a:3,sf:null,meas:[],todo:['muffler'],org:['ppe','rotate']});
+ if(c.boxes.some(b=>b.mat==='glass'))add({zone:'Зона робота и станции',type:'mat',
+  n:'Осколки при падении стеклянной тары, порезы при уборке',
+  stage:['run','clean','fault'],who:['op'],
+  s:3,f:1,o:2,a:2,sf:null,meas:['vacsens',zone],todo:vac?['vacfail']:[],org:['ppe','train','manual']});
+ if(c.boxes.some(b=>b.mat==='metal'||b.mat==='alu'))add({zone:'Конвейер и станция',type:'mat',
+  n:'Порезы об острые кромки и заусенцы металлической тары',
+  stage:['run','exch','clean'],who:['op'],
+  s:2,f:2,o:2,a:2,sf:null,meas:[],todo:['edges'],org:['ppe','train']});
+ return H;}
+// Применение мер: складываем поправки принятых мер, каждый элемент не опускается ниже 1.
+function measSum(keys,cat){const d={s:0,f:0,o:0,a:0},use=[];
+ keys.forEach(k=>{const m=cat[k];if(!m)return;use.push({k,m});for(const p in m.d)d[p]+=m.d[p];});
+ return{use,d};}
+function hazCalc(h,c){
+ const e=(c.risk.est||{})[h.id]||{};
+ const s=clamp(+e.s||h.s,1,4),f=clamp(+e.f||h.f,1,3),o=clamp(+e.o||h.o,1,3),a=clamp(+e.a||h.a,1,3);
+ const M=measSum(h.meas,MEAS),O=measSum((h.org||[]).filter(k=>(c.risk.org||[]).indexOf(k)>=0),ORG);
+ const m1=M.use.filter(x=>x.m.step===1),m2=M.use.filter(x=>x.m.step===2);
+ const cut=(v,d,hi)=>clamp(v+d,1,hi);
+ const res={s:cut(s,M.d.s+O.d.s,4),f:cut(f,M.d.f+O.d.f,3),o:cut(o,M.d.o+O.d.o,3),a:cut(a,M.d.a+O.d.a,3)};
+ // Требуемый PL определяется после шага 1 (безопасная конструкция) — до технических средств:
+ // именно так ISO 12100 выстраивает порядок мер. Для функций, останавливающих робота,
+ // ISO 10218-2 задаёт нижнюю границу PL d независимо от графа рисков.
+ const d1=measSum(h.meas.filter(k=>MEAS[k]&&MEAS[k].step===1),MEAS).d;
+ const s1=cut(s,d1.s,4),f1=cut(f,d1.f,3),a1=cut(a,d1.a,3);
+ let plr=plRequired(s1>=3?2:1,f1>=2?2:1,a1>=2?2:1),floor=false;
+ if(h.sf&&PL_ORDER.indexOf(plr)<PL_ORDER.indexOf('d')){plr='d';floor=true;}
+ const cls0=riskClass(s,f,o,a),cls=riskClass(res.s,res.f,res.o,res.a);
+ return Object.assign({},h,{s,f,o,a,res,cls0,cls,ok:cls<=RISK_OK,plr,plFloor:floor,
+  m1,m2,m3:O.use,edited:!!(e.s||e.f||e.o||e.a)});}
+function riskCalc(c,D){
+ const rows=hazards(c,D).map(h=>hazCalc(h,c));
+ const bad=rows.filter(x=>!x.ok);
+ const plr=rows.filter(x=>x.sf).reduce((p,x)=>PL_ORDER.indexOf(x.plr)>PL_ORDER.indexOf(p)?x.plr:p,'a');
+ return{rows,bad,plr,worst:rows.reduce((m,x)=>Math.max(m,x.cls),1),
+  org:(c.risk.org||[]).slice(),ok:bad.length===0};}
 // ======================= 3D-ВИД =======================
 const V3={ok:false,orbit:{theta:-0.9,phi:0.95,r:9,tx:0,ty:0.5,tz:1},follow:false,cache:{},pools:{},agents:{}};
 const COL3={box:[0xC9A66B,0x8DB3A0,0xB39DDB,0xE0A0A0],sheet:0x8FA3B5,robot:0xE0762C,fence:0x7B8794,pallet:0xB08D57,conv:0x9AA3AB,floor:0xD9DEE3,agent:0x3A6EA5,fork:0xF5B400,amr:0xF2F4F6,red:0xD33B2F,off:0xB8C0C8,green:0x2A9D5C,yellow:0xF5B400,post:0x6E7883,mesh:0x8A949E,joint:0x2A2E33};
@@ -1388,6 +1584,54 @@ function renderArch(){
 <p><b>Автоподача.</b> ${c.conveyors.some(x=>x.feed!=='manual')?'Упаковочная машина связана с ПЛК двумя сигналами: «готов принять» (ПЛК → машина, снимается при Suspended/Held и заполнении накопителя) и «коробка отправлена» (машина → ПЛК, счёт входа). При ручной загрузке эти сигналы заменяет датчик B5.':'При ручной загрузке интерфейса с оборудованием выше по потоку нет; вход считается по датчику B5.'}</p>
 <h3>Порядок пусконаладки</h3><ul><li>Цепь безопасности без питания приводов: каждый стоп, дверь, ${D.safety==='fence'?'завеса с мьютингом и без, байпас проёмов только при «освобождено»':'оба поля сканеров и переключение наборов полей'} — протокол валидации по ISO 13849-2.</li><li>I/O-check по списку сигналов.</li><li>ЧП: направление, рампы, ток; STO из шкафа.</li><li>Захват: ${vac?'вакуум на реальной коробке, время набора, тест на потерю при обрыве шланга':'усилие и датчики положения'}; масса захвата и центр тяжести — в настройки робота.</li><li>Робот: точки для каждой схемы и слоя, снижение скорости у паллеты, обмен с ПЛК по каждому шагу GRAFCET.</li>${ex.out==='amr'?'<li>AMR: маршруты, точки стыковки, обмен заявками с ПЛК, поведение при потере связи.</li>':''}<li>Прогон с коробками: такт, накопление, защитная остановка в каждой точке цикла — коробка не должна падать при стопе категории 1.</li></ul>`;
  $('algoText').innerHTML=algoText(c,D);}
+// ======================= ОЦЕНКА РИСКА ПО ISO 12100 =======================
+const RK_BADGE={1:'ok',2:'ok',3:'warn',4:'bad'};
+function rkEst(h){const sc=(p,n,v)=>`<select data-e="${h.id}.${p}">${Array.from({length:n},(_,i)=>i+1)
+  .map(x=>`<option value="${x}" ${x===v?'selected':''}>${x}</option>`).join('')}</select>`;
+ return `<div class="est"><b>S</b><b>F</b><b>O</b><b>A</b>${sc('s',4,h.s)}${sc('f',3,h.f)}${sc('o',3,h.o)}${sc('a',3,h.a)}</div>`;}
+function renderRisk(){
+ const c=normalize(CFG),D=derive(c,true),R=D.risk,bd=(s,t)=>`<span class="badge ${s}">${t}</span>`;
+ const cls=x=>bd(RK_BADGE[x],RISK_CLS[x]);
+ $('rkCards').innerHTML=[['Опасностей в реестре',R.rows.length,'выведены из этой конфигурации'],
+  ['Не сведены к приемлемому',R.bad.length,R.bad.length?R.bad.map(x=>x.id).join(', '):'все в классах 1 и 2'],
+  ['Худший остаточный класс',RISK_CLS[R.worst],'приемлемы низкий и средний'],
+  ['Требуемый PL по реестру','PL '+R.plr,`на вкладке «Безопасность и PL» задан PL ${D.pl.plr}`]]
+  .map(x=>`<div class="card"><span>${x[0]}</span><b>${x[1]}</b><span>${x[2]}</span></div>`).join('');
+ $('rkNote').innerHTML=`Порядок ISO 12100: определить границы машины → выявить опасности → оценить и оценить приемлемость риска → снизить его тремя шагами (безопасная конструкция, технические средства, информация для пользователя) → проверить, что меры не создали новых опасностей. Тренажёр выводит опасности из состава ячейки: ${D.safety==='fence'?'ограждение с завесами':'сканеры без ограждения'}, ${EXCH_OUT[c.exch.out].toLowerCase()}, ${GRIPPERS[c.grip.type].name.toLowerCase()}, ${c.conveyors.length} конвейер${c.conveyors.length===1?'':'а'}${c.sheet.mode!=='none'?', магазин прокладок':''}${c.exch.in==='robot'?', стопка пустых паллет':''}. Меняется конфигурация — меняется реестр.`;
+ $('rkOrg').innerHTML=ORG_ORDER.map(k=>`<label class="ccf"><input type="checkbox" data-org="${k}" ${c.risk.org.indexOf(k)>=0?'checked':''}><span>${ORG[k].n}</span><b>${Object.entries(ORG[k].d).map(([p,v])=>p.toUpperCase()+' '+v).join(', ')}</b></label>`).join('')
+  +`<p class="note">Шаг 3 не заменяет первые два: инструкцией и знаками нельзя закрыть риск, который решается конструкцией или защитным устройством. Поэтому организационные меры здесь снижают в основном возможность избежать вреда и вероятность ошибки, но не тяжесть травмы — кроме СИЗ.</p>`;
+ const ms=(list,c2)=>list.map(x=>`<p class="ms${c2||''}">• ${x.m?x.m.n:MEAS[x].n}</p>`).join('');
+ $('rkTable').innerHTML='<tr><th>№</th><th>Опасность</th><th>Этапы и кто подвергается</th><th>Риск без мер</th>'
+  +'<th>Меры по трём шагам</th><th>Остаточный риск</th><th>PL</th></tr>'
+  +R.rows.map(h=>`<tr><td class="tag">${h.id}</td>
+  <td><b>${h.zone}</b><small style="display:block;color:var(--muted)">${HZ_TYPE[h.type]}: ${h.n}</small></td>
+  <td style="color:var(--muted)">${h.stage.map(x=>HZ_STAGE[x]).join(', ')}<small style="display:block">${h.who.map(x=>HZ_WHO[x]).join(', ')}</small></td>
+  <td>${rkEst(h)}${cls(h.cls0)}${h.edited?'<small style="display:block;color:var(--muted)">оценка изменена</small>':''}</td>
+  <td>${h.m1.length?`<p class="ms"><b>1. Конструкция</b></p>${ms(h.m1)}`:''}${h.m2.length?`<p class="ms"><b>2. Технические средства</b></p>${ms(h.m2)}`:''}${h.m3.length?`<p class="ms"><b>3. Информация</b></p>${ms(h.m3)}`:''}${!h.m1.length&&!h.m2.length&&!h.m3.length?'<p class="ms todo">Принятых мер нет</p>':''}${h.todo.length?`<p class="ms todo"><b>Не заложено в этой ячейке</b></p>${ms(h.todo,' todo')}`:''}</td>
+  <td>S${h.res.s} F${h.res.f} O${h.res.o} A${h.res.a}<br>${cls(h.cls)}${h.ok?'':'<small style="display:block;color:var(--badfg)">не приемлемо — вернуться к шагу 1 или 2</small>'}</td>
+  <td>${h.sf?`${bd(PL_ORDER.indexOf(D.pl.plr)>=PL_ORDER.indexOf(h.plr)?'ok':'bad','PL '+h.plr)}<small style="display:block;color:var(--muted)">${h.sf}${h.plFloor?'; нижняя граница по ISO 10218-2':''}</small>`:'<span style="color:var(--muted)">—</span>'}</td></tr>`).join('');
+ const tbl=(ttl,o)=>`<p class="ms"><b>${ttl}</b></p>`+Object.entries(o).map(([k,v])=>`<p class="ms">${k} — ${v}</p>`).join('');
+ $('rkScales').innerHTML=tbl('S — тяжесть вреда',HZ_S)+tbl('F — частота и время воздействия',HZ_F)
+  +tbl('O — вероятность возникновения опасного события',HZ_O)+tbl('A — возможность избежать вреда',HZ_A);
+ $('rkMatrix').innerHTML='<tr><th>S \\ вероятность вреда</th>'+[1,2,3,4].map(p=>`<th>${p}</th>`).join('')+'</tr>'
+  +[1,2,3,4].map(s=>`<tr><td>${s} — ${HZ_S[s].split(',')[0]}</td>`
+   +[1,2,3,4].map(p=>`<td>${cls(RISK_M[s-1][p-1])}</td>`).join('')+'</tr>').join('');
+ $('rkMnote').innerHTML=`Вероятность вреда — сумма F + O + A: 3–4 → 1, 5–6 → 2, 7–8 → 3, 9 → 4. Тяжесть мерами почти не снижается, поэтому опасность со смертельным исходом даже под ограждением остаётся в среднем классе — это не ошибка расчёта, а свойство такой опасности: её держат меры, а не удача.`;
+ $('rkText').innerHTML=`<h3>Что делать с этой таблицей</h3>
+<p><b>Это шаблон, а не готовый протокол.</b> Реестр выведен из состава ячейки и типовых оценок; под конкретное производство правятся S, F, O и A — прямо в таблице. Частоту доступа и возможность избежать вреда ставит тот, кто видел площадку: сколько раз за смену человек реально заходит за ограждение, видно ли робота от двери, успевает ли оператор отойти от проезжающего погрузчика.</p>
+<p><b>Три шага идут по порядку и не заменяют друг друга</b> (ISO 12100, п. 6). Сначала конструкция: убрать опасность или сделать её неопасной — скругления, зазоры, ограничение скорости и силы, механизация подъёма. Только то, что не убрано конструкцией, закрывается техническими средствами: ограждение, завесы, блокировки, STO. И лишь остаток — информацией для пользователя. Инструкцией нельзя закрыть то, что решается конструкцией: это прямое требование стандарта, и колонка «Не заложено в этой ячейке» показывает, где до конструкции ещё не дошли.</p>
+<p><b>Связь с ISO 13849-1.</b> Требуемый PL определяется после шага 1 и до шага 2 — именно в этот момент решается, какая функция безопасности нужна и насколько надёжной она должна быть. Поэтому в колонке PL стоит уровень, посчитанный по графу рисков от оценки, уже уменьшенной мерами безопасной конструкции. Для функций, останавливающих робота, ISO 10218-2 задаёт нижнюю границу PL d независимо от графа — это отмечено в строке.</p>
+<p><b>Остаточный риск — это то, о чём надо написать.</b> Всё, что осталось в среднем классе и выше, попадает в руководство по эксплуатации: какая опасность, при какой работе, что делать и чего не делать. ${R.bad.length?`Сейчас ${R.bad.length} опасност${R.bad.length===1?'ь не сведена':'и не сведены'} к приемлемому классу (${R.bad.map(x=>x.id).join(', ')}) — это не «написать в инструкции», а вернуться к шагу 1 или 2.`:'Опасностей выше приемлемого класса в текущей конфигурации нет.'}</p>
+<h3>Чего этот шаблон не делает</h3>
+<p>Не определяет границы машины (пространственные, временны́е, по применению) — это отдельный раздел протокола, и его пишет проектировщик. Не учитывает опасности, зависящие от площадки: освещённость, полы, соседнее оборудование, пути эвакуации. Не оценивает предвидимое неправильное применение сверх типового (обход защиты, работа с открытой дверью на штатной скорости). И не заменяет валидацию: принятые меры проверяются по ISO 13849-2 и протоколируются отдельно.</p>`;}
+$('tab-risk').addEventListener('input',e=>{const t=e.target;
+ if(t.dataset.org){const k=t.dataset.org,i=CFG.risk.org.indexOf(k);
+  if(t.checked){if(i<0)CFG.risk.org.push(k);}else if(i>=0)CFG.risk.org.splice(i,1);}
+ else if(t.dataset.e){const [id,p]=t.dataset.e.split('.');
+  if(!CFG.risk.est[id])CFG.risk.est[id]={};CFG.risk.est[id][p]=+t.value;}
+ else return;
+ normalize(CFG);saveCfg();renderRisk();renderChecks();});
+$('bRkReset').onclick=()=>{CFG.risk.est={};normalize(CFG);saveCfg();renderRisk();renderChecks();};
 // ======================= БЕЗОПАСНОСТЬ И PERFORMANCE LEVEL =======================
 // Вкладка целиком считается «на лету» лёгким derive: цепь безопасности не влияет на такт,
 // поэтому пересобирать симуляцию не нужно.
@@ -1864,9 +2108,9 @@ function initHelp(){
  $('gloss').innerHTML=GLOSS.map(g=>`<dt>${g[0]}</dt><dd>${g[1]}</dd>`).join('');
  $('stdText').innerHTML=`<h3>Нормы, к которым привязан тренажёр</h3><ul><li>ГОСТ Р ИСО 12100 — оценка рисков.</li><li>ГОСТ Р ИСО 13849-1/-2 — PL, категории архитектуры, валидация.</li><li>ГОСТ Р МЭК 60204-1 — электрооборудование машин, категории стопов.</li><li>ГОСТ Р ИСО 10218-1/-2, ISO/TS 15066 — роботы, коллаборативные режимы.</li><li>ГОСТ ИСО 13855, 13857, 14119, ISO 14120 — расстояния, ограждения, блокировки.</li><li>EN 415-4 — безопасность паллетайзеров; ISO 3691-4 — безопасность беспилотных транспортных средств (AMR/AGV).</li><li>ISA-TR88.00.02 (PackML), МЭК 60848 (GRAFCET), МЭК 61131-3, МЭК 61439-1.</li><li>Методика расчёта вакуумных захватов — по рекомендациям производителей присосок (три расчётных случая, коэффициент запаса 1,5–2).</li><li>Методика оценки производительности паллетайзера по циклам на паллету (REDCARGO PRO130).</li></ul><h3>Что упрощено в модели</h3><p>Схемы укладки — из семейства сетка / две зоны / пинвил без перевязки внутри слоя; конвейер — установившийся режим; цикл робота — по расстояниям в плане с нормативом циклов; поля сканеров — круги; тележки и люди идут по прямой к проёму; расход через картон и время набора вакуума — оценочные. Все параметры каталога подлежат проверке по паспорту.</p>`;}
 // ======================= ИНИЦИАЛИЗАЦИЯ =======================
-function showTab(t){if(t==='pl')renderPL();document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));if(t==='3d'&&typeof resize3D==='function')resize3D();}
+function showTab(t){if(t==='pl')renderPL();if(t==='risk')renderRisk();document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));if(t==='3d'&&typeof resize3D==='function')resize3D();}
 $('tabs').addEventListener('click',e=>{const t=e.target.dataset.tab;if(t)showTab(t);});
-initHelp();renderCfg();renderPL();if(typeof init3D==='function')init3D();buildSim();renderArch();
+initHelp();renderCfg();renderPL();renderRisk();if(typeof init3D==='function')init3D();buildSim();renderArch();
 let last=performance.now();
 function loop(now){const dt=Math.min(.1,(now-last)/1000)*(S.timeScale||1);last=now;tick(dt);if(typeof render3D==='function'&&$('tab-3d').classList.contains('on'))render3D();requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
@@ -1985,9 +2229,18 @@ const CSV_TABLES={
    INFEED[x.cv.infeed].name,ALIGN[x.cv.align].name,csvNum(x.gx,0,s),x.round?'':csvNum(x.ga,1,s),
    csvNum(x.dx,0,s),csvNum(x.tol.dx,0,s),x.round?'':csvNum(x.tol.da,1,s),
    x.ok?'в допуске':visionOK(c.vision.mode,x.need)?'позу даёт камера':`не в допуске — нужно ${VISION[x.need].name.toLowerCase()}`])})},
+ risk:{name:'Реестр опасностей (ISO 12100)',file:'оценка-риска',build:(c,D,s)=>({
+  head:['№','Зона','Вид опасности','Опасность','Этапы','Подвергаются','S','F','O','A','Класс без мер',
+   'Шаг 1: безопасная конструкция','Шаг 2: технические средства','Шаг 3: информация','Не заложено в ячейке',
+   'S ост.','F ост.','O ост.','A ост.','Класс остаточный','Приемлемо','Требуемый PL','Функция безопасности'],
+  rows:D.risk.rows.map(h=>[h.id,h.zone,HZ_TYPE[h.type],h.n,h.stage.map(x=>HZ_STAGE[x]).join(', '),
+   h.who.map(x=>HZ_WHO[x]).join(', '),h.s,h.f,h.o,h.a,RISK_CLS[h.cls0],
+   h.m1.map(x=>x.m.n).join('; '),h.m2.map(x=>x.m.n).join('; '),h.m3.map(x=>x.m.n).join('; '),
+   h.todo.map(k=>MEAS[k].n).join('; '),
+   h.res.s,h.res.f,h.res.o,h.res.a,RISK_CLS[h.cls],h.ok?'да':'нет',h.sf?h.plr:'',h.sf||''])})},
  warn:{name:'Замечания расчёта',file:'замечания',build:(c,D,s)=>({
   head:['№','Замечание'],rows:D.warnings.map((w,i)=>[i+1,w])})}};
-const CSV_ORDER=['bom','sig','params','sku','pl','base','warn'];
+const CSV_ORDER=['bom','sig','params','sku','risk','pl','base','warn'];
 let CSV_LAST='bom';
 // Один «лист» на файл; вариант «все таблицы» кладёт их блоками с заголовками.
 function csvBuild(key){const c=normalize(CFG),D=derive(c),s=csvSep(),T=CSV_TABLES[key];
@@ -2146,6 +2399,23 @@ function reportHTML(c,D,png){
   ['Промышленная сеть',c.fieldbus],
   ['Сигналы',`${D.io.DI} DI / ${D.io.DO} DO / ${D.io.SI} безопасных входов / ${D.io.SO} безопасных выходов / ${D.io.BUS} объектов по шине`],
   ['Модули ввода-вывода',`${D.io.diMod} × DI16, ${D.io.doMod} × DO16 (с запасом 20 %)`]]));
+ {const R=D.risk;
+  H.push(`<h3>Оценка риска по ISO 12100</h3>`+repTable([
+   ['Опасностей в реестре',`${R.rows.length}; выведены из состава ячейки`],
+   ['Не сведены к приемлемому риску',R.bad.length?`${R.bad.length} — ${R.bad.map(x=>x.id+' («'+x.zone+'»)').join(', ')}`:'нет'],
+   ['Худший остаточный класс',`${RISK_CLS[R.worst]} (приемлемы низкий и средний)`],
+   ['Организационные меры',R.org.length?R.org.map(k=>ORG[k].n).join('; '):'не приняты'],
+   ['Требуемый PL по реестру',`PL ${R.plr}; на вкладке безопасности задан PL ${D.pl.plr}`]]));
+  H.push(repCols(['№','Зона и опасность','Этапы, кто подвергается','Без мер','Меры по трём шагам','Остаточный','PL'],
+   R.rows.map(h=>[h.id,`<b>${h.zone}</b><br>${HZ_TYPE[h.type]}: ${h.n}`,
+    `${h.stage.map(x=>HZ_STAGE[x]).join(', ')}<br>${h.who.map(x=>HZ_WHO[x]).join(', ')}`,
+    `S${h.s} F${h.f} O${h.o} A${h.a}<br>${RISK_CLS[h.cls0]}`,
+    [h.m1.length?'1. '+h.m1.map(x=>x.m.n).join('; '):'',h.m2.length?'2. '+h.m2.map(x=>x.m.n).join('; '):'',
+     h.m3.length?'3. '+h.m3.map(x=>x.m.n).join('; '):'',
+     h.todo.length?'Не заложено: '+h.todo.map(k=>MEAS[k].n).join('; '):''].filter(Boolean).join('<br>'),
+    `S${h.res.s} F${h.res.f} O${h.res.o} A${h.res.a}<br>${RISK_CLS[h.cls]}${h.ok?'':' — НЕ ПРИЕМЛЕМО'}`,
+    h.sf?`PL ${h.plr} (${h.sf})`:'—'])));
+  H.push(`<p class="sub">Шкала: S — тяжесть вреда (1…4), F — частота и время воздействия, O — вероятность возникновения опасного события, A — возможность избежать вреда (по 1…3). Класс риска — по матрице «тяжесть × вероятность вреда»; ISO 12100 числовую шкалу не задаёт, применённая описана в методике. Меры идут тремя шагами п. 6 стандарта: безопасная конструкция, технические средства, информация для пользователя.</p>`);}
  {const P=D.pl;
   H.push(`<h3>Performance Level по ISO 13849-1</h3>`+repTable([
    ['Оценка риска',`${P.risk} → требуемый уровень PL ${P.plr}`],

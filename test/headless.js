@@ -359,6 +359,96 @@ check('вкладка PL отрисовывается', (() => { w.eval('showTab
 check('раздел PL попадает в отчёт', w.eval(`reportHTML(CFG,derive(CFG),null)`).indexOf('Performance Level') > 0);
 w.eval('showTab("sim")');
 
+console.log('Оценка риска по ISO 12100 (п. 5)');
+const PL_ORD = ['a', 'b', 'c', 'd', 'e'];
+const rk = extra => w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));${extra || ''}normalize(CFG);
+ const D=derive(CFG,true),R=D.risk;
+ return{n:R.rows.length,zones:R.rows.map(x=>x.zone),ids:R.rows.map(x=>x.id),
+  bad:R.bad.map(x=>x.id),plr:R.plr,worst:R.worst,ok:R.ok,
+  rows:R.rows.map(x=>({id:x.id,s:x.s,f:x.f,o:x.o,a:x.a,res:x.res,cls0:x.cls0,cls:x.cls,ok:x.ok,
+   sf:x.sf,plr:x.plr,floor:x.plFloor,m1:x.m1.length,m2:x.m2.length,m3:x.m3.length,todo:x.todo.length})),
+  warn:D.warnings.filter(x=>/Оценка риска|Реестр опас/.test(x)).length,plGraph:D.pl.plr};})()`);
+const has = (r, z) => r.zones.some(x => x.indexOf(z) >= 0);
+
+// матрица и шкала
+check('вероятность вреда складывается из F, O и A', w.eval('pClass(1,1,1)') === 1 && w.eval('pClass(3,3,3)') === 4);
+check('матрица: лёгкий вред при любой вероятности не выше среднего класса',
+  [1, 2, 3, 4].every(p => w.eval(`riskClass(1,${p === 4 ? 3 : 1},${p >= 3 ? 3 : 1},${p >= 2 ? 3 : 1})`) <= 2));
+check('матрица: смертельная опасность даже при минимальной вероятности остаётся средним классом',
+  w.eval('riskClass(4,1,1,1)') === 2, String(w.eval('riskClass(4,1,1,1)')));
+check('матрица: тяжёлая опасность при высокой вероятности — очень высокий класс', w.eval('riskClass(4,3,3,3)') === 4);
+check('порог приемлемости — класс 2', w.eval('RISK_OK') === 2);
+
+const r0 = rk();
+check('реестр не пустой и опасности пронумерованы подряд',
+  r0.n > 8 && r0.ids.every((id, i) => id === 'H' + (i + 1)), `${r0.n} опасностей`);
+check('в реестре есть робот, конвейер, электрика и обмен паллет',
+  has(r0, 'досягаемости робота') && has(r0, 'Конвейер подачи') && has(r0, 'Шкаф управления') && has(r0, 'Проезд'));
+check('меры снижают риск: остаточный класс не выше исходного',
+  r0.rows.every(x => x.cls <= x.cls0) && r0.rows.some(x => x.cls < x.cls0));
+check('тяжесть не растёт и не падает сама по себе', r0.rows.every(x => x.res.s <= x.s));
+check('ни один элемент риска не уходит ниже единицы',
+  r0.rows.every(x => x.res.s >= 1 && x.res.f >= 1 && x.res.o >= 1 && x.res.a >= 1));
+
+// реестр следует за конфигурацией
+check('без прокладок магазин из реестра уходит', !has(rk(`CFG.sheet.mode='none';`), 'Магазин прокладок'));
+check('со стопкой паллет появляется своя опасность', has(rk(`CFG.exch.in='robot';`), 'Стопка пустых паллет'));
+check('конвейер паллет заменяет опасность проезда техники',
+  has(rk(`CFG.exch.out='conveyor';`), 'Конвейер паллет') && !has(rk(`CFG.exch.out='conveyor';`), 'Проезд'));
+check('стеклянная тара добавляет осколки', rk(`CFG.boxes[0].mat='glass';`).n === r0.n + 1);
+check('у кобота удар манипулятором оценён легче, но воздействие чаще', (() => {
+  const a = r0.rows[0], b = rk(`CFG.robot='ur10';CFG.safety='cobot';`).rows[0];
+  return b.s < a.s && b.f > a.f; })());
+
+// связь с ISO 13849-1
+check('требуемый PL берётся только от опасностей с функцией безопасности',
+  r0.rows.filter(x => x.sf).length > 0 && r0.plr === r0.rows.filter(x => x.sf)
+    .reduce((p, x) => PL_ORD.indexOf(x.plr) > PL_ORD.indexOf(p) ? x.plr : p, 'a'));
+check('для функций, останавливающих робота, нижняя граница PL d по ISO 10218-2',
+  r0.rows.filter(x => x.sf).every(x => PL_ORD.indexOf(x.plr) >= PL_ORD.indexOf('d')));
+check('типовая ячейка: реестр и граф рисков сходятся на PL d',
+  r0.plr === 'd' && r0.plGraph === 'd');
+check('заниженный граф рисков даёт замечание', rk(`CFG.pl.S=1;CFG.pl.F=1;CFG.pl.P=1;`).warn > 0);
+
+// организационные меры и правка оценок
+const noOrg = rk(`CFG.risk.org=[];`);
+check('снятые организационные меры поднимают остаточный риск',
+  noOrg.bad.length > r0.bad.length, `${r0.bad.length} → ${noOrg.bad.length}`);
+check('ручная загрузка не закрывается одной инструкцией: нужна механизация', (() => {
+  const x = r0.rows[r0.zones.findIndex(z => z.indexOf('Загрузка конвейера') >= 0)];
+  return x && !x.ok && x.todo > 0 && x.m1 === 0; })());
+check('неприемлемый остаточный риск попадает в замечания', r0.warn > 0 && r0.bad.length > 0);
+{ const i = r0.zones.findIndex(z => z.indexOf('Станция готовой паллеты') >= 0), id = r0.ids[i];
+  const up = rk(`CFG.risk.est={${id}:{o:3}};`);
+  check('правка оценки в таблице меняет класс риска',
+    up.rows[i].cls0 > r0.rows[i].cls0 && up.rows[i].cls >= r0.rows[i].cls,
+    `${r0.rows[i].cls0} → ${up.rows[i].cls0}`); }
+check('правка сохраняется в конфигурации и переживает выгрузку-загрузку',
+  w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));CFG.risk.est={H1:{f:3}};CFG.risk.org=['ppe'];
+   const t=cfgFromJSON(cfgJSON());return t.risk.est.H1.f===3&&t.risk.org.length===1;})()`));
+check('битые оценки отбрасываются при нормализации',
+  w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));CFG.risk.est={H1:'мусор',H2:{s:99}};CFG.risk.org=['нет-такой'];
+   normalize(CFG);return CFG.risk.est.H1===undefined&&CFG.risk.est.H2.s===4&&CFG.risk.org.length===0;})()`));
+
+// вкладка, выгрузка и отчёт
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();showTab('risk');`);
+check('вкладка оценки риска отрисовывается',
+  d.getElementById('rkTable').querySelectorAll('tr').length === w.eval('DD.risk.rows.length') + 1 &&
+  d.getElementById('rkText').innerHTML.length > 500);
+check('оценки правятся прямо в таблице', d.querySelectorAll('#rkTable select[data-e]').length === w.eval('DD.risk.rows.length') * 4);
+{ const sel = d.querySelector('#rkTable select[data-e="H1.o"]'); sel.value = '1';
+  sel.dispatchEvent(new w.Event('input', { bubbles: true }));
+  check('селект в таблице пишет оценку в конфигурацию', w.eval('CFG.risk.est.H1.o') === 1);
+  d.getElementById('bRkReset').click();
+  check('кнопка сброса очищает правки', Object.keys(w.eval('CFG.risk.est')).length === 0); }
+{ const cb = d.querySelector('#rkOrg input[data-org="rotate"]'); cb.checked = true;
+  cb.dispatchEvent(new w.Event('input', { bubbles: true }));
+  check('галочка организационной меры попадает в конфигурацию', w.eval(`CFG.risk.org.indexOf('rotate')`) >= 0); }
+check('реестр выгружается в CSV', (() => { const t = w.eval(`csvBuild('risk')`);
+  return t.text.split('\r\n').filter(x => x.length).length === w.eval('DD.risk.rows.length') + 1; })());
+check('оценка риска попадает в отчёт', w.eval(`reportHTML(CFG,derive(CFG),null)`).indexOf('Оценка риска по ISO 12100') > 0);
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();showTab('sim');`);
+
 console.log('Выгрузка таблиц в CSV (п. 3)');
 // разбор CSV обратно в строки — так проверяем и кавычки, и целость строк
 const csvParse = (txt, sep) => {
@@ -381,7 +471,7 @@ w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.name='Тестовая ячей�
  renderCfg();buildSim();renderArch();$('csvSep').value=';';`);
 
 const keys = w.eval('CSV_ORDER');
-check('таблиц на выгрузку — семь', keys.length === 7, keys.join(','));
+check('таблиц на выгрузку — восемь', keys.length === 8, keys.join(','));
 let ragged = 0, noBom = 0, empty = 0;
 keys.forEach(k => { const t = csvOf(k), n = t.rows[0].length;
   if (!t.bom) noBom++;
