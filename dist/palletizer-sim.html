@@ -24,7 +24,7 @@ main{max-width:1400px;margin:0 auto;padding:14px 22px 40px}
 .tab{display:none}.tab.on{display:grid;gap:14px}
 #tab-sim{grid-template-columns:minmax(0,1.55fr) minmax(330px,1fr)}
 #tab-cfg{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}
-#tab-arch,#tab-help,#tab-algo,#tab-3d{grid-template-columns:1fr}
+#tab-arch,#tab-help,#tab-algo,#tab-3d,#tab-pl{grid-template-columns:1fr}
 #v3wrap{position:relative;width:100%;height:600px;background:linear-gradient(#dfe5ea,#f3f5f7);border-radius:6px;overflow:hidden;touch-action:none}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #v3wrap{background:linear-gradient(#1c2229,#2a313a)}}
 :root[data-theme="dark"] #v3wrap{background:linear-gradient(#1c2229,#2a313a)}
@@ -101,6 +101,9 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 .row.tara{grid-template-columns:1.1fr 1fr 2.2fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
 .row.base{grid-template-columns:1.3fr 1.5fr 2.4fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
 .fitn{font-size:11px;color:var(--muted)}.fitn.warn{color:var(--warnfg)}.fitn.bad{color:var(--badfg)}
+.ccf{display:grid;grid-template-columns:auto 1fr auto;gap:5px 9px;align-items:baseline;font-size:13.5px;padding:4px 0;border-bottom:1px solid var(--line)}
+.ccf input{margin:0}.ccf b{color:var(--muted);font-weight:500;white-space:nowrap}
+.plsf{margin-bottom:12px}.plsf table{margin-top:4px}.plsf .hd{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
 .row input,.row select{padding:3px 4px;font-size:13px}
 .row .h{color:var(--muted);font-size:12px}
 .badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:12.5px;font-weight:500;white-space:nowrap}
@@ -146,7 +149,7 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 <header>
 <h1>Тренажёр РТК паллетизации</h1>
 <p>Соберите ячейку в конфигураторе — роботы, захват, коробки, конвейеры, паллеты, тип защиты. Тренажёр рассчитает укладку с перевязкой, вакуумный захват, досягаемость и производительность, предложит оптимальный вариант, выдаст состав АСУ ТП и опишет алгоритм работы обычным языком, а затем даст управлять ячейкой с пульта.</p>
-<nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="rep">Отчёт и обмен</button><button data-tab="help">Задания и справочник</button></nav>
+<nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="pl">Безопасность и PL</button><button data-tab="rep">Отчёт и обмен</button><button data-tab="help">Задания и справочник</button></nav>
 </header>
 <main>
 <!-- ================= СИМУЛЯЦИЯ ================= -->
@@ -207,6 +210,17 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
  <div class="panel"><h2>Состав АСУ ТП (спецификация)</h2><div class="svgwrap"><table id="bom"></table></div></div>
  <div class="panel"><h2>Сигналы и модули ввода-вывода</h2><div id="ioSummary"></div><div class="svgwrap"><table id="sig"></table></div></div>
  <div class="panel prose" id="archText"></div>
+</section>
+<!-- ================= БЕЗОПАСНОСТЬ И PL ================= -->
+<section id="tab-pl" class="tab">
+ <div class="two">
+ <div class="panel"><h2>Требуемый PL — граф рисков (приложение A)</h2><div id="plRisk"></div></div>
+ <div class="panel"><h2>Архитектура цепи и наработка</h2><div id="plArch"></div></div>
+ </div>
+ <div class="panel"><h2>Меры против отказов по общей причине (CCF, приложение F)</h2><div id="plCCF"></div></div>
+ <div class="panel"><h2>Функции безопасности: MTTFd, DCavg, достигнутый PL</h2><div id="plSF"></div></div>
+ <div class="panel"><h2>Столбчатая диаграмма PL (рис. 5)</h2><div class="svgwrap"><svg id="plBar" viewBox="0 0 900 290" xmlns="http://www.w3.org/2000/svg"></svg></div><p class="note">Столбец — сочетание категории и DCavg, три полосы в столбце — класс MTTFd канала: <b>н</b> — низкий (3…10 лет), <b>с</b> — средний (10…30), <b>в</b> — высокий (30…100). Закрашены клетки, в которые попали подсистемы этой ячейки; пунктиром отмечен требуемый PL.</p></div>
+ <div class="panel prose" id="plText"></div>
 </section>
 <!-- ================= СПРАВОЧНИК ================= -->
 <section id="tab-help" class="tab">
@@ -381,9 +395,10 @@ const DEF={name:'Ячейка паллетизации',robots:1,robot:'cb20',cu
  boxes:[{name:'Средняя',l:400,w:300,h:250,m:8,rate:0,layers:0}],
  conveyors:[{type:'roller',len:3,speed:12,accum:true,box:0,feed:'manual',interval:10,rate:6,infeed:'oriented',align:'guides'}],
  vision:{mode:'none'},
- palletHandling:'forklift',safety:'fence',fieldbus:'PROFINET',tStop:0.5,opt:{target:400,allowCobot:true,maxRobots:2}};
+ palletHandling:'forklift',safety:'fence',fieldbus:'PROFINET',tStop:0.5,
+ pl:{S:2,F:2,P:1,arch:'cat3',edm:true,dop:240,hop:16,opsES:2,opsLC:30,opsDoor:6,ccf:['sep','over','well','fmea','train','emc','env']},opt:{target:400,allowCobot:true,maxRobots:2}};
 let CFG=deep(DEF);
-try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.vision=Object.assign(deep(DEF.vision),s.vision||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.vision=Object.assign(deep(DEF.vision),s.vision||{});CFG.pl=Object.assign(deep(DEF.pl),s.pl||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
 function saveCfg(){try{localStorage.setItem('pal-sim-cfg4',JSON.stringify(CFG));}catch(e){}}
 function robotOf(c){const r=ROBOTS.find(x=>x.id===c.robot)||ROBOTS[3];if(r.id==='custom')return{id:'custom',name:'Свой робот',cls:c.custom.cls,payload:+c.custom.payload,reach:+c.custom.reach,v:c.custom.cls==='cobot'?1:2,cpm:+c.custom.cpm||8,cost:2,ex:''};return r;}
 function safetyMode(c,rob){if(rob.cls!=='cobot')return'fence';return c.safety==='auto'?'cobot':c.safety;}
@@ -393,6 +408,11 @@ function normalize(c){if(c.exch.out==='conveyor')c.exch.in='dispenser';else if(c
  const extra=(c.exch.in==='robot'?1:0);if(c.stations+c.magazines+extra>6)c.magazines=Math.max(0,6-c.stations-extra);if(c.sheet.mode==='none')c.magazines=0;if(c.sheet.mode!=='none'&&c.magazines===0)c.magazines=1;
  const M=c.motion;M.vZ=clamp(+M.vZ||900,100,2000);M.vPlace=clamp(+M.vPlace||150,20,400);M.hAppr=clamp(+M.hAppr||60,5,400);M.tJerk=clamp(+M.tJerk||0,0,1);M.wSpeed=clamp(+M.wSpeed||180,20,720);c.sheet.sect=clamp(Math.round(+c.sheet.sect||1),1,8);
  if(!c.vision||!VISION[c.vision.mode])c.vision={mode:'none'};
+ if(!c.pl)c.pl=deep(DEF.pl);const PL=c.pl;
+ PL.S=PL.S===1?1:2;PL.F=PL.F===1?1:2;PL.P=PL.P===1?1:2;if(!PL_ARCH[PL.arch])PL.arch='cat3';
+ PL.dop=clamp(Math.round(+PL.dop||240),1,365);PL.hop=clamp(Math.round(+PL.hop||16),1,24);
+ ['opsES','opsLC','opsDoor'].forEach(k=>{PL[k]=clamp(Math.round(+PL[k]||1),0,500);});
+ if(!Array.isArray(PL.ccf))PL.ccf=[];
  c.conveyors.forEach(v=>{if(!INFEED[v.infeed])v.infeed='oriented';if(!ALIGN[v.align])v.align='guides';});
  c.boxes.forEach(b=>{if(!SHAPES[b.shape])b.shape='box';if(!MATS[b.mat])b.mat='carton';
   if(b.shape==='cyl')b.w=b.l;});                       // цилиндр описываем квадратом со стороной Ø
@@ -609,6 +629,7 @@ function derive(c,light){
  const Tlc=c.tStop+0.03;let Slc=2000*Tlc+8*(30-14);if(Slc>500)Slc=Math.max(500,1600*Tlc+128);D.Slc=Slc;const Tsc=c.tStop+0.1;D.Ssc=1600*Tsc+(1200-0.4*300);
  D.halfDiag=Math.hypot(heaviest.l*k,heaviest.w)/2;D.rSlow=rob.reach+D.halfDiag+D.Ssc;D.rStop=rob.reach+D.halfDiag+300;
  D.F=LY.F;D.fencePerim=2*((D.F.x1-D.F.x0)+(D.F.y1-D.F.y0));
+ D.pl=plCalc(c,D);
  D.warnings=[];const w=D.warnings;
  if(LY.blocked.length)w.push(`Нет свободного подъезда к позици${LY.blocked.length>1?'ям':'и'} ${LY.blocked.join(', ')}: коридор шириной ${f0(LY.veh.w)} мм под ${EXCH_OUT[c.exch.out].toLowerCase()} перекрыт соседними паллетами или конвейером. Уменьшите число позиций вокруг робота, увеличьте радиус расстановки или смените способ вывоза.`);
  if(c.robots>1)w.push(`Проезд между роботами ${f0(LY.aisle)} мм — под ${EXCH_OUT[c.exch.out].toLowerCase()}. Станции вынесены на внешние углы, магазины смотрят в проезд: за листами ходит человек, за паллетами заезжает техника.`);
@@ -643,6 +664,14 @@ function derive(c,light){
  if(c.exch.out==='jack'&&D.palletsPerHour>8)w.push(`${f1(D.palletsPerHour)} паллет в час вручную рохлей — оператор будет занят обменом почти постоянно; рассмотрите погрузчик, AMR или конвейер паллет.`);
  if(c.stations===1&&c.exch.out!=='conveyor')w.push(`Одна станция: на каждый обмен паллеты робот простаивает ${f0(tEx)} с (${f0(D.exLoss*100)} % времени). Вторая станция снимает простой.`);
  if(safety==='cobot'&&c.exch.out!=='conveyor')w.push('Обмен паллет в зоне сканеров: при освобождении станции контроллер безопасности переключает набор полей, исключая её сектор — иначе каждая тележка будет останавливать робота.');
+ // ISO 13849-1: расхождение достигнутого PL с требуемым и нарушенные условия категории
+ {const PL=D.pl;
+  if(!PL.ccfOK)w.push(`Меры против отказов по общей причине набрали ${PL.ccf} баллов из ${CCF_NEED} обязательных (приложение F ISO 13849-1): для категорий 2, 3 и 4 расчёт PL недействителен, пока порог не набран.`);
+  PL.sf.forEach(f=>{const bad=f.res.filter(r=>r.issues.length);
+   if(bad.length)w.push(`${f.id} «${f.name}»: подсистем${bad.length>1?'ы':'а'} «${bad.map(r=>r.name).join('», «')}» не даёт PL — ${bad[0].issues[0]}.`);
+   else if(!f.ok)w.push(`${f.id} «${f.name}»: достигнут PL ${f.pl}, а по графу рисков требуется PL ${f.plr}. Поднимите категорию, возьмите компоненты с бо́льшим MTTFd или добавьте диагностику.`);});
+  if((PL.arch.cat==='3'||PL.arch.cat==='4')&&!c.pl.edm)w.push('Контроль обратной связи контакторов (EDM) выключен: диагностика силовой части падает до 60 %, а по ISO 13849-1 для категорий 3 и 4 отключающие элементы должны контролироваться. Заведите зеркальные контакты на контроллер безопасности.');
+  if(PL.arch.ch===1&&PLR_HARD.indexOf(PL.plr)>=0)w.push(`Одноканальная архитектура (${PL.arch.name.split(':')[0].toLowerCase()}) при требуемом PL ${PL.plr}: одиночный отказ приводит к потере функции безопасности. Нужны два канала с диагностикой.`);}
  if(light)return D;
  D.sig=signals(c,D);const cnt=x=>D.sig.filter(s=>s.k===x).length;D.io={DI:cnt('DI'),DO:cnt('DO'),SI:cnt('SI'),SO:cnt('SO'),BUS:cnt('BUS')};D.io.diMod=Math.ceil(D.io.DI*1.2/16);D.io.doMod=Math.ceil(D.io.DO*1.2/16);D.bom=bom(c,D);D.plan=planSKU(c,D);return D;}
 // ======================= ПЛАНИРОВЩИК АРТИКУЛОВ =======================
@@ -813,6 +842,144 @@ ${sh.mode!=='none'?`<li><b>Листы заканчиваются</b> — ${sheet
 ${fence?'<li><b>Нужно войти в ячейку</b> — кнопка «Запрос доступа»: робот заканчивает перенос, возвращается в исходную, конвейер останавливается, и только тогда замок отпускает дверь.</li>':''}</ul>
 <h3>Обязанности оператора за смену</h3><ul><li>${c.conveyors.every(x=>x.feed==='manual')?'Класть коробки на конвейер, не заходя за завесу.':'Следить за подачей от упаковочной машины.'}</li><li>${ex.out==='jack'?'Вывозить готовые паллеты рохлей и закатывать пустые':ex.out==='forklift'?'Вызывать погрузчик или самому менять паллеты':ex.out==='amr'?'Следить за работой AMR и зарядкой':'Следить за конвейером паллет и диспенсером'}${sh.mode!=='none'?(ex.sheetsBy==='person'?', докладывать листы в магазин':', следить за заменой магазина AMR'):''}, реагировать на жёлтую и красную лампу.</li><li>В конце смены — «Стоп», дождаться Stopped, снять готовые паллеты, выключить питание.</li></ul>
 <h3>Цифры для проверки</h3><p>Цикл робота ${f1(D.tCycle)} с (${f1(D.cpm)} циклов/мин)${sh.mode!=='none'?`, цикл с листом ${f1(D.tSheet)} с`:''}${ex.in==='robot'?`, цикл с паллетой ${f1(D.tPallet)} с`:''}. На паллету ${D.cyclesPerPallet} циклов и ${f1(D.tPerPallet/60)} мин → ${f1(D.tPerBox)} с на коробку → ${f0(D.capRobot)} коробок в час у ${nR>1?'роботов':'робота'}. Подача даёт ${f0(D.capFeed)} в час, конвейер пропускает ${f0(D.capConv)}. Паллет в час ${f1(D.palletsPerHour)}${sh.mode!=='none'?`, листов в час ${f0(D.sheetsPerHour)}, пополнений магазина ${f1(D.refillsPerHour)} в час`:''}. За смену 8 ч при готовности 85 % — ${f0(D.bottleneck*8*0.85)} коробок, ${f0(D.bottleneck*8*0.85/pat.total)} паллет.</p>`;}
+// ======================= PERFORMANCE LEVEL ПО ISO 13849-1 =======================
+// Упрощённый метод: категория + MTTFd канала + DCavg дают PL по столбчатой диаграмме
+// (рис. 5); подсистемы складываются по таблице 11; требуемый PL — по графу рисков
+// приложения A. По духу — SISTEMA внутри тренажёра. Подробности — docs/methodology.md.
+const PL_ORDER=['a','b','c','d','e'];
+const RISK_S={1:'S1 — лёгкая, обратимая травма',2:'S2 — тяжёлая необратимая травма или смерть'};
+const RISK_F={1:'F1 — редкое или кратковременное пребывание в зоне',2:'F2 — частое или постоянное'};
+const RISK_P={1:'P1 — избежать вреда возможно при определённых условиях',2:'P2 — избежать практически невозможно'};
+// Граф рисков, приложение A: S — тяжесть, F — частота и время пребывания, P — возможность избежать.
+function plRequired(S,F,P){return {'1-1-1':'a','1-1-2':'b','1-2-1':'b','1-2-2':'c',
+ '2-1-1':'c','2-1-2':'d','2-2-1':'d','2-2-2':'e'}[`${S}-${F}-${P}`]||'e';}
+// Меры против отказов по общей причине, приложение F, таблица F.1. Порог — 65 баллов из 100.
+const CCF_ITEMS=[
+ ['sep','Разделение: сигнальные пути каналов разнесены физически (отдельные кабели, клеммы, модули)',15],
+ ['div','Разнообразие: каналы на разных технологиях, принципах или компонентах',20],
+ ['over','Защита от перенапряжения, перегрузки, перегрева, перепада давления',15],
+ ['well','Применены проверенные компоненты',5],
+ ['fmea','Анализ видов и последствий отказов учёл отказы по общей причине',5],
+ ['train','Персонал обучен, компетентность подтверждена',5],
+ ['emc','Помехозащищённость обеспечена и проверена по ISO 13849-2',25],
+ ['env','Учтены прочие влияния: температура, удар, вибрация, влажность',10]];
+const CCF_NEED=65;
+const PLR_HARD=['d','e']; // начиная с PL d одноканальная цепь не годится
+function ccfScore(list){const L=list||[];return CCF_ITEMS.reduce((s,x)=>s+(L.indexOf(x[0])>=0?x[2]:0),0);}
+// Архитектуры цепи безопасности: сколько каналов, какая диагностика, чем реализована логика.
+const PL_ARCH={
+ catB:{cat:'B',name:'Категория B: один канал, диагностики нет',ch:1,dcIn:0,dcLog:0,dcOut:0,
+  logic:{n:'Промежуточное реле (не безопасное)',mttfd:30,dcKey:'dcLog'}},
+ cat1:{cat:'1',name:'Категория 1: один канал на проверенных компонентах',ch:1,dcIn:0,dcLog:0,dcOut:0,
+  logic:{n:'Реле безопасности с принудительным управлением контактами',mttfd:100,dcKey:'dcLog'}},
+ cat3:{cat:'3',name:'Категория 3: два канала, диагностика при запросе',ch:2,dcIn:90,dcLog:99,dcOut:90,
+  logic:{n:'Контроллер безопасности, два канала с тест-импульсами',mttfd:100,dcKey:'dcLog'}},
+ cat4:{cat:'4',name:'Категория 4: два канала, непрерывная диагностика',ch:2,dcIn:99,dcLog:99,dcOut:99,
+  logic:{n:'Контроллер безопасности PL e, непрерывная самодиагностика',mttfd:100,dcKey:'dcLog'}}};
+function mttfdClass(y){return y<3?'bad':y<10?'low':y<30?'med':'high';}
+function dcClass(d){return d<60?'none':d<90?'low':d<99?'med':'high';}
+// Столбчатая диаграмма обрывает столбцы по категориям: у категорий 2 и 3 правый столбец —
+// средний DC, «высокий» там просто не предусмотрен. Лишнюю диагностику засчитываем как средний DC.
+const DC_CAP={'B':'none','1':'none','2':'med','3':'med','4':'high'};
+const DC_ORDER=['none','low','med','high'];
+function dcCap(cat,cl){const m=DC_CAP[cat]||'high';return DC_ORDER.indexOf(cl)>DC_ORDER.indexOf(m)?m:cl;}
+const MC_RU={bad:'ниже 3 лет — недопустимо',low:'низкий (3…10 лет)',med:'средний (10…30 лет)',high:'высокий (30…100 лет)'};
+const DC_RU={none:'отсутствует (< 60 %)',low:'низкий (60…90 %)',med:'средний (90…99 %)',high:'высокий (≥ 99 %)'};
+// Столбчатая диаграмма рис. 5: пустая клетка означает, что такое сочетание не допускается.
+function plFromBar(cat,m,d){
+ if(m==='bad')return null;
+ if(cat==='B')return d==='none'?{low:'a',med:'b',high:'b'}[m]:null;
+ if(cat==='1')return (d==='none'&&m==='high')?'c':null;
+ if(cat==='2'){if(d==='low')return{low:'a',med:'b',high:'c'}[m];if(d==='med')return{low:'b',med:'c',high:'d'}[m];return null;}
+ if(cat==='3'){if(d==='low')return{low:'b',med:'c',high:'d'}[m];if(d==='med')return{low:'c',med:'d',high:'d'}[m];return null;}
+ if(cat==='4')return (d==='high'&&m==='high')?'e':null;
+ return null;}
+// Последовательное соединение подсистем, таблица 11: считаем худший PL и сколько подсистем его имеют.
+function plSeries(list){
+ if(!list.length||list.some(p=>!p))return null;
+ const low=list.reduce((x,y)=>PL_ORDER.indexOf(y)<PL_ORDER.indexOf(x)?y:x);
+ const n=list.filter(p=>p===low).length;
+ const T={a:[3,'a',null],b:[2,'b','a'],c:[2,'c','b'],d:[3,'d','c'],e:[3,'e','d']}[low];
+ return n<=T[0]?T[1]:T[2];}
+// MTTFd компонента: электроника задаётся напрямую, электромеханика — через B10d и число
+// срабатываний в год (n_op = срабатываний за смену × смен в году), MTTFd = B10d / (0,1 · n_op).
+function compMTTFd(k,P){
+ if(k.mttfd)return k.mttfd;
+ const shifts=Math.max(1,P.dop*(P.hop/8)),nop=Math.max(1,(k.ops||1)*shifts);
+ return k.b10d/(0.1*nop);}
+// Симметризация двух каналов, приложение D: при одинаковых каналах даёт то же значение.
+function mttfdSym(a,b){return (2/3)*(a+b-1/(1/a+1/b));}
+// Расчёт подсистемы: MTTFd канала, DCavg, проверка CCF и требований категории.
+function subCalc(sub,P,ccf){
+ let inv=0,dcw=0;
+ sub.comp.forEach(k=>{const q=k.q||1,t=Math.min(100,compMTTFd(k,P));inv+=q/t;dcw+=q*(k.dc||0)/t;});
+ const chan=inv>0?Math.min(100,1/inv):100;
+ const mttfd=sub.ch>1?Math.min(100,mttfdSym(chan,chan)):chan;
+ const single=sub.cat==='B'||sub.cat==='1';
+ const dcavg=single?0:(inv>0?dcw/inv:0);
+ const mC=mttfdClass(mttfd),dC=single?'none':dcCap(sub.cat,dcClass(dcavg));
+ const issues=[];
+ if(['2','3','4'].indexOf(sub.cat)>=0&&ccf<CCF_NEED)issues.push(`меры против отказов по общей причине набрали ${ccf} баллов из ${CCF_NEED} обязательных`);
+ let pl=issues.length?null:plFromBar(sub.cat,mC,dC);
+ if(!pl&&!issues.length){
+  if(sub.cat==='4')issues.push('категория 4 требует высоких MTTFd и DC — сочетание не выполняется');
+  else if(sub.cat==='1')issues.push('категория 1 требует высокого MTTFd (от 30 лет)');
+  else if(mC==='bad')issues.push('MTTFd канала ниже 3 лет — упрощённый метод неприменим');
+  else issues.push('сочетание категории, MTTFd и DC не даёт ни одного PL по рис. 5');}
+ return{name:sub.name,cat:sub.cat,ch:sub.ch,comp:sub.comp,mttfd,chan,dcavg,mC,dC,pl,issues};}
+// Функции безопасности этой ячейки, собранные из её же конфигурации.
+function sfList(c,D){
+ const P=c.pl,A=PL_ARCH[P.arch]||PL_ARCH.cat3,fence=D.safety==='fence';
+ const nCv=c.conveyors.length,nR=c.robots,plr=plRequired(P.S,P.F,P.P);
+ const dcOut=P.edm?A.dcOut:Math.min(A.dcOut,60);
+ const logic=()=>({name:'Логика цепи безопасности',cat:A.cat,ch:A.ch,
+  comp:[{n:A.logic.n,mttfd:A.logic.mttfd,dc:A.dcLog}]});
+ const power=()=>({name:'Отключение силовой части',cat:A.cat,ch:A.ch,comp:[
+  {n:A.ch>1?'Контакторы KM1 и KM2 с зеркальными контактами':'Контактор KM1',b10d:1300000,ops:P.opsES+P.opsLC+P.opsDoor,dc:dcOut,q:A.ch>1?2:1},
+  {n:'Входы STO частотных преобразователей',mttfd:100,dc:dcOut,q:nCv},
+  {n:'Безопасные входы контроллеров роботов',mttfd:100,dc:dcOut,q:nR}]});
+ const sf=[];
+ sf.push({id:'SF1',name:'Аварийный стоп, категория останова 0',plr,
+  note:'ISO 13850: кнопка с фиксацией и принудительным размыканием контактов, деблокировка и сброс только вручную',
+  subs:[{name:'Кнопки аварийного стопа',cat:A.cat,ch:A.ch,comp:[
+    {n:'Кнопка на пульте оператора, 2 НЗ с принудительным размыканием',b10d:100000,ops:P.opsES,dc:A.dcIn},
+    {n:'Кнопки на пультах обучения роботов',b10d:100000,ops:P.opsES,dc:A.dcIn,q:nR}]},logic(),power()]});
+ if(fence){
+  sf.push({id:'SF2',name:'Защитная остановка по световым завесам, категория останова 1',plr,
+   note:`Расстояние установки S ≥ ${f0(D.Slc)} мм по ISO 13855`,
+   subs:[{name:'Световые завесы проёмов конвейеров',cat:A.cat,ch:A.ch,
+    comp:[{n:'Завеса тип 4 с двумя выходами OSSD',mttfd:100,dc:A.dcIn,q:nCv}]},logic(),power()]});
+  sf.push({id:'SF3',name:'Блокировка двери ограждения с удержанием',plr,
+   note:'ISO 14119: удержание снимается только сигналом контроллера безопасности, защита от обхода — RFID',
+   subs:[{name:'Выключатель с блокировкой',cat:A.cat,ch:A.ch,
+    comp:[{n:'Выключатель RFID с удержанием',b10d:2000000,ops:P.opsDoor,dc:A.dcIn}]},logic(),
+    {name:'Запирание двери',cat:A.cat,ch:A.ch,comp:[{n:'Электромагнитный замок Q1',b10d:1000000,ops:P.opsDoor,dc:dcOut}]}]});
+  if(c.exch.out!=='conveyor')sf.push({id:'SF4',name:'Мьютинг проёма на время обмена паллеты',plr,
+   note:'Байпас завесы разрешается только при освобождённой станции: последовательность двух датчиков в окне времени',
+   subs:[{name:'Датчики мьютинга и сигнал «станция освобождена»',cat:A.cat,ch:A.ch,comp:[
+     {n:'Датчики мьютинга проёмов',mttfd:60,dc:A.dcIn,q:2*nCv},
+     {n:'Кнопка «станция освобождена» у проёма',b10d:100000,ops:P.opsLC,dc:A.dcIn}]},logic(),power()]});
+ } else {
+  sf.push({id:'SF2',name:'Защитная остановка по защитному полю сканеров',plr,
+   note:`Поле снижения скорости ≥ ${f0(D.Ssc)} мм от границы досягаемости (ISO 13855, ISO/TS 15066)`,
+   subs:[{name:'Лазерные сканеры безопасности',cat:A.cat,ch:A.ch,
+    comp:[{n:'Сканер 275°, два поля, наборы полей по входам',mttfd:100,dc:A.dcIn,q:2*nR}]},logic(),power()]});
+  sf.push({id:'SF4',name:'Снижение скорости по полю предупреждения',plr,
+   note:'Разделение и мониторинг скорости по ISO/TS 15066: робот переходит в Reduced Mode, питание не снимается',
+   subs:[{name:'Лазерные сканеры безопасности',cat:A.cat,ch:A.ch,
+    comp:[{n:'Сканер 275°, поле предупреждения',mttfd:100,dc:A.dcIn,q:2*nR}]},logic(),
+    {name:'Безопасный вход робота «сниженная скорость»',cat:A.cat,ch:A.ch,
+     comp:[{n:'Вход Reduced Mode контроллера робота',mttfd:100,dc:dcOut,q:nR}]}]});
+ }
+ return{sf,A,plr,dcOut};}
+function plCalc(c,D){
+ const P=c.pl,{sf,A,plr,dcOut}=sfList(c,D),ccf=ccfScore(P.ccf);
+ sf.forEach(f=>{f.res=f.subs.map(s=>subCalc(s,P,ccf));
+  f.pl=plSeries(f.res.map(r=>r.pl));
+  f.ok=!!f.pl&&PL_ORDER.indexOf(f.pl)>=PL_ORDER.indexOf(f.plr);});
+ const worst=sf.reduce((x,f)=>{if(!f.pl)return null;return x===null?null:(PL_ORDER.indexOf(f.pl)<PL_ORDER.indexOf(x)?f.pl:x);},'e');
+ return{plr,ccf,ccfOK:ccf>=CCF_NEED,arch:A,dcOut,sf,worst,ok:sf.every(f=>f.ok),
+  risk:`${RISK_S[P.S]}; ${RISK_F[P.F]}; ${RISK_P[P.P]}`};}
 // ======================= 3D-ВИД =======================
 const V3={ok:false,orbit:{theta:-0.9,phi:0.95,r:9,tx:0,ty:0.5,tz:1},follow:false,cache:{},pools:{},agents:{}};
 const COL3={box:[0xC9A66B,0x8DB3A0,0xB39DDB,0xE0A0A0],sheet:0x8FA3B5,robot:0xE0762C,fence:0x7B8794,pallet:0xB08D57,conv:0x9AA3AB,floor:0xD9DEE3,agent:0x3A6EA5,fork:0xF5B400,amr:0xF2F4F6,red:0xD33B2F,off:0xB8C0C8,green:0x2A9D5C,yellow:0xF5B400,post:0x6E7883,mesh:0x8A949E,joint:0x2A2E33};
@@ -1213,6 +1380,76 @@ function renderArch(){
 <p><b>Автоподача.</b> ${c.conveyors.some(x=>x.feed!=='manual')?'Упаковочная машина связана с ПЛК двумя сигналами: «готов принять» (ПЛК → машина, снимается при Suspended/Held и заполнении накопителя) и «коробка отправлена» (машина → ПЛК, счёт входа). При ручной загрузке эти сигналы заменяет датчик B5.':'При ручной загрузке интерфейса с оборудованием выше по потоку нет; вход считается по датчику B5.'}</p>
 <h3>Порядок пусконаладки</h3><ul><li>Цепь безопасности без питания приводов: каждый стоп, дверь, ${D.safety==='fence'?'завеса с мьютингом и без, байпас проёмов только при «освобождено»':'оба поля сканеров и переключение наборов полей'} — протокол валидации по ISO 13849-2.</li><li>I/O-check по списку сигналов.</li><li>ЧП: направление, рампы, ток; STO из шкафа.</li><li>Захват: ${vac?'вакуум на реальной коробке, время набора, тест на потерю при обрыве шланга':'усилие и датчики положения'}; масса захвата и центр тяжести — в настройки робота.</li><li>Робот: точки для каждой схемы и слоя, снижение скорости у паллеты, обмен с ПЛК по каждому шагу GRAFCET.</li>${ex.out==='amr'?'<li>AMR: маршруты, точки стыковки, обмен заявками с ПЛК, поведение при потере связи.</li>':''}<li>Прогон с коробками: такт, накопление, защитная остановка в каждой точке цикла — коробка не должна падать при стопе категории 1.</li></ul>`;
  $('algoText').innerHTML=algoText(c,D);}
+// ======================= БЕЗОПАСНОСТЬ И PERFORMANCE LEVEL =======================
+// Вкладка целиком считается «на лету» лёгким derive: цепь безопасности не влияет на такт,
+// поэтому пересобирать симуляцию не нужно.
+const PL_COLS=[['B','none'],['1','none'],['2','low'],['2','med'],['3','low'],['3','med'],['4','high']];
+const MC_SHORT={low:'н',med:'с',high:'в'},DC_SHORT={none:'нет',low:'низк.',med:'средн.',high:'высок.'};
+function plBarSVG(P){
+ const ms=['low','med','high'],x0=74,y0=14,W=884,cw=(W-x0)/PL_COLS.length,rh=40,bw=cw/3-8;
+ const used={};P.sf.forEach(f=>f.res.forEach(r=>{if(r.pl)used[`${r.cat}|${r.dC}|${r.mC}`]=1;}));
+ let s='';
+ PL_ORDER.slice().reverse().forEach((pl,i)=>{const y=y0+i*rh,lack=PL_ORDER.indexOf(pl)<PL_ORDER.indexOf(P.plr);
+  if(lack)s+=`<rect x="${x0}" y="${y}" width="${W-x0}" height="${rh}" fill="var(--red)" opacity=".06"/>`;
+  s+=`<text x="${x0-12}" y="${y+rh/2+5}" text-anchor="end" font-size="13" font-weight="600" fill="${lack?'var(--muted)':'var(--ink)'}">PL ${pl}</text>`
+   +`<line x1="${x0}" y1="${y+rh}" x2="${W}" y2="${y+rh}" stroke="var(--line)"/>`;});
+ const yReq=y0+(4-PL_ORDER.indexOf(P.plr))*rh+rh;
+ s+=`<line x1="${x0}" y1="${yReq}" x2="${W}" y2="${yReq}" stroke="var(--red)" stroke-width="1.6" stroke-dasharray="7 4"/>`
+  +`<text x="${W-4}" y="${yReq-6}" text-anchor="end" font-size="11.5" fill="var(--red)">требуется PL ${P.plr}</text>`;
+ PL_COLS.forEach((col,j)=>{const cx=x0+j*cw;
+  if(j)s+=`<line x1="${cx}" y1="${y0}" x2="${cx}" y2="${y0+5*rh}" stroke="var(--line)"/>`;
+  s+=`<text x="${cx+cw/2}" y="${y0+5*rh+18}" text-anchor="middle" font-size="12" font-weight="500" fill="var(--ink)">Кат. ${col[0]}</text>`
+   +`<text x="${cx+cw/2}" y="${y0+5*rh+33}" text-anchor="middle" font-size="11" fill="var(--muted)">DC ${DC_SHORT[col[1]]}</text>`;
+  ms.forEach((m,k)=>{const pl=plFromBar(col[0],m,col[1]),bx=cx+k*(cw/3)+4;
+   s+=`<text x="${bx+bw/2}" y="${y0+5*rh+47}" text-anchor="middle" font-size="10" fill="var(--muted)">${MC_SHORT[m]}</text>`;
+   if(!pl)return;
+   const on=used[`${col[0]}|${col[1]}|${m}`],y=y0+(4-PL_ORDER.indexOf(pl))*rh+5;
+   s+=`<rect x="${bx}" y="${y}" width="${bw}" height="${rh-10}" rx="3" fill="${on?'var(--robot)':'var(--dim)'}" stroke="${on?'var(--robot)':'var(--line)'}"/>`;
+   if(on)s+=`<text x="${bx+bw/2}" y="${y+rh/2-1}" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">${pl}</text>`;});});
+ s+=`<text x="4" y="${y0+5*rh+18}" font-size="11" fill="var(--muted)">MTTFd</text>`
+  +`<text x="4" y="${y0+5*rh+33}" font-size="11" fill="var(--muted)">канала:</text>`;
+ return s;}
+function renderPL(){
+ const c=normalize(CFG),D=derive(c,true),P=D.pl,p=c.pl,bd=(s,t)=>`<span class="badge ${s}">${t}</span>`;
+ $('plRisk').innerHTML=`<div class="field"><label>S — тяжесть травмы</label>${sel('pl.S',[[1,'S1 — лёгкая'],[2,'S2 — тяжёлая']],p.S)}<small>${RISK_S[p.S]}</small></div>
+ <div class="field"><label>F — частота и время пребывания в опасной зоне</label>${sel('pl.F',[[1,'F1 — редко'],[2,'F2 — часто']],p.F)}<small>${RISK_F[p.F]}</small></div>
+ <div class="field"><label>P — возможность избежать вреда</label>${sel('pl.P',[[1,'P1 — возможно'],[2,'P2 — почти нет']],p.P)}<small>${RISK_P[p.P]}</small></div>
+ <div class="check"><div>Требуемый уровень PLr<small>Граф рисков приложения A ISO 13849-1; для паллетайзера с обменом паллет обычно S2·F2·P1 → PL d</small></div>${bd('ok','PL '+P.plr)}</div>
+ <p class="note">Оценка риска — не свойство железа, а решение по конкретной ячейке: тяжесть считается по максимуму (удар манипулятором с грузом ${f1(D.heaviest.m*c.grip.pick)} кг на скорости ${c.speedPct} % — это S2), частота — по числу входов в зону за смену, возможность избежать — по тому, видит ли человек робота и успевает ли отойти.</p>`;
+ $('plArch').innerHTML=`<div class="field"><label>Архитектура (категория)</label>${sel('pl.arch',Object.entries(PL_ARCH).map(([k,v])=>[k,v.name]),p.arch)}<small>Каналов ${P.arch.ch}; DC входов ${P.arch.dcIn} %, логики ${P.arch.dcLog} %, силовой части ${P.dcOut} %</small></div>
+ <div class="field"><label>Контроль обратной связи контакторов (EDM)</label>${sel('pl.edm',[['true','Есть: зеркальные контакты на КБ'],['false','Нет']],p.edm)}<small>Без EDM диагностика отключающих элементов не выше 60 %</small></div>
+ <div class="field"><label>Рабочих дней в году</label>${num('pl.dop',p.dop,5,1,365)}</div>
+ <div class="field"><label>Часов работы в сутки</label>${num('pl.hop',p.hop,1,1,24)}<small>n_op = срабатываний за смену × смен в году; смен в году ${f0(p.dop*(p.hop/8))}</small></div>
+ <div class="field"><label>Срабатываний аварийного стопа за смену</label>${num('pl.opsES',p.opsES,1,0,500)}</div>
+ <div class="field"><label>Пересечений завесы (обменов) за смену</label>${num('pl.opsLC',p.opsLC,1,0,500)}<small>Расчёт даёт ${f1(D.palletsPerHour*p.hop)} обменов паллет в сутки</small></div>
+ <div class="field"><label>Открываний двери ограждения за смену</label>${num('pl.opsDoor',p.opsDoor,1,0,500)}</div>
+ <p class="note">Электромеханика (кнопки, замки, контакторы) стареет от числа срабатываний: MTTFd = B10d / (0,1 · n_op). Электроника (завесы, сканеры, STO, контроллер безопасности) берётся из сертификата и в расчёте ограничена 100 годами на канал.</p>`;
+ $('plCCF').innerHTML=CCF_ITEMS.map(x=>`<label class="ccf"><input type="checkbox" data-ccf="${x[0]}" ${p.ccf.indexOf(x[0])>=0?'checked':''}><span>${x[1]}</span><b>${x[2]} б.</b></label>`).join('')
+  +`<div class="check"><div>Набрано баллов<small>Порог ${CCF_NEED} из 100 — без него расчёт PL для категорий 2, 3 и 4 недействителен</small></div>${bd(P.ccfOK?'ok':'bad',P.ccf+' / '+CCF_NEED)}</div>`;
+ $('plSF').innerHTML=P.sf.map(f=>`<div class="plsf"><div class="hd"><div><b>${f.id}. ${f.name}</b><small style="display:block;color:var(--muted)">${f.note}</small></div>${bd(f.ok?'ok':'bad',f.pl?`PL ${f.pl} при требуемом ${f.plr}`:'PL не определён')}</div>
+ <div class="svgwrap"><table><tr><th>Подсистема</th><th>Кат.</th><th>MTTFd канала</th><th>DCavg</th><th>PL</th><th>Состав канала</th></tr>
+ ${f.res.map(r=>`<tr><td>${r.name}</td><td class="tag">${r.cat}</td><td>${r.mttfd>=100?'≥ 100':f1(r.mttfd)} лет<small style="color:var(--muted)"> — ${MC_RU[r.mC]}</small></td><td>${f0(r.dcavg)} %<small style="color:var(--muted)"> — ${DC_RU[r.dC]}</small></td><td>${r.pl?bd(PL_ORDER.indexOf(r.pl)>=PL_ORDER.indexOf(f.plr)?'ok':'warn','PL '+r.pl):bd('bad','—')}</td><td style="color:var(--muted)">${r.comp.map(k=>`${k.q>1?k.q+' × ':''}${k.n}${k.b10d?` (B10d ${f0(k.b10d/1000)} тыс.)`:''}`).join('; ')}</td></tr>`).join('')}
+ </table></div>${f.res.some(r=>r.issues.length)?`<p class="note" style="color:var(--badfg)">${f.res.filter(r=>r.issues.length).map(r=>r.name+': '+r.issues.join('; ')).join('. ')}.</p>`:''}</div>`).join('')
+  +`<div class="check"><div>Итог по ячейке<small>Худшая из функций безопасности; подсистемы внутри функции складываются по таблице 11</small></div>${bd(P.ok?'ok':'bad',P.worst?`PL ${P.worst} при требуемом ${P.plr}`:'PL не определён')}</div>`;
+ $('plBar').innerHTML=plBarSVG(P);
+ $('plText').innerHTML=`<h3>Как считается</h3>
+<p><b>1. Требуемый PL.</b> По графу рисков приложения A: S (тяжесть) → F (частота и время пребывания) → P (возможность избежать). Выбранная комбинация S${p.S}·F${p.F}·P${p.P} даёт <b>PL ${P.plr}</b>. Этот уровень — требование ко всем функциям безопасности ячейки; в реальном проекте оценка риска оформляется отдельным документом по ISO 12100 и может дать разным функциям разные PLr.</p>
+<p><b>2. Функции безопасности.</b> Тренажёр собирает их из конфигурации: ${P.sf.map(f=>f.id+' — '+f.name.toLowerCase()).join('; ')}. Каждая раскладывается на подсистемы «датчик — логика — исполнительный элемент»: у одной функции их две или три, и PL функции определяется их последовательным соединением.</p>
+<p><b>3. MTTFd канала.</b> Компоненты канала складываются по отказам: 1/MTTFd = Σ (1/MTTFd каждого). Электромеханика пересчитывается из B10d через число срабатываний: при ${p.dop} рабочих днях и ${p.hop} часах в сутки смен в году ${f0(p.dop*(p.hop/8))}. Значение на канал ограничено 100 годами, как требует стандарт. Для двухканальных архитектур каналы симметризуются по приложению D.</p>
+<p><b>4. DCavg.</b> Среднее по диагностическому охвату, взвешенное по интенсивности отказов: DCavg = Σ(DC_i / MTTFd_i) / Σ(1 / MTTFd_i). Для категорий B и 1 диагностики нет по определению. У категорий 2 и 3 столбчатая диаграмма обрывается на среднем DC — лишняя диагностика там не повышает PL, её засчитывают как средний охват.</p>
+<p><b>5. CCF.</b> Отказы по общей причине — то, что убивает избыточность: общий кабель, общее питание, общий перегрев. По приложению F набирается ${P.ccf} из ${CCF_NEED} обязательных баллов. ${P.ccfOK?'Порог набран.':'Порог не набран — для категорий 2, 3 и 4 расчёт PL недействителен, пока меры не приняты.'}</p>
+<p><b>6. Результат.</b> ${P.ok?`Все функции достигают требуемого PL ${P.plr}${P.worst?` (худшая — PL ${P.worst})`:''}.`:`Требуемый PL ${P.plr} достигается не всеми функциями — см. замечания в таблице и на вкладке «Конфигуратор».`} Расчёт упрощённый, как в SISTEMA: он не заменяет валидацию по ISO 13849-2 и не учитывает отказы ПО, время миссии сверх 20 лет и требования к монтажу.</p>
+<h3>Что попробовать</h3>
+<ul><li>Поставьте категорию B или 1 и посмотрите, как PL падает ниже требуемого: одноканальная цепь не даёт PL d ни при каких MTTFd.</li>
+<li>Выключите EDM при категории 3 — DC силовой части упадёт с ${P.arch.dcOut} % до 60 %, и подсистема отключения потеряет уровень.</li>
+<li>Снимите галочки помехозащищённости и разделения — сумма CCF уйдёт ниже ${CCF_NEED}, и расчёт станет недействительным независимо от качества компонентов.</li>
+<li>Увеличьте число пересечений завесы за смену до 200 — посмотрите, как B10d кнопок и контакторов переводит MTTFd в низкий класс.</li></ul>`;}
+$('tab-pl').addEventListener('input',e=>{const t=e.target;
+ if(t.dataset.ccf){const k=t.dataset.ccf,i=CFG.pl.ccf.indexOf(k);if(t.checked){if(i<0)CFG.pl.ccf.push(k);}else if(i>=0)CFG.pl.ccf.splice(i,1);}
+ else{const k=t.dataset.k;if(!k)return;let v=t.value;
+  if(t.type==='number'){v=+v;if(isNaN(v))return;}else if(v==='true'||v==='false')v=v==='true';else if(/^-?\d+$/.test(v))v=+v;
+  setPath(CFG,k,v);}
+ normalize(CFG);saveCfg();renderPL();renderChecks();});
 // ======================= СИМУЛЯЦИЯ =======================
 const STEPS=[['wait','Ожидание коробок / выбор задания'],
  ['toPick','Подход к зоне захвата со снижением к точке подхода'],['downPick','Опускание к коробке на скорости подвода'],['grip','Захват: вакуум ВКЛ, контроль датчиков'],['upPick','Отрыв груза строго вверх'],
@@ -1619,9 +1856,9 @@ function initHelp(){
  $('gloss').innerHTML=GLOSS.map(g=>`<dt>${g[0]}</dt><dd>${g[1]}</dd>`).join('');
  $('stdText').innerHTML=`<h3>Нормы, к которым привязан тренажёр</h3><ul><li>ГОСТ Р ИСО 12100 — оценка рисков.</li><li>ГОСТ Р ИСО 13849-1/-2 — PL, категории архитектуры, валидация.</li><li>ГОСТ Р МЭК 60204-1 — электрооборудование машин, категории стопов.</li><li>ГОСТ Р ИСО 10218-1/-2, ISO/TS 15066 — роботы, коллаборативные режимы.</li><li>ГОСТ ИСО 13855, 13857, 14119, ISO 14120 — расстояния, ограждения, блокировки.</li><li>EN 415-4 — безопасность паллетайзеров; ISO 3691-4 — безопасность беспилотных транспортных средств (AMR/AGV).</li><li>ISA-TR88.00.02 (PackML), МЭК 60848 (GRAFCET), МЭК 61131-3, МЭК 61439-1.</li><li>Методика расчёта вакуумных захватов — по рекомендациям производителей присосок (три расчётных случая, коэффициент запаса 1,5–2).</li><li>Методика оценки производительности паллетайзера по циклам на паллету (REDCARGO PRO130).</li></ul><h3>Что упрощено в модели</h3><p>Схемы укладки — из семейства сетка / две зоны / пинвил без перевязки внутри слоя; конвейер — установившийся режим; цикл робота — по расстояниям в плане с нормативом циклов; поля сканеров — круги; тележки и люди идут по прямой к проёму; расход через картон и время набора вакуума — оценочные. Все параметры каталога подлежат проверке по паспорту.</p>`;}
 // ======================= ИНИЦИАЛИЗАЦИЯ =======================
-function showTab(t){document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));if(t==='3d'&&typeof resize3D==='function')resize3D();}
+function showTab(t){if(t==='pl')renderPL();document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));if(t==='3d'&&typeof resize3D==='function')resize3D();}
 $('tabs').addEventListener('click',e=>{const t=e.target.dataset.tab;if(t)showTab(t);});
-initHelp();renderCfg();if(typeof init3D==='function')init3D();buildSim();renderArch();
+initHelp();renderCfg();renderPL();if(typeof init3D==='function')init3D();buildSim();renderArch();
 let last=performance.now();
 function loop(now){const dt=Math.min(.1,(now-last)/1000)*(S.timeScale||1);last=now;tick(dt);if(typeof render3D==='function'&&$('tab-3d').classList.contains('on'))render3D();requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
@@ -1791,6 +2028,17 @@ function reportHTML(c,D,png){
   ['Промышленная сеть',c.fieldbus],
   ['Сигналы',`${D.io.DI} DI / ${D.io.DO} DO / ${D.io.SI} безопасных входов / ${D.io.SO} безопасных выходов / ${D.io.BUS} объектов по шине`],
   ['Модули ввода-вывода',`${D.io.diMod} × DI16, ${D.io.doMod} × DO16 (с запасом 20 %)`]]));
+ {const P=D.pl;
+  H.push(`<h3>Performance Level по ISO 13849-1</h3>`+repTable([
+   ['Оценка риска',`${P.risk} → требуемый уровень PL ${P.plr}`],
+   ['Архитектура',`${P.arch.name}; DC входов ${P.arch.dcIn} %, логики ${P.arch.dcLog} %, силовой части ${P.dcOut} %${c.pl.edm?', EDM есть':', EDM нет'}`],
+   ['Наработка',`${c.pl.dop} дней в году по ${c.pl.hop} ч; срабатываний за смену: аварийный стоп ${c.pl.opsES}, завеса ${c.pl.opsLC}, дверь ${c.pl.opsDoor}`],
+   ['Меры против отказов по общей причине',`${P.ccf} баллов из ${CCF_NEED} обязательных — ${P.ccfOK?'порог набран':'ПОРОГ НЕ НАБРАН, расчёт недействителен'}`],
+   ['Итог',P.worst?`достигнут PL ${P.worst} при требуемом PL ${P.plr} — ${P.ok?'соответствует':'НЕ СООТВЕТСТВУЕТ'}`:'PL не определён — см. замечания']]));
+  H.push(repCols(['Функция','Подсистема','Кат.','MTTFd канала, лет','DCavg, %','PL','Итог функции'],
+   P.sf.flatMap(f=>f.res.map((r,i)=>[i?'':`${f.id}. ${f.name}`,r.name,r.cat,r.mttfd>=100?'≥ 100':f1(r.mttfd),f0(r.dcavg),r.pl?'PL '+r.pl:'—',
+    i?'':(f.pl?`PL ${f.pl} при требуемом ${f.plr}${f.ok?'':' — НЕ СООТВЕТСТВУЕТ'}`:'не определён')]))));
+  H.push(`<p class="sub">Упрощённый метод ISO 13849-1: MTTFd канала — по отказам компонентов (электромеханика из B10d и числа срабатываний), DCavg — средневзвешенный диагностический охват, PL подсистемы — по столбчатой диаграмме рис. 5, PL функции — последовательное соединение подсистем по таблице 11. Расчёт не заменяет валидацию по ISO 13849-2.</p>`);}
  H.push(`<h3>Схема участка с габаритами</h3>`+planSVG(c,D,1000)
   +`<p class="sub">Условные обозначения: серый штрих — ограждение; оранжевый штрих — досягаемость робота; красный отрезок — проём с световой завесой; синий пунктир — маршрут подъезда техники к позиции; пунктирный квадрат — площадка ожидания за ограждением. Размеры в миллиметрах.</p>`);
  H.push(png?`<h3>3D-компоновка</h3><img src="${png}" alt="3D-вид ячейки">`

@@ -7,6 +7,7 @@ const path = require('path');
 const ORDER = [
   'index.head.html',        // <head>, CSS, разметка всех вкладок, открывающий <script>
   '01-catalog-and-calc.js', // каталоги, схемы укладки, захват, компоновка, derive(), сигналы, BOM, оптимизатор, текст алгоритма
+  '01b-safety-pl.js',       // Performance Level по ISO 13849-1: граф рисков, MTTFd, DCavg, CCF, категории
   '02-view3d.js',           // three.js: сцена, кинематика робота, тележки
   '03-ui-and-sim.js',       // конфигуратор, архитектура, симуляция, задания, инициализация
   '04-report.js',          // обмен конфигурацией (json), отчёт по ячейке, 2D-схема с габаритами

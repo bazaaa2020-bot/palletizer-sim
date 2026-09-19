@@ -144,9 +144,10 @@ const DEF={name:'Ячейка паллетизации',robots:1,robot:'cb20',cu
  boxes:[{name:'Средняя',l:400,w:300,h:250,m:8,rate:0,layers:0}],
  conveyors:[{type:'roller',len:3,speed:12,accum:true,box:0,feed:'manual',interval:10,rate:6,infeed:'oriented',align:'guides'}],
  vision:{mode:'none'},
- palletHandling:'forklift',safety:'fence',fieldbus:'PROFINET',tStop:0.5,opt:{target:400,allowCobot:true,maxRobots:2}};
+ palletHandling:'forklift',safety:'fence',fieldbus:'PROFINET',tStop:0.5,
+ pl:{S:2,F:2,P:1,arch:'cat3',edm:true,dop:240,hop:16,opsES:2,opsLC:30,opsDoor:6,ccf:['sep','over','well','fmea','train','emc','env']},opt:{target:400,allowCobot:true,maxRobots:2}};
 let CFG=deep(DEF);
-try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.vision=Object.assign(deep(DEF.vision),s.vision||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.vision=Object.assign(deep(DEF.vision),s.vision||{});CFG.pl=Object.assign(deep(DEF.pl),s.pl||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
 function saveCfg(){try{localStorage.setItem('pal-sim-cfg4',JSON.stringify(CFG));}catch(e){}}
 function robotOf(c){const r=ROBOTS.find(x=>x.id===c.robot)||ROBOTS[3];if(r.id==='custom')return{id:'custom',name:'Свой робот',cls:c.custom.cls,payload:+c.custom.payload,reach:+c.custom.reach,v:c.custom.cls==='cobot'?1:2,cpm:+c.custom.cpm||8,cost:2,ex:''};return r;}
 function safetyMode(c,rob){if(rob.cls!=='cobot')return'fence';return c.safety==='auto'?'cobot':c.safety;}
@@ -156,6 +157,11 @@ function normalize(c){if(c.exch.out==='conveyor')c.exch.in='dispenser';else if(c
  const extra=(c.exch.in==='robot'?1:0);if(c.stations+c.magazines+extra>6)c.magazines=Math.max(0,6-c.stations-extra);if(c.sheet.mode==='none')c.magazines=0;if(c.sheet.mode!=='none'&&c.magazines===0)c.magazines=1;
  const M=c.motion;M.vZ=clamp(+M.vZ||900,100,2000);M.vPlace=clamp(+M.vPlace||150,20,400);M.hAppr=clamp(+M.hAppr||60,5,400);M.tJerk=clamp(+M.tJerk||0,0,1);M.wSpeed=clamp(+M.wSpeed||180,20,720);c.sheet.sect=clamp(Math.round(+c.sheet.sect||1),1,8);
  if(!c.vision||!VISION[c.vision.mode])c.vision={mode:'none'};
+ if(!c.pl)c.pl=deep(DEF.pl);const PL=c.pl;
+ PL.S=PL.S===1?1:2;PL.F=PL.F===1?1:2;PL.P=PL.P===1?1:2;if(!PL_ARCH[PL.arch])PL.arch='cat3';
+ PL.dop=clamp(Math.round(+PL.dop||240),1,365);PL.hop=clamp(Math.round(+PL.hop||16),1,24);
+ ['opsES','opsLC','opsDoor'].forEach(k=>{PL[k]=clamp(Math.round(+PL[k]||1),0,500);});
+ if(!Array.isArray(PL.ccf))PL.ccf=[];
  c.conveyors.forEach(v=>{if(!INFEED[v.infeed])v.infeed='oriented';if(!ALIGN[v.align])v.align='guides';});
  c.boxes.forEach(b=>{if(!SHAPES[b.shape])b.shape='box';if(!MATS[b.mat])b.mat='carton';
   if(b.shape==='cyl')b.w=b.l;});                       // цилиндр описываем квадратом со стороной Ø
@@ -372,6 +378,7 @@ function derive(c,light){
  const Tlc=c.tStop+0.03;let Slc=2000*Tlc+8*(30-14);if(Slc>500)Slc=Math.max(500,1600*Tlc+128);D.Slc=Slc;const Tsc=c.tStop+0.1;D.Ssc=1600*Tsc+(1200-0.4*300);
  D.halfDiag=Math.hypot(heaviest.l*k,heaviest.w)/2;D.rSlow=rob.reach+D.halfDiag+D.Ssc;D.rStop=rob.reach+D.halfDiag+300;
  D.F=LY.F;D.fencePerim=2*((D.F.x1-D.F.x0)+(D.F.y1-D.F.y0));
+ D.pl=plCalc(c,D);
  D.warnings=[];const w=D.warnings;
  if(LY.blocked.length)w.push(`Нет свободного подъезда к позици${LY.blocked.length>1?'ям':'и'} ${LY.blocked.join(', ')}: коридор шириной ${f0(LY.veh.w)} мм под ${EXCH_OUT[c.exch.out].toLowerCase()} перекрыт соседними паллетами или конвейером. Уменьшите число позиций вокруг робота, увеличьте радиус расстановки или смените способ вывоза.`);
  if(c.robots>1)w.push(`Проезд между роботами ${f0(LY.aisle)} мм — под ${EXCH_OUT[c.exch.out].toLowerCase()}. Станции вынесены на внешние углы, магазины смотрят в проезд: за листами ходит человек, за паллетами заезжает техника.`);
@@ -406,6 +413,14 @@ function derive(c,light){
  if(c.exch.out==='jack'&&D.palletsPerHour>8)w.push(`${f1(D.palletsPerHour)} паллет в час вручную рохлей — оператор будет занят обменом почти постоянно; рассмотрите погрузчик, AMR или конвейер паллет.`);
  if(c.stations===1&&c.exch.out!=='conveyor')w.push(`Одна станция: на каждый обмен паллеты робот простаивает ${f0(tEx)} с (${f0(D.exLoss*100)} % времени). Вторая станция снимает простой.`);
  if(safety==='cobot'&&c.exch.out!=='conveyor')w.push('Обмен паллет в зоне сканеров: при освобождении станции контроллер безопасности переключает набор полей, исключая её сектор — иначе каждая тележка будет останавливать робота.');
+ // ISO 13849-1: расхождение достигнутого PL с требуемым и нарушенные условия категории
+ {const PL=D.pl;
+  if(!PL.ccfOK)w.push(`Меры против отказов по общей причине набрали ${PL.ccf} баллов из ${CCF_NEED} обязательных (приложение F ISO 13849-1): для категорий 2, 3 и 4 расчёт PL недействителен, пока порог не набран.`);
+  PL.sf.forEach(f=>{const bad=f.res.filter(r=>r.issues.length);
+   if(bad.length)w.push(`${f.id} «${f.name}»: подсистем${bad.length>1?'ы':'а'} «${bad.map(r=>r.name).join('», «')}» не даёт PL — ${bad[0].issues[0]}.`);
+   else if(!f.ok)w.push(`${f.id} «${f.name}»: достигнут PL ${f.pl}, а по графу рисков требуется PL ${f.plr}. Поднимите категорию, возьмите компоненты с бо́льшим MTTFd или добавьте диагностику.`);});
+  if((PL.arch.cat==='3'||PL.arch.cat==='4')&&!c.pl.edm)w.push('Контроль обратной связи контакторов (EDM) выключен: диагностика силовой части падает до 60 %, а по ISO 13849-1 для категорий 3 и 4 отключающие элементы должны контролироваться. Заведите зеркальные контакты на контроллер безопасности.');
+  if(PL.arch.ch===1&&PLR_HARD.indexOf(PL.plr)>=0)w.push(`Одноканальная архитектура (${PL.arch.name.split(':')[0].toLowerCase()}) при требуемом PL ${PL.plr}: одиночный отказ приводит к потере функции безопасности. Нужны два канала с диагностикой.`);}
  if(light)return D;
  D.sig=signals(c,D);const cnt=x=>D.sig.filter(s=>s.k===x).length;D.io={DI:cnt('DI'),DO:cnt('DO'),SI:cnt('SI'),SO:cnt('SO'),BUS:cnt('BUS')};D.io.diMod=Math.ceil(D.io.DI*1.2/16);D.io.doMod=Math.ceil(D.io.DO*1.2/16);D.bom=bom(c,D);D.plan=planSKU(c,D);return D;}
 // ======================= ПЛАНИРОВЩИК АРТИКУЛОВ =======================

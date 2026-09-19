@@ -307,6 +307,58 @@ const miss = w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));CFG.robot='pl130'
 check('без центрирования робот промахивается', miss.bad > 0, `промахов ${miss.bad}`);
 check('с центрированием промахов нет', miss.good === 0 && miss.placed > 10, `промахов ${miss.good}, уложено ${miss.placed}`);
 
+console.log('Performance Level по ISO 13849-1 (п. 2)');
+// формулы стандарта проверяем точечно, по таблицам
+const g = expr => w.eval(expr);
+check('граф рисков: S1F1P1 → a, S2F2P2 → e', g("plRequired(1,1,1)") === 'a' && g("plRequired(2,2,2)") === 'e');
+check('граф рисков: S2F2P1 → d (типовая паллетизация)', g("plRequired(2,2,1)") === 'd');
+check('рис. 5: кат. B с диагностикой не даёт PL', g("plFromBar('B','high','med')") === null);
+check('рис. 5: кат. 1 даёт PL c только при высоком MTTFd', g("plFromBar('1','high','none')") === 'c' && g("plFromBar('1','med','none')") === null);
+check('рис. 5: кат. 3 со средними DC и высоким MTTFd → PL d', g("plFromBar('3','high','med')") === 'd');
+check('рис. 5: PL e только у кат. 4 при высоких MTTFd и DC', g("plFromBar('4','high','high')") === 'e' && g("plFromBar('3','high','high')") === null);
+check('рис. 5: MTTFd ниже 3 лет не даёт PL ни при какой категории',
+  ['B','1','2','3','4'].every(c => g(`plFromBar('${c}','bad','high')`) === null));
+check('таблица 11: три подсистемы PL d дают PL d, четыре — PL c',
+  g("plSeries(['d','d','d'])") === 'd' && g("plSeries(['d','d','d','d'])") === 'c');
+check('таблица 11: три подсистемы PL c дают PL b', g("plSeries(['c','c','c'])") === 'b');
+check('таблица 11: неопределённая подсистема обнуляет функцию', g("plSeries(['d',null,'e'])") === null);
+check('симметризация приложения D на одинаковых каналах возвращает канал',
+  Math.abs(g("mttfdSym(30,30)") - 30) < 1e-9, String(g("mttfdSym(30,30)")));
+check('B10d → MTTFd: вдвое больше срабатываний — вдвое меньше MTTFd',
+  Math.abs(g("compMTTFd({b10d:1e5,ops:10},{dop:240,hop:16})") / g("compMTTFd({b10d:1e5,ops:20},{dop:240,hop:16})") - 2) < 1e-9);
+check('CCF: полный набор мер — 100 баллов, порог 65',
+  g("ccfScore(CCF_ITEMS.map(x=>x[0]))") === 100 && g("CCF_NEED") === 65);
+
+const pl = extra => w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));${extra || ''}normalize(CFG);
+ const D=derive(CFG,true),P=D.pl;
+ return{plr:P.plr,worst:P.worst,ok:P.ok,ccf:P.ccf,ccfOK:P.ccfOK,n:P.sf.length,
+  ids:P.sf.map(f=>f.id+':'+f.pl).join(' '),issues:P.sf.some(f=>f.res.some(r=>r.issues.length)),
+  warn:D.warnings.filter(x=>/PL |общей причине|EDM|канальн/.test(x)).length};})()`);
+
+const p0 = pl();
+check('типовая ячейка: требуется PL d и он достигается', p0.plr === 'd' && p0.worst === 'd' && p0.ok, `${p0.worst} / ${p0.plr}`);
+check('функций безопасности с ограждением — четыре', p0.n === 4, p0.ids);
+check('замечаний по PL при типовой конфигурации нет', p0.warn === 0);
+const p1 = pl(`CFG.pl.arch='catB';`);
+check('категория B не даёт требуемого PL d', !pl(`CFG.pl.arch='catB';`).ok);
+check('и это попадает в замечания', p1.warn > 0, `замечаний ${p1.warn}`);
+const p2 = pl(`CFG.pl.ccf=['well','train'];`);
+check('без мер против отказов по общей причине расчёт недействителен',
+  p2.ccfOK === false && p2.worst === null && p2.issues, `${p2.ccf} баллов`);
+const p3 = pl(`CFG.pl.edm=false;`);
+check('выключенный EDM снижает диагностику и поднимает замечание', p3.warn > 0, `замечаний ${p3.warn}`);
+const p4 = pl(`CFG.pl.opsES=200;CFG.pl.opsLC=400;CFG.pl.opsDoor=200;`);
+check('частые срабатывания роняют MTTFd и уровень', !p4.ok || p4.worst !== 'd', `${p4.worst}`);
+const p5 = pl(`CFG.pl.S=1;CFG.pl.F=1;CFG.pl.P=1;`);
+check('лёгкий риск требует всего PL a', p5.plr === 'a' && p5.ok);
+const p6 = pl(`CFG.robot='ur10';CFG.safety='cobot';`);
+check('у кобота свой набор функций: поле сканера и снижение скорости',
+  p6.n === 3 && /SF4/.test(p6.ids), p6.ids);
+check('вкладка PL отрисовывается', (() => { w.eval('showTab("pl")');
+  return d.getElementById('plSF').innerHTML.length > 500 && d.getElementById('plBar').innerHTML.length > 500; })());
+check('раздел PL попадает в отчёт', w.eval(`reportHTML(CFG,derive(CFG),null)`).indexOf('Performance Level') > 0);
+w.eval('showTab("sim")');
+
 w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();`);
 
 check('нет ошибок выполнения', errs.length === 0, errs.join('; '));
