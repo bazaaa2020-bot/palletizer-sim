@@ -122,13 +122,28 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 .tsel{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-left:auto}
 .opt{font-size:13.5px}.opt b{font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+#cfgText{width:100%;height:170px;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);padding:8px;resize:vertical;margin-top:10px}
+.rep h2{margin:0 0 2px;font-size:20px}
+.rep h3{margin:20px 0 6px;font-size:15px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.rep table{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0}
+.rep th,.rep td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top}
+.rep th{color:var(--muted);font-weight:600;white-space:nowrap}
+.rep td.k{color:var(--muted);width:40%}
+.rep .sub{color:var(--muted);font-size:12px;margin:2px 0 10px}
+.rep img{max-width:100%;border:1px solid var(--line);border-radius:6px}
+.rep ul{margin:6px 0;padding-left:20px}.rep li{margin:3px 0;font-size:13px}
+.rep svg.plan{background:var(--panel);border:1px solid var(--line);border-radius:6px}
+@media print{body{background:#fff}header,#tabs,#tab-rep>.panel:not(#repOut){display:none!important}
+ .tab{display:none!important}#tab-rep{display:block!important}
+ #repOut{box-shadow:none;border:0;padding:0}
+ .rep h3{page-break-after:avoid}.rep table,.rep img,.rep svg{page-break-inside:avoid}}
 </style>
 </head>
 <body>
 <header>
 <h1>Тренажёр РТК паллетизации</h1>
 <p>Соберите ячейку в конфигураторе — роботы, захват, коробки, конвейеры, паллеты, тип защиты. Тренажёр рассчитает укладку с перевязкой, вакуумный захват, досягаемость и производительность, предложит оптимальный вариант, выдаст состав АСУ ТП и опишет алгоритм работы обычным языком, а затем даст управлять ячейкой с пульта.</p>
-<nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="help">Задания и справочник</button></nav>
+<nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="rep">Отчёт и обмен</button><button data-tab="help">Задания и справочник</button></nav>
 </header>
 <main>
 <!-- ================= СИМУЛЯЦИЯ ================= -->
@@ -197,6 +212,23 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
  <div class="panel"><h2>Что означают элементы</h2><dl class="gl" id="gloss"></dl></div>
  </div>
  <div class="panel prose" id="stdText"></div>
+</section>
+<!-- ================= ОТЧЁТ И ОБМЕН ================= -->
+<section id="tab-rep" class="tab">
+ <div class="two">
+ <div class="panel"><h2>Конфигурация: сохранить и загрузить</h2>
+  <div class="field"><label>Название ячейки</label><input type="text" id="cfgName" value=""><small>Попадёт в имя файла и в заголовок отчёта</small></div>
+  <div class="btns"><button id="bSaveCfg" class="b-apply">Сохранить в файл (.json)</button><button id="bLoadCfg">Загрузить из файла…</button><button id="bCopyCfg">Показать и скопировать</button></div>
+  <input type="file" id="fCfg" accept=".json,application/json" hidden>
+  <p class="note" id="cfgMsg">Файл хранит все параметры ячейки: робот, захват, движения, коробки, паллеты и схемы укладки, конвейеры, прокладки, обмен паллет, безопасность и шину. Загрузка заменяет текущую конфигурацию и пересобирает симуляцию.</p>
+  <textarea id="cfgText" hidden spellcheck="false"></textarea>
+ </div>
+ <div class="panel"><h2>Отчёт по ячейке</h2>
+  <div class="btns"><button id="bMakeRep" class="b-apply">Сформировать отчёт</button><button id="bDlRep">Скачать отчёт (.html)</button><button id="bPrintRep">Печать / PDF</button></div>
+  <p class="note">В отчёт входят исходные данные, результаты расчёта, схема участка с габаритными размерами, 3D-компоновка, спецификация, список сигналов и замечания расчёта. Чтобы в отчёт попал 3D-вид, откройте вкладку «3D-вид» хотя бы раз — картинка снимается с работающей сцены.</p>
+ </div>
+ </div>
+ <div class="panel" id="repOut"></div>
 </section>
 </main>
 <script>

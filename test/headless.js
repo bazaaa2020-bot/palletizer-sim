@@ -218,6 +218,45 @@ check('в двухроботной ячейке обмен паллет идёт
 
 w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();`);
 
+console.log('Отчёт и обмен конфигурацией');
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.name='Тестовая ячейка';CFG.robot='pl130';CFG.robots=2;CFG.stations=2;CFG.grip.pick=4;CFG.grip.pitch='adj';CFG.motion.vPlace=120;CFG.boxes[0].l=450;CFG.conveyors.push(JSON.parse(JSON.stringify(CFG.conveyors[0])));renderCfg();buildSim();renderArch();`);
+const round = w.eval(`(()=>{const txt=cfgJSON();const back=cfgFromJSON(txt);
+ const keep=['robots','stations','robot','pallet','maxStack','patternMode','speedPct','name'];
+ const diff=keep.filter(k=>String(back[k])!==String(CFG[k]));
+ const deep2=[['grip.pick',back.grip.pick,CFG.grip.pick],['grip.pitch',back.grip.pitch,CFG.grip.pitch],
+  ['motion.vPlace',back.motion.vPlace,CFG.motion.vPlace],['boxes0.l',back.boxes[0].l,CFG.boxes[0].l],
+  ['conveyors',back.conveyors.length,CFG.conveyors.length]].filter(x=>String(x[1])!==String(x[2])).map(x=>x[0]);
+ const o=JSON.parse(txt);
+ return{bytes:txt.length,fmt:o.format,name:o.name,diff:diff.concat(deep2)};})()`);
+check('конфигурация выгружается в json', round.bytes > 400 && round.fmt === 'palletizer-sim/config@1' && round.name === 'Тестовая ячейка', `${round.bytes} байт, format=${round.fmt}`);
+check('выгрузка и загрузка не теряют параметров', round.diff.length === 0, 'разошлись: ' + round.diff.join(', '));
+
+const bad = w.eval(`(()=>{const r=[];
+ [['{"нет":1}','мусор'],['{"cfg":{"boxes":[]}}','без conveyors'],['не json','битый текст']].forEach(([t,n])=>{
+  try{cfgFromJSON(t);r.push(n+': принят');}catch(e){}});
+ return r;})()`);
+check('битый файл конфигурации отвергается', bad.length === 0, bad.join('; '));
+
+const applied = w.eval(`(()=>{const txt=cfgJSON();CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();
+ CFG=cfgFromJSON(txt);renderCfg();buildSim();renderArch();
+ return{robots:CFG.robots,pick:CFG.grip.pick,name:CFG.name,stations:DD.stations.length,placed:S.stats.placed};})()`);
+check('загруженная конфигурация применяется к симуляции', applied.robots === 2 && applied.pick === 4 && applied.stations === 4, JSON.stringify(applied));
+
+const rep = w.eval(`(()=>{const c=normalize(CFG),D=derive(c);const h=reportHTML(c,D,'');
+ const svg=planSVG(c,D,1000);
+ const need=['Коротко','Робот и движения','Захват','Тара и схемы укладки','Паллеты, станции и обмен','Конвейеры подачи','Безопасность и АСУ ТП','Схема участка с габаритами','Спецификация','Список сигналов','Замечания расчёта'];
+ const miss=need.filter(x=>h.indexOf(x)<0);
+ const std=reportStandalone(c,D,'');
+ return{len:h.length,miss,svgLen:svg.length,dims:(svg.match(/class="dimt"/g)||[]).length,
+  marker:svg.indexOf('marker-end')>=0,std:std.length,stdHead:std.slice(0,15),
+  note3d:h.indexOf('3D-вид недоступен')>=0};})()`);
+check('отчёт собирается со всеми разделами', rep.miss.length === 0 && rep.len > 4000, `${rep.len} символов; нет: ${rep.miss.join(', ')}`);
+check('в отчёте схема участка с размерными линиями', rep.svgLen > 2000 && rep.dims >= 4 && rep.marker, `${rep.dims} размеров, ${rep.svgLen} символов`);
+check('без three.js отчёт честно пишет, что 3D нет', rep.note3d);
+check('отдельный файл отчёта — валидный html', rep.stdHead.indexOf('<!doctype html>') === 0 && rep.std > rep.len, `${rep.std} байт`);
+
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();`);
+
 check('нет ошибок выполнения', errs.length === 0, errs.join('; '));
 console.log(failed ? `\nПровалено проверок: ${failed}` : '\nВсе проверки пройдены');
 process.exit(failed ? 1 : 0);

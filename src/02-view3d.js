@@ -66,7 +66,7 @@ function fenceWall(R,x0,z0,x1,z1,gaps){const len=Math.hypot(x1-x0,z1-z0);if(len<
    po.position.set(x0+ux*sPos,0,z0+uz*sPos);po.rotation.y=ang;R.add(po);}});}
 function init3D(){
  const wrap=$('v3wrap');if(typeof THREE==='undefined'){$('v3msg').textContent='Библиотека three.js не загрузилась — 3D-вид недоступен без доступа к cdnjs.cloudflare.com.';return;}
- let ren;try{ren=new THREE.WebGLRenderer({antialias:true,alpha:true});}catch(e){$('v3msg').textContent='WebGL недоступен в этом браузере — 3D-вид отключён.';return;}
+ let ren;try{ren=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});}catch(e){$('v3msg').textContent='WebGL недоступен в этом браузере — 3D-вид отключён.';return;}
  ren.setPixelRatio(Math.min(2,window.devicePixelRatio||1));wrap.appendChild(ren.domElement);
  const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(45,1.6,0.05,300);
  scene.add(new THREE.HemisphereLight(0xffffff,0x8a97a5,0.95));const dl=new THREE.DirectionalLight(0xffffff,0.65);dl.position.set(4,9,3);scene.add(dl);

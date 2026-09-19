@@ -53,7 +53,7 @@ function rayToRect(F,p,dx,dy){let t=Infinity;
  return isFinite(t)&&t>0?{x:p.x+dx*t,y:p.y+dy*t}:null;}
 const SLOT_ANGLES={1:[0],2:[-90,90],3:[-90,0,90],4:[-90,-30,30,90],5:[-90,-45,0,45,90],6:[-90,-54,-18,18,54,90]};
 const STN='ABCDEFGH';
-const DEF={robots:1,robot:'cb20',custom:{payload:10,reach:1300,cls:'cobot',cpm:8},speedPct:100,
+const DEF={name:'Ячейка паллетизации',robots:1,robot:'cb20',custom:{payload:10,reach:1300,cls:'cobot',cpm:8},speedPct:100,
  grip:{type:'cups',cup:'bellows',cupD:0,vac:60,pressure:5,pick:1,mass:0,pitch:'fixed',tShift:1.5},gripH:250,baseH:800,
  pallet:'EUR 1200×800',maxStack:1300,stations:2,magazines:1,patternMode:'interlock',slotR:950,pickDist:850,convH:700,convGap:900,
  sheet:{mode:'between',everyN:2,cap:20,low:3,speedPct:60,tGrip:1.0,sect:4},
