@@ -673,11 +673,15 @@ function fencePost(){const g=new THREE.Group();const p=box3(0.06,FENCE_H,0.06,CO
  const b=box3(0.15,0.014,0.15,COL3.post);b.position.y=0.007;g.add(b);return g;}
 // Световая завеса: излучатель и приёмник по краям проёма, между ними плоскость лучей.
 function curtain3(w,h,y0){const g=new THREE.Group(),caps=[];
- [-w/2,w/2].forEach(x=>{const c=box3(0.05,h+0.10,0.07,COL3.joint);c.position.set(x,y0+h/2,0);g.add(c);
-  const cap=box3(0.055,0.035,0.075,COL3.red);cap.position.set(x,y0+h+0.06,0);g.add(cap);caps.push(cap);});
- const pl=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat(COL3.red,{transparent:true,opacity:0.10,side:THREE.DoubleSide}));
- pl.position.y=y0+h/2;g.add(pl);
- const pts=[];for(let y=y0+0.06;y<y0+h;y+=0.12)pts.push(-w/2,y,0,w/2,y,0);
+ // Излучатель и приёмник — тонкие профили, привинченные к стойкам ограждения по краям
+ // проёма, поэтому они стоят внутри проёма и чуть впереди стойки, а не дублируют её.
+ const dx=Math.max(0.05,w/2-0.055),zo=0.04;
+ [-dx,dx].forEach(x=>{const c=box3(0.035,h+0.05,0.05,COL3.joint);c.position.set(x,y0+h/2,zo);g.add(c);
+  const cap=box3(0.04,0.028,0.055,COL3.red);cap.position.set(x,y0+h+0.04,zo);g.add(cap);caps.push(cap);});
+ const bw=2*dx;
+ const pl=new THREE.Mesh(new THREE.PlaneGeometry(bw,h),mat(COL3.red,{transparent:true,opacity:0.10,side:THREE.DoubleSide}));
+ pl.position.set(0,y0+h/2,zo);g.add(pl);
+ const pts=[];for(let y=y0+0.06;y<y0+h;y+=0.12)pts.push(-dx,y,zo,dx,y,zo);
  const beams=lines3(pts,COL3.red,0.35);g.add(beams);
  g.userData={plane:pl,beams,caps};return g;}
 // Напольная разметка сектора обмена — для коллаборативной ячейки без ограждения.
@@ -688,6 +692,8 @@ function setCurtain(g,hex){if(!g||!g.userData)return;const u=g.userData;
  if(u.plane)u.plane.material.color.setHex(hex);if(u.beams)u.beams.material.color.setHex(hex);
  if(u.caps)u.caps.forEach(c=>c.material.color.setHex(hex));}
 // Точка выхода луча из центра позиции наружу на линию ограждения и стена, в которую он упёрся.
+// Точка на стене w по расстоянию s от её начала.
+function wallPoint(F,w,s){return w===0?{x:F.x0+s,y:F.y0}:w===1?{x:F.x1,y:F.y0+s}:w===2?{x:F.x1-s,y:F.y1}:{x:F.x0,y:F.y1-s};}
 function fenceHit(F,cx,cy,dx,dy){let t=Infinity;
  if(dx>1e-6)t=Math.min(t,(F.x1-cx)/dx);if(dx<-1e-6)t=Math.min(t,(F.x0-cx)/dx);
  if(dy>1e-6)t=Math.min(t,(F.y1-cy)/dy);if(dy<-1e-6)t=Math.min(t,(F.y0-cy)/dy);
@@ -734,7 +740,13 @@ function build3D(){
  const grid=new THREE.GridHelper(Math.max(W,H),Math.round(Math.max(W,H)),0xb8c0c8,0xcdd3d9);grid.position.set(cx,0,cz);R.add(grid);
  // Проёмы в ограждении: под каждый конвейер и под обмен на каждой позиции вокруг робота.
  const F=D.F,ops=[[],[],[],[]],slotOp={},CH=FENCE_H-FENCE_GAP;
- const addOp=(hit,w)=>{if(!hit)return null;const o={s:hit.s,w,x:hit.x,y:hit.y,ang:hit.ang};ops[hit.w].push(o);return o;};
+ // Проёмы, попавшие на одну стену рядом, объединяем: иначе у общего проезда встают две
+ // завесы в одной точке и стойки задваиваются.
+ const addOp=(hit,w)=>{if(!hit)return null;const arr=ops[hit.w];
+  const ex=arr.find(o=>Math.abs(o.s-hit.s)<(o.w+w)/2);
+  if(ex){const s0=Math.min(ex.s-ex.w/2,hit.s-w/2),s1=Math.max(ex.s+ex.w/2,hit.s+w/2);
+   ex.s=(s0+s1)/2;ex.w=s1-s0;const p=wallPoint(F,hit.w,ex.s);ex.x=p.x;ex.y=p.y;return ex;}
+  const o={s:hit.s,w,x:hit.x,y:hit.y,ang:hit.ang,wall:hit.w};arr.push(o);return o;};
  const convOp=LY.convs.map(cv=>addOp(fenceHit(F,cv.x1,cv.y,-1,0),cv.w+150));
  const veh=c.exch.out!=='conveyor';
  const opW=sl=>sl.kind==='mg'?pal.L+300:(veh?Math.max(pal.L+300,2100):pal.L+300);
@@ -749,8 +761,10 @@ function build3D(){
    [-1,1].forEach(sx=>[-1,1].forEach(sz=>{const m=box3(0.05,0.07,0.05,COL3.joint);
     m.position.set((o.x+sx*250)*mm,c.convH*mm+0.12,(o.y+sz*(cv.w/2+90))*mm);R.add(m);}));});
   // завесы в проёмах обмена — на линии ограждения, а не над паллетой
-  Object.keys(slotOp).forEach(id=>{const o=slotOp[id];const g=curtain3(o.w*mm,CH,FENCE_GAP);
-   g.position.set(o.x*mm,0,o.y*mm);g.rotation.y=o.ang;R.add(g);V3.gates[id]=g;});
+  const built=new Map();
+  Object.keys(slotOp).forEach(id=>{const o=slotOp[id];let g=built.get(o);
+   if(!g){g=curtain3(o.w*mm,CH,FENCE_GAP);g.position.set(o.x*mm,0,o.y*mm);g.rotation.y=o.ang;R.add(g);built.set(o,g);}
+   V3.gates[id]=g;});
   // дверь на петле с замком
   if(doorOp){const dg=new THREE.Group();dg.position.set(doorOp.x*mm,0,doorOp.y*mm);dg.rotation.y=doorOp.ang;R.add(dg);
    const leaf=new THREE.Group();leaf.position.x=-0.5;dg.add(leaf);const dp=fencePanel(0.95);dp.position.x=0.5;leaf.add(dp);
@@ -846,10 +860,12 @@ function render3D(){
    R.plate.scale.set((nc*hb.l*mm-0.01)/R.pw,1,(nr*hb.w*mm-0.01)/R.pd);}
   else R.plate.scale.set(1,1,1);});
  D.LY.convs.forEach((cv,i)=>{const key='cv'+i;if(!V3.pools[key])V3.pools[key]=[];const pool=V3.pools[key],b=cv.b,col=COL3.box[cv.bi%4];S.conv[i].boxes.forEach((bx,j)=>{if(!pool[j]){pool[j]=box3(b.l*mm-0.01,b.h*mm,b.w*mm-0.01,col);dyn.add(pool[j]);}const m=pool[j];m.visible=true;m.position.set((cv.x0+b.l/2+bx.p*(cv.len-b.l))*mm,(c.convH+b.h/2)*mm,cv.y*mm);});for(let j=S.conv[i].boxes.length;j<pool.length;j++)pool[j].visible=false;});
+ V3.gw=new Map();
  S.st.forEach(s=>{const st=V3.stations[s.id];if(!st)return;const sig=`${s.present}|${s.layer}|${s.placed.length}|${s.parity}|${s.sheetLayers.length}|${s.complete}`;if(V3.cache[s.id]!==sig){V3.cache[s.id]=sig;buildStation3(s);}
   const off=s.phase==='out'?s.out*(pal.W+600):0;st.outer.position.set((s.slot.cx+s.slot.cos*off)*mm,0,(s.slot.cy+s.slot.sin*off)*mm);
-  setCurtain(V3.gates[s.id],s.phase==='out'||(released(s)&&c.exch.out!=='conveyor')?COL3.off:COL3.red);});
- S.mags.forEach(m=>{const st=V3.mags[m.id];if(!st)return;const hh=Math.max(0.004,m.sheets*0.004);st.scale.y=hh;st.position.y=pal.h*mm+hh/2;setCurtain(V3.gates[m.id],m.loading?COL3.off:COL3.red);});
+  const gg=V3.gates[s.id];if(gg)V3.gw.set(gg,(V3.gw.get(gg)||false)||s.phase==='out'||(released(s)&&c.exch.out!=='conveyor'));});
+ S.mags.forEach(m=>{const st=V3.mags[m.id];if(!st)return;const hh=Math.max(0.004,m.sheets*0.004);st.scale.y=hh;st.position.y=pal.h*mm+hh/2;const gg=V3.gates[m.id];if(gg)V3.gw.set(gg,(V3.gw.get(gg)||false)||m.loading);});
+ V3.gw.forEach((off,g)=>setCurtain(g,off?COL3.off:COL3.red));
  S.stacks.forEach(p=>{const st=V3.stacks[p.id];if(!st)return;const sig='ps'+p.n;if(V3.cache[p.id]!==sig){V3.cache[p.id]=sig;clear3(st.g);for(let i=0;i<p.n;i++){const pm=palletMesh(pal);pm.position.y=i*pal.h*mm;st.g.add(pm);}}});
  const seen=new Set();S.agents.forEach(a=>{seen.add(a.id);let g=V3.agents[a.id];if(!g){g=agentMesh(a);V3.agents[a.id]=g;}g.position.set(a.x*mm,0,a.y*mm);g.rotation.y=-a.target.slot.ang*Math.PI/180;const u=g.userData;const byHand=a.carry==='sheets'&&a.kind!=='amr';u.carry.visible=!!a.carry&&!byHand;u.hand.visible=byHand;u.load.visible=a.carry==='full';u.sheets.visible=a.carry==='sheets';if(a.carry==='full')u.load.material.color.setHex(COL3.box[(a.target.bi||0)%4]);});
  Object.keys(V3.agents).forEach(id=>{if(!seen.has(+id)){dyn.remove(V3.agents[id]);delete V3.agents[id];}});
