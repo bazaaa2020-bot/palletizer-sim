@@ -31,6 +31,26 @@ const EXCH_IN={vehicle:'Та же тележка привозит пустую �
 const SHEETS_BY={person:'Человек докладывает листы в магазин',amr:'AMR привозит паллету с листами (замена магазина целиком)'};
 const AGENT={person:{v:1.0,lift:2,name:'человек'},jack:{v:0.8,lift:4,name:'человек с рохлей'},forklift:{v:1.5,lift:3,name:'погрузчик'},amr:{v:1.0,lift:5,name:'AMR'}};
 const CUP_D=[30,40,50,60,80,100,125];
+// Транспорт обмена: габарит по ширине и вылет площадки ожидания за ограждением.
+const VEH={jack:{w:800,park:1500},forklift:{w:1400,park:2600},amr:{w:1000,park:1800},conveyor:{w:800,park:1200}};
+function vehOf(c){return VEH[c.exch.out]||VEH.jack;}
+// Пересечение отрезка с прямоугольником (возможно повёрнутым), раздутым на halfW.
+function segBox(p0,p1,o,halfW){const t=-(o.ang||0)*Math.PI/180,ct=Math.cos(t),st=Math.sin(t);
+ const tr=p=>({x:(p.x-o.x)*ct-(p.y-o.y)*st,y:(p.x-o.x)*st+(p.y-o.y)*ct});
+ const a=tr(p0),b=tr(p1),hx=o.hx+halfW,hy=o.hy+halfW,dx=b.x-a.x,dy=b.y-a.y;
+ let t0=0,t1=1;
+ for(const [pp,qq] of [[-dx,a.x+hx],[dx,hx-a.x],[-dy,a.y+hy],[dy,hy-a.y]]){
+  if(Math.abs(pp)<1e-9){if(qq<0)return false;}
+  else{const r=qq/pp;if(pp<0){if(r>t1)return false;if(r>t0)t0=r;}else{if(r<t0)return false;if(r<t1)t1=r;}}}
+ return true;}
+function segCircle(p0,p1,o,halfW){const dx=p1.x-p0.x,dy=p1.y-p0.y,l2=dx*dx+dy*dy;
+ let t=l2?((o.x-p0.x)*dx+(o.y-p0.y)*dy)/l2:0;t=clamp(t,0,1);
+ return Math.hypot(p0.x+dx*t-o.x,p0.y+dy*t-o.y)<o.rad+halfW;}
+// Точка выхода луча из p по (dx,dy) на прямоугольник F.
+function rayToRect(F,p,dx,dy){let t=Infinity;
+ if(dx>1e-6)t=Math.min(t,(F.x1-p.x)/dx);if(dx<-1e-6)t=Math.min(t,(F.x0-p.x)/dx);
+ if(dy>1e-6)t=Math.min(t,(F.y1-p.y)/dy);if(dy<-1e-6)t=Math.min(t,(F.y0-p.y)/dy);
+ return isFinite(t)&&t>0?{x:p.x+dx*t,y:p.y+dy*t}:null;}
 const SLOT_ANGLES={1:[0],2:[-90,90],3:[-90,0,90],4:[-90,-30,30,90],5:[-90,-45,0,45,90],6:[-90,-54,-18,18,54,90]};
 const STN='ABCDEFGH';
 const DEF={robots:1,robot:'cb20',custom:{payload:10,reach:1300,cls:'cobot',cpm:8},speedPct:100,
@@ -155,18 +175,58 @@ function convCalc(cv,b,k){
 // ======================= КОМПОНОВКА =======================
 function layout(c,D){
  const pal=D.pal,nR=c.robots,nPS=c.exch.in==='robot'?1:0,K=c.stations+c.magazines+nPS,ang=SLOT_ANGLES[Math.min(K,6)].slice();
- const ord=ang.slice().sort((a,b)=>Math.abs(b)-Math.abs(a));const stAng=ord.slice(0,c.stations).sort((a,b)=>a-b),rest=ord.slice(c.stations,K);const mgAng=rest.slice(0,c.magazines),psAng=rest.slice(c.magazines);
- let dmin=180;if(K>1){const s=ang.slice().sort((a,b)=>a-b);for(let i=1;i<s.length;i++)dmin=Math.min(dmin,s[i]-s[i-1]);}
+ const veh=vehOf(c),aisle=Math.max(1000,veh.w+700),hw=veh.w/2+100;
+ // Раздача углов. При двух роботах позиции, смотрящие на соседа, заперты чужой стопой:
+ // туда уходят магазины (их обслуживает человек с листами), а станции и стопка паллет
+ // получают внешние углы — к ним подъезжает техника. Робот 2 зеркалит набор.
+ let stAng,mgAng,psAng;
+ if(nR>1){const ord=ang.slice().sort((a,b)=>a-b);
+  stAng=ord.slice(0,c.stations);const rest=ord.slice(c.stations);psAng=rest.slice(0,nPS);mgAng=rest.slice(nPS);}
+ else{const ord=ang.slice().sort((a,b)=>Math.abs(b)-Math.abs(a));
+  stAng=ord.slice(0,c.stations);const rest=ord.slice(c.stations,K);mgAng=rest.slice(0,c.magazines);psAng=rest.slice(c.magazines);}
+ stAng=stAng.slice().sort((a,b)=>a-b);
+ let dmin=180;if(K>1){const sA=ang.slice().sort((a,b)=>a-b);for(let i=1;i<sA.length;i++)dmin=Math.min(dmin,sA[i]-sA[i-1]);}
  const Rmin=K>1?(pal.L+150)/(2*Math.sin(dmin/2*Math.PI/180)):0;const R=Math.max(c.slotR,Math.ceil(Rmin/10)*10);
- const half=Math.hypot(pal.W,pal.L)/2;const pitch=2*(R+half)+500;const parkD=half+700+1000;
- const robots=[];for(let i=0;i<nR;i++){const base={x:0,y:i*pitch};const slots=[];
-  const mk=(kind,idx,id,a)=>{const t=a*Math.PI/180,cs=Math.cos(t),sn=Math.sin(t);slots.push({kind,idx,id,ang:a,cx:base.x+R*cs,cy:base.y+R*sn,cos:cs,sin:sn,robot:i,park:{x:base.x+(R+parkD)*cs,y:base.y+(R+parkD)*sn},gate:{x:base.x+(R+pal.W/2+350)*cs,y:base.y+(R+pal.W/2+350)*sn}});};
+ const half=Math.hypot(pal.W,pal.L)/2;const pitch=2*(R+half)+aisle;const parkD=veh.park;
+ const robots=[];for(let i=0;i<nR;i++){const base={x:0,y:i*pitch},sgn=(nR>1&&i>0)?-1:1;const slots=[];
+  const mk=(kind,idx,id,a0)=>{const a=a0*sgn,t=a*Math.PI/180,cs=Math.cos(t),sn=Math.sin(t);
+   slots.push({kind,idx,id,ang:a,cx:base.x+R*cs,cy:base.y+R*sn,cos:cs,sin:sn,robot:i});};
   stAng.forEach((a,j)=>mk('st',j,STN[i*c.stations+j],a));mgAng.forEach((a,j)=>mk('mg',j,'M'+(i*c.magazines+j+1),a));psAng.forEach((a,j)=>mk('ps',j,'П'+(i+1),a));
   robots.push({i,base,home:{x:-350,y:base.y},slots,convs:[]});}
  c.conveyors.forEach((cv,i)=>{robots[i%nR].convs.push(i);});
  const convs=c.conveyors.map((cv,i)=>{const r=robots[i%nR],j=r.convs.indexOf(i),m=r.convs.length,b=boxOf(c,cv.box);const y=r.base.y+(m===1?0:(j-(m-1)/2)*c.convGap);return{robot:i%nR,y,w:b.w+120,x1:-c.pickDist+b.l/2,x0:-c.pickDist+b.l/2-cv.len*1000,len:cv.len*1000,b,bi:cv.box};});
+ const all=robots.flatMap(r=>r.slots);
+ let xs=[],ys=[];all.forEach(s=>{xs.push(s.cx-half,s.cx+half);ys.push(s.cy-half,s.cy+half);});convs.forEach(cv=>{ys.push(cv.y-cv.w/2,cv.y+cv.w/2);});
+ const F={x0:-(c.pickDist+400),x1:Math.max(...xs)+700,y0:Math.min(...ys)-700,y1:Math.max(...ys)+700};
+ // --- маршрут подъезда к каждой позиции ---
+ // Кандидаты: радиально к стене; прямо по +X к стене; выход в межроботный проезд и по нему
+ // к стене. Берём самый короткий, чей коридор шириной с технику свободен от стоп, роботов
+ // и конвейеров. Если свободного нет — позиция помечается заблокированной (предупреждение).
+ const obs=all.map(s=>({id:s.id,x:s.cx,y:s.cy,ang:s.ang,hx:pal.W/2,hy:pal.L/2}))
+  .concat(robots.map(r=>({id:'R'+r.i,x:r.base.x,y:r.base.y,rad:400})))
+  .concat(convs.map((cv,k)=>({id:'CV'+k,x:(cv.x0+cv.x1)/2,y:cv.y,ang:0,hx:cv.len/2,hy:cv.w/2})));
+ const clearPath=(pts,skip)=>{for(let k=1;k<pts.length;k++)for(const o of obs){if(o.id===skip)continue;
+   if(o.rad!==undefined){if(segCircle(pts[k-1],pts[k],o,hw))return false;}
+   else if(segBox(pts[k-1],pts[k],o,hw))return false;}
+  return true;};
+ const plen=pts=>{let L=0;for(let k=1;k<pts.length;k++)L+=Math.hypot(pts[k].x-pts[k-1].x,pts[k].y-pts[k-1].y);return L;};
+ const aisles=[];for(let i=1;i<nR;i++)aisles.push(i*pitch-pitch/2);
+ all.forEach(s=>{const c0={x:s.cx,y:s.cy},cand=[];
+  const add=pts=>{if(pts.every(Boolean))cand.push([c0].concat(pts));};
+  add([rayToRect(F,c0,s.cos,s.sin)]);
+  add([rayToRect(F,c0,1,0)]);
+  aisles.forEach(ay=>{const turn={x:s.cx,y:ay};add([turn,rayToRect(F,turn,1,0)]);});
+  // коридор меряем от кромки паллеты: у самой позиции техника и так стоит вплотную
+  const fromEdge=pts=>{const dx=pts[1].x-pts[0].x,dy=pts[1].y-pts[0].y,L=Math.hypot(dx,dy)||1,off=pal.L/2+150;
+   return off<L?[{x:pts[0].x+dx/L*off,y:pts[0].y+dy/L*off}].concat(pts.slice(1)):pts.slice(1);};
+  const ok=cand.filter(p=>clearPath(fromEdge(p),s.id)).sort((a,b)=>plen(a)-plen(b));
+  const best=ok[0]||cand[0]||[c0,{x:F.x1,y:s.cy}];
+  s.blocked=!ok.length;s.route=best.slice(1);s.gate=s.route[s.route.length-1];
+  const prev=s.route.length>1?s.route[s.route.length-2]:c0;
+  const dx=s.gate.x-prev.x,dy=s.gate.y-prev.y,L=Math.hypot(dx,dy)||1;
+  s.acc={x:dx/L,y:dy/L};s.park={x:s.gate.x+s.acc.x*parkD,y:s.gate.y+s.acc.y*parkD};});
  const cw=(s,p)=>({x:s.cx+s.cos*p.x-s.sin*p.y,y:s.cy+s.sin*p.x+s.cos*p.y});
- return{R,Rmin,pitch,robots,convs,cw,half,parkD};}
+ return{R,Rmin,pitch,robots,convs,cw,half,parkD,F,aisle,veh,blocked:all.filter(s=>s.blocked).map(s=>s.id)};}
 // ======================= РАСЧЁТ КОНФИГУРАЦИИ =======================
 function derive(c,light){
  normalize(c);const rob=robotOf(c),pal=PALLETS[c.pallet]||PALLETS['EUR 1200×800'],safety=safetyMode(c,rob),n=c.conveyors.length,nR=c.robots,k=c.grip.pick;
@@ -211,9 +271,10 @@ function derive(c,light){
  // безопасность
  const Tlc=c.tStop+0.03;let Slc=2000*Tlc+8*(30-14);if(Slc>500)Slc=Math.max(500,1600*Tlc+128);D.Slc=Slc;const Tsc=c.tStop+0.1;D.Ssc=1600*Tsc+(1200-0.4*300);
  D.halfDiag=Math.hypot(heaviest.l*k,heaviest.w)/2;D.rSlow=rob.reach+D.halfDiag+D.Ssc;D.rStop=rob.reach+D.halfDiag+300;
- let xs=[],ys=[];LY.robots.forEach(r=>r.slots.forEach(s=>{xs.push(s.cx-LY.half,s.cx+LY.half);ys.push(s.cy-LY.half,s.cy+LY.half);}));LY.convs.forEach(cv=>{ys.push(cv.y-cv.w/2,cv.y+cv.w/2);});
- D.F={x0:-(c.pickDist+400),x1:Math.max(...xs)+700,y0:Math.min(...ys)-700,y1:Math.max(...ys)+700};D.fencePerim=2*((D.F.x1-D.F.x0)+(D.F.y1-D.F.y0));
+ D.F=LY.F;D.fencePerim=2*((D.F.x1-D.F.x0)+(D.F.y1-D.F.y0));
  D.warnings=[];const w=D.warnings;
+ if(LY.blocked.length)w.push(`Нет свободного подъезда к позици${LY.blocked.length>1?'ям':'и'} ${LY.blocked.join(', ')}: коридор шириной ${f0(LY.veh.w)} мм под ${EXCH_OUT[c.exch.out].toLowerCase()} перекрыт соседними паллетами или конвейером. Уменьшите число позиций вокруг робота, увеличьте радиус расстановки или смените способ вывоза.`);
+ if(c.robots>1)w.push(`Проезд между роботами ${f0(LY.aisle)} мм — под ${EXCH_OUT[c.exch.out].toLowerCase()}. Станции вынесены на внешние углы, магазины смотрят в проезд: за листами ходит человек, за паллетами заезжает техника.`);
  if(LY.R>c.slotR)w.push(`Радиус расстановки увеличен до ${f0(LY.R)} мм: при ${c.stations+c.magazines+D.stacks.length/nR} позициях вокруг робота паллеты иначе перекрывались бы.`);
  if(D.reachStatus==='bad')w.push(`Робот не достаёт: ${rWhere} — нужно ${f0(rReq)} мм при досягаемости ${f0(rob.reach)} мм. Уменьшите число позиций или радиус, высоту стопы, либо возьмите робота с большей досягаемостью.`);
  else if(D.reachStatus==='warn')w.push(`Запас по досягаемости меньше 10 % (${rWhere}): на краю зоны кисть теряет ориентацию.`);

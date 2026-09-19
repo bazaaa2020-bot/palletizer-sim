@@ -79,6 +79,10 @@ function renderChecks(D){
   ['Грузоподъёмность',bd(D.payStatus,`${f1(D.mReq)} / ${D.rob.payload} кг · ${f0(D.util*100)} %`),`${c.grip.pick>1?c.grip.pick+' × ':''}${D.heaviest.m} кг + захват ${f1(D.gripM)} кг${c.exch.in==='robot'?'; паллета '+D.pal.m+' кг':''}`],
   ['Захват',bd(D.grip.status,`${f0(D.grip.Fth)} / ${f0(D.grip.Fcap)} Н · ${f0(D.grip.util*100)} %`),`${GRIPPERS[c.grip.type].name}; ${D.grip.case}; захват ${f2(D.grip.tGrip)} с`]];
  if(c.grip.pick>1)Object.values(D.pats).forEach(p=>rows.push(['Группы захвата',bd(p.adjUsed?'ok':'warn',`${p.groupsPerPallet} ходов на паллету${p.adjUsed?` · ${p.shapes}`:' · только ряды'}`),p.adjUsed?`Регулируемый шаг зон: рядами было бы ${p.rowGroups} ходов; ${p.shifts} перестроений по ${f1(p.tShift)} с = ${f1(p.shifts*p.tShift)} с на паллету`:`Фиксированный шаг зон — группа только ряд вплотную; ${f1(p.kEff)} коробки за ход из ${c.grip.pick}`]));
+ {const sl=D.LY.robots.flatMap(r=>r.slots),bl=D.LY.blocked.length;
+  const fmt=s=>`${s.id}: ${s.route.length>1?'через проезд':'напрямую'}`;
+  rows.push(['Подъезд к позициям',bd(bl?'bad':'ok',bl?`заперто ${bl}`:`${sl.length} позиц. · коридор ${f0(D.LY.veh.w)} мм`),
+   bl?`Нет свободного маршрута к ${D.LY.blocked.join(', ')} — тележка пойдёт напрямую через оборудование`:sl.map(fmt).join('; ')]);}
  Object.values(D.pats).forEach(p=>rows.push(['Схема укладки',bd(p.interlock?'ok':(c.patternMode==='column'?'ok':'warn'),`${p.n} в слое · ${p.layers} слоёв · ${p.total} шт.${c.grip.pick>1?` · ${f1(p.kEff)} за ход`:''}`),`${p.name}; ${p.stability}; заполнение ${f0(p.fill*100)} %; стопа ${f0(p.stackH)} мм, ${f0(p.mass)} кг`]));
  rows.push(['Цикл робота',bd('ok',`${f1(D.tCycle)} с · ${f1(D.cpm)} циклов/мин`),`геометрия ${f1(D.tCycleModel)} с, норматив ${f1(D.tCycleNorm)} с${c.sheet.mode!=='none'?`; цикл с листом ${f1(D.tSheet)} с`:''}${c.exch.in==='robot'?`; с паллетой ${f1(D.tPallet)} с`:''}`],
   ['На паллету',bd('ok',`${D.cyclesPerPallet} циклов · ${f1(D.tPerPallet/60)} мин`),`${f1(D.tPerBox)} с на коробку${c.stations===1?`; простой на обмен ${f0(D.exLoss*100)} %`:''}; ${c.robots>1?'два робота: ':''}${f0(D.capRobot)} кор/ч`],
@@ -200,9 +204,12 @@ function buildStatic(){
   const [dx0,dy]=P(F.x1-1100,F.y1),[dx1]=P(F.x1-300,F.y1);s+=`<rect x="${dx0}" y="${dy-6}" width="${dx1-dx0}" height="12" fill="var(--bg)"/><line id="doorLine" data-x2="${dx1}" x1="${dx0}" y1="${dy}" x2="${dx1}" y2="${dy}" stroke="var(--fence)" stroke-width="5"/><circle id="lockDot" cx="${dx1+9}" cy="${dy}" r="6" fill="var(--green)"/><text x="${dx0}" y="${dy-9}" font-size="10" fill="var(--muted)">дверь S2/S3, замок Q1</text>`;}
  else LY.robots.forEach(r=>{const [bx,by]=P(r.base.x,r.base.y);s+=`<circle cx="${bx}" cy="${by}" r="${D.rSlow*sc}" fill="var(--yellow)" fill-opacity=".07" stroke="var(--yellow)" stroke-dasharray="6 5"/><circle cx="${bx}" cy="${by}" r="${D.rStop*sc}" fill="var(--red)" fill-opacity=".05" stroke="var(--red)" stroke-dasharray="6 5"/>`;if(r.i===0)s+=`<text x="${bx+D.rStop*sc*0.7}" y="${by-D.rStop*sc*0.72}" font-size="10" fill="var(--red)">защитное поле</text><text x="${bx+Math.min(D.rSlow,G.rDraw)*sc*0.6}" y="${by-Math.min(D.rSlow,G.rDraw)*sc*0.8}" font-size="10" fill="var(--warnfg)">поле снижения скорости S=${f0(D.Ssc)} мм</text>`;});
  // проёмы обмена (завеса/сектор) у станций, магазинов, стопок
- LY.robots.forEach(r=>r.slots.forEach(sl=>{const isConvOut=sl.kind==='st'&&ex.out==='conveyor';const d=pal.W/2+250,L2=pal.L/2+100;const [ax,ay]=P(sl.cx+sl.cos*d-sl.sin*(-L2),sl.cy+sl.sin*d+sl.cos*(-L2)),[bx,by]=P(sl.cx+sl.cos*d-sl.sin*L2,sl.cy+sl.sin*d+sl.cos*L2);
-  s+=`<line id="gate-${sl.id}" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="var(--red)" stroke-width="3"/><text x="${(ax+bx)/2+sl.cos*10}" y="${(ay+by)/2+sl.sin*10+4}" font-size="10" text-anchor="middle" fill="var(--muted)">${D.safety==='fence'?(sl.kind==='st'?'S6'+sl.id:sl.kind==='mg'?'S7.'+sl.id:'S8'):'сектор '+sl.id}</text>`;
-  if(!isConvOut&&sl.kind!=='ps'){const [px,py]=P(sl.park.x,sl.park.y);s+=`<rect x="${px-14}" y="${py-14}" width="28" height="28" rx="4" fill="none" stroke="var(--line)" stroke-dasharray="3 3"/><circle id="lamp-${sl.id}" cx="${px+sl.cos*22}" cy="${py+sl.sin*22}" r="4" fill="var(--off)"/>`;}}));
+ LY.robots.forEach(r=>r.slots.forEach(sl=>{const isConvOut=sl.kind==='st'&&ex.out==='conveyor';const L2=pal.L/2+100,ac=sl.acc;
+  const [ax,ay]=P(sl.gate.x-ac.y*(-L2),sl.gate.y+ac.x*(-L2)),[bx,by]=P(sl.gate.x-ac.y*L2,sl.gate.y+ac.x*L2);
+  const rt=[{x:sl.cx,y:sl.cy}].concat(sl.route).map(q=>P(q.x,q.y));
+  s+=`<polyline points="${rt.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ')}" fill="none" stroke="var(--blue)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".45"/>`;
+  s+=`<line id="gate-${sl.id}" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="var(--red)" stroke-width="3"/><text x="${(ax+bx)/2+ac.x*10}" y="${(ay+by)/2+ac.y*10+4}" font-size="10" text-anchor="middle" fill="var(--muted)">${D.safety==='fence'?(sl.kind==='st'?'S6'+sl.id:sl.kind==='mg'?'S7.'+sl.id:'S8'):'сектор '+sl.id}</text>`;
+  if(!isConvOut&&sl.kind!=='ps'){const [px,py]=P(sl.park.x,sl.park.y);s+=`<rect x="${px-14}" y="${py-14}" width="28" height="28" rx="4" fill="none" stroke="var(--line)" stroke-dasharray="3 3"/><circle id="lamp-${sl.id}" cx="${px+ac.x*22}" cy="${py+ac.y*22}" r="4" fill="var(--off)"/>`;}}));
  LY.convs.forEach((cv,i)=>{const [x0,y0]=P(cv.x0,cv.y-cv.w/2),[x1,y1]=P(cv.x1,cv.y+cv.w/2);s+=`<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" rx="3" fill="var(--dim)" stroke="var(--line)"/>`;
   if(75*sc>3.5)for(let x=cv.x0+75;x<cv.x1;x+=75){const [rx]=P(x,0);s+=`<line x1="${rx}" y1="${y0+2}" x2="${rx}" y2="${y1-2}" stroke="var(--line)"/>`;}
   const [exx]=P(cv.x1-30,0);s+=`<rect x="${exx}" y="${y0-2}" width="4" height="${y1-y0+4}" fill="var(--ink)"/><text x="${x0}" y="${y0-5}" font-size="10" fill="var(--muted)">конвейер ${i+1}: ${cv.b.name} ${cv.b.m} кг · ${c.conveyors[i].feed==='manual'?'ручная подача':'автоподача'} → робот ${cv.robot+1}</text>`;
@@ -382,26 +389,32 @@ function finishStop(){S.conv.forEach(cv=>cv.vfd.sto=true);allPower(false);setSta
 function done(id){S.tasks[id]=true;const t=TASKS.find(t=>t[0]===id);log('Задание выполнено: '+t[1]);try{localStorage.setItem('pal-sim-tasks4',JSON.stringify(S.tasks));}catch(e){}}
 // ---------- агенты: человек, рохля, погрузчик, AMR ----------
 function dispatch(task,target,kind){
- const c=CFG;if(target.agent)return false;const A=AGENT[kind];const a={id:S.nextId++,kind,task,target,x:target.slot.park.x,y:target.slot.park.y,park:target.slot.park,phase:'go',t:0,carry:task==='sheets'?(kind==='amr'?'sheets':'sheets'):null,crossed:false,v:A.v,lift:A.lift};
+ const c=CFG;if(target.agent)return false;const A=AGENT[kind];const a={id:S.nextId++,kind,task,target,x:target.slot.park.x,y:target.slot.park.y,park:target.slot.park,phase:'go',leg:0,t:0,carry:task==='sheets'?(kind==='amr'?'sheets':'sheets'):null,crossed:false,v:A.v,lift:A.lift};
  target.agent=a;S.agents.push(a);S.flags.agentSeen.add(kind);
  if(task==='pallet')log(kind==='amr'?`AMR: заявка на станцию ${target.id} принята флот-менеджером, тележка выехала`:`${A.name[0].toUpperCase()+A.name.slice(1)} подъезжает к проёму станции ${target.id}`);
  else log(kind==='amr'?`AMR везёт паллету с листами к магазину ${target.id}`:`Оператор идёт к магазину ${target.id} с листами`);
  return true;}
 function agentTick(a,dt){
- const c=CFG,D=DD,s=a.target,slot=s.slot,gateD=D.pal.W/2+350;const move=(to,f)=>{const d=Math.hypot(to.x-a.x,to.y-a.y),v=a.v*1000*(f||1)*dt;if(d<=v){a.x=to.x;a.y=to.y;return true;}a.x+=(to.x-a.x)/d*v;a.y+=(to.y-a.y)/d*v;return false;};
- const center=(a.task==='sheets'&&a.kind!=='amr')?{x:slot.cx+slot.cos*(D.pal.W/2+300),y:slot.cy+slot.sin*(D.pal.W/2+300)}:{x:slot.cx,y:slot.cy};
- const crossing=()=>{const d=Math.hypot(a.x-slot.cx,a.y-slot.cy);if(d<gateD&&!a.crossed){a.crossed=true;const ok=a.task==='pallet'?released(s):!robotBusyAt(s.id);
+ const c=CFG,D=DD,s=a.target,slot=s.slot;const move=(to,f)=>{const d=Math.hypot(to.x-a.x,to.y-a.y),v=a.v*1000*(f||1)*dt;if(d<=v){a.x=to.x;a.y=to.y;return true;}a.x+=(to.x-a.x)/d*v;a.y+=(to.y-a.y)/d*v;return false;};
+ const center=(a.task==='sheets'&&a.kind!=='amr')?{x:slot.cx+slot.acc.x*(D.pal.W/2+300),y:slot.cy+slot.acc.y*(D.pal.W/2+300)}:{x:slot.cx,y:slot.cy};
+ // Тележка идёт не по прямой, а маршрутом позиции: площадка → проём → свободный коридор →
+ // паллета, и тем же путём обратно. Маршрут посчитан в layout() с проверкой на габарит.
+ const inb=slot.route.slice().reverse().concat([center]),outb=slot.route.concat([a.park]);
+ const follow=(L,onGate)=>{if(a.leg>=L.length)return true;
+  if(move(L[a.leg])){const was=a.leg;a.leg++;if(onGate&&was===0)onGate();}
+  return a.leg>=L.length;};
+ const crossing=()=>{if(!a.crossed){a.crossed=true;const ok=a.task==='pallet'?released(s):!robotBusyAt(s.id);
   if(ok){if(a.task==='sheets'){s.loading=true;}log(D.safety==='fence'?`Проём ${a.task==='pallet'?'S6'+s.id:'S7.'+s.id}: станция освобождена — завеса в мьютинге (MUTE${s.id}=1), ${AGENT[a.kind].name} входит`:`Сканер: сектор ${s.id} исключён из защитного поля (LS.SET), ${AGENT[a.kind].name} входит`);}
-  else{log(`${AGENT[a.kind].name[0].toUpperCase()+AGENT[a.kind].name.slice(1)} пересёк проём ${s.id}, пока робот работает на этой позиции`,'alarm');protectiveStop(`Пересечён проём ${s.id} без освобождения (${D.safety==='fence'?'S6'+s.id+' не в мьютинге':'сектор в защитном поле'})`,D.safety!=='fence');S.lc.fault=D.safety==='fence';a.phase='back';a.carry=null;}}};
+  else{log(`${AGENT[a.kind].name[0].toUpperCase()+AGENT[a.kind].name.slice(1)} пересёк проём ${s.id}, пока робот работает на этой позиции`,'alarm');protectiveStop(`Пересечён проём ${s.id} без освобождения (${D.safety==='fence'?'S6'+s.id+' не в мьютинге':'сектор в защитном поле'})`,D.safety!=='fence');S.lc.fault=D.safety==='fence';a.phase='back';a.leg=slot.route.length;a.carry=null;}}};
  switch(a.phase){
-  case 'go':crossing();if(a.phase!=='go')break;if(move(center)){a.phase=a.task==='pallet'?'lift':'load';a.t=a.task==='pallet'?a.lift:2+c.sheet.cap/10;}break;
-  case 'lift':a.t-=dt;if(a.t<=0){if(s.present){s.present=false;a.carry='full';S.stats.exch++;log(`${AGENT[a.kind].name[0].toUpperCase()+AGENT[a.kind].name.slice(1)} забрал паллету ${s.id} (B${s.id}=0)`);if(S.flags.palletDone)S.flags.palletRemoved=true;}a.phase='back';}break;
-  case 'load':a.t-=dt;if(a.t<=0){s.sheets=c.sheet.cap;s.loading=false;S.stats.refills++;a.carry=null;log(a.kind==='amr'?`AMR заменил магазин ${s.id}: ${c.sheet.cap} листов (B4=1), уезжает`:`Оператор доложил листы в ${s.id} до ${c.sheet.cap}, нажал «готово» (SB4.${s.id})`);S.tasks.t14||done('t14');a.phase='back';}break;
-  case 'back':if(move(a.park)){if(a.task==='pallet'&&a.carry==='full'){a.phase='drop';a.t=3;}else a.phase='done';}break;
-  case 'drop':a.t-=dt;if(a.t<=0){a.carry=null;if(c.exch.in==='vehicle'){a.carry='empty';a.phase='go2';a.crossed=false;log(`${AGENT[a.kind].name[0].toUpperCase()+AGENT[a.kind].name.slice(1)} везёт пустую паллету на станцию ${s.id}`);}else a.phase='done';}break;
-  case 'go2':crossing();if(a.phase!=='go2')break;if(move(center)){a.phase='set';a.t=a.lift*0.7;}break;
-  case 'set':a.t-=dt;if(a.t<=0){Object.assign(s,newPal(true),{agent:a});if(c.sheet.mode==='bottom'&&S.mags.length)s.needSheet=true;a.carry=null;log(`Пустая паллета на станции ${s.id} (B${s.id}=1)`);if(S.flags.palletRemoved&&!S.tasks.t5)done('t5');a.phase='back2';}break;
-  case 'back2':if(move(a.park))a.phase='done';break;}
+  case 'go':{const done=follow(inb,crossing);if(a.phase!=='go')break;if(done){a.phase=a.task==='pallet'?'lift':'load';a.t=a.task==='pallet'?a.lift:2+c.sheet.cap/10;a.leg=0;}break;}
+  case 'lift':a.t-=dt;if(a.t<=0){if(s.present){s.present=false;a.carry='full';S.stats.exch++;log(`${AGENT[a.kind].name[0].toUpperCase()+AGENT[a.kind].name.slice(1)} забрал паллету ${s.id} (B${s.id}=0)`);if(S.flags.palletDone)S.flags.palletRemoved=true;}a.phase='back';a.leg=0;}break;
+  case 'load':a.t-=dt;if(a.t<=0){s.sheets=c.sheet.cap;s.loading=false;S.stats.refills++;a.carry=null;log(a.kind==='amr'?`AMR заменил магазин ${s.id}: ${c.sheet.cap} листов (B4=1), уезжает`:`Оператор доложил листы в ${s.id} до ${c.sheet.cap}, нажал «готово» (SB4.${s.id})`);S.tasks.t14||done('t14');a.phase='back';a.leg=0;}break;
+  case 'back':if(follow(outb)){if(a.task==='pallet'&&a.carry==='full'){a.phase='drop';a.t=3;}else a.phase='done';}break;
+  case 'drop':a.t-=dt;if(a.t<=0){a.carry=null;if(c.exch.in==='vehicle'){a.carry='empty';a.phase='go2';a.crossed=false;a.leg=0;log(`${AGENT[a.kind].name[0].toUpperCase()+AGENT[a.kind].name.slice(1)} везёт пустую паллету на станцию ${s.id}`);}else a.phase='done';}break;
+  case 'go2':{const done=follow(inb,crossing);if(a.phase!=='go2')break;if(done){a.phase='set';a.t=a.lift*0.7;a.leg=0;}break;}
+  case 'set':a.t-=dt;if(a.t<=0){Object.assign(s,newPal(true),{agent:a});if(c.sheet.mode==='bottom'&&S.mags.length)s.needSheet=true;a.carry=null;log(`Пустая паллета на станции ${s.id} (B${s.id}=1)`);if(S.flags.palletRemoved&&!S.tasks.t5)done('t5');a.phase='back2';a.leg=0;}break;
+  case 'back2':if(follow(outb))a.phase='done';break;}
  if(a.phase==='done'){s.agent=null;s.waitT=0;if(a.task==='pallet'&&c.exch.out!=='conveyor')log(`Проём ${s.id} закрыт: кнопка «готово» (SB${s.id}), станция снова доступна роботу`);return false;}
  return true;}
 function autoExchange(dt){

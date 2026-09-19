@@ -89,7 +89,7 @@ function build3D(){
  const convOp=LY.convs.map(cv=>addOp(fenceHit(F,cv.x1,cv.y,-1,0),cv.w+150));
  const veh=c.exch.out!=='conveyor';
  const opW=sl=>sl.kind==='mg'?pal.L+300:(veh?Math.max(pal.L+300,2100):pal.L+300);
- LY.robots.forEach(r=>r.slots.forEach(sl=>{const o=addOp(fenceHit(F,sl.cx,sl.cy,sl.cos,sl.sin),opW(sl));if(o){o.kind=sl.kind;slotOp[sl.id]=o;}}));
+ LY.robots.forEach(r=>r.slots.forEach(sl=>{const o=addOp(fenceHit(F,sl.gate.x-sl.acc.x*10,sl.gate.y-sl.acc.y*10,sl.acc.x,sl.acc.y),opW(sl));if(o){o.kind=sl.kind;slotOp[sl.id]=o;}}));
  if(D.safety==='fence'){
   const doorOp=addOp(fenceHit(F,F.x1-700,F.y1-1,0,1),1000);
   [[F.x0,F.y0,F.x1,F.y0],[F.x1,F.y0,F.x1,F.y1],[F.x1,F.y1,F.x0,F.y1],[F.x0,F.y1,F.x0,F.y0]]

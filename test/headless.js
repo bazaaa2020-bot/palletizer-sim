@@ -175,6 +175,49 @@ check('обмен паллет прошёл', S().stats.exch > 0, 'exch=' + S().
 check('начатая паллета дозаполняется до конца', bothStarted === 0, bothStarted + ' тактов с двумя начатыми паллетами');
 check('груз не проходит сквозь чужую стопу', through === 0, through ? `${through} тактов, заход на ${(-worst).toFixed(0)} мм` : '');
 
+console.log('Логистика: подъезд к позициям');
+const routeCheck = () => w.eval(`(()=>{const D=DD,LY=D.LY,pal=D.pal,hw=LY.veh.w/2+100,F=LY.F,all=LY.robots.flatMap(r=>r.slots);
+ const obs=all.map(s=>({id:s.id,x:s.cx,y:s.cy,ang:s.ang,hx:pal.W/2,hy:pal.L/2}))
+  .concat(LY.robots.map(r=>({id:'R'+r.i,x:r.base.x,y:r.base.y,rad:400})))
+  .concat(LY.convs.map((cv,k)=>({id:'CV'+k,x:(cv.x0+cv.x1)/2,y:cv.y,ang:0,hx:cv.len/2,hy:cv.w/2})));
+ const bad=[];
+ all.forEach(s=>{const c0={x:s.cx,y:s.cy},pts=[c0].concat(s.route);
+  const dx=pts[1].x-c0.x,dy=pts[1].y-c0.y,L=Math.hypot(dx,dy)||1,off=pal.L/2+150;
+  const chk=off<L?[{x:c0.x+dx/L*off,y:c0.y+dy/L*off}].concat(pts.slice(1)):pts.slice(1);
+  for(let k=1;k<chk.length;k++)for(const o of obs){if(o.id===s.id)continue;
+   if(o.rad!==undefined?segCircle(chk[k-1],chk[k],o,hw):segBox(chk[k-1],chk[k],o,hw))bad.push(s.id+'↔'+o.id);}
+  const p=s.park;if(p.x>F.x0-50&&p.x<F.x1+50&&p.y>F.y0-50&&p.y<F.y1+50)bad.push(s.id+': парковка внутри');});
+ return{bad:[...new Set(bad)],blocked:LY.blocked};})()`);
+let cfgN = 0; const cfgBad = [], cfgBlocked = [];
+for (const robots of [1, 2]) for (const stations of [1, 2, 3, 4]) for (const out of ['jack', 'forklift', 'amr', 'conveyor']) {
+  if (robots * stations > 6) continue;
+  w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.robot='pl130';CFG.robots=${robots};CFG.stations=${stations};CFG.exch.out='${out}';`
+    + `while(CFG.conveyors.length<${robots})CFG.conveyors.push(JSON.parse(JSON.stringify(CFG.conveyors[0])));DD=derive(CFG);`);
+  const r = routeCheck(); cfgN++;
+  if (r.bad.length) cfgBad.push(`${robots}р${stations}ст ${out}: ${r.bad.join(',')}`);
+  if (r.blocked.length) cfgBlocked.push(`${robots}р${stations}ст ${out}: ${r.blocked.join(',')}`);
+}
+check('маршруты подъезда свободны во всех компоновках', cfgBad.length === 0, `${cfgN} компоновок; ` + cfgBad.slice(0, 2).join('; '));
+check('запертых позиций нет', cfgBlocked.length === 0, cfgBlocked.slice(0, 2).join('; '));
+
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.robot='pl130';CFG.robots=2;CFG.stations=2;CFG.conveyors.push(JSON.parse(JSON.stringify(CFG.conveyors[0])));CFG.conveyors.forEach(x=>{x.feed='rate';x.rate=40;});CFG.exch.reaction=4;CFG.boxes[0].layers=1;renderCfg();buildSim();renderArch();`);
+click('#bReset'); run(2); click('#bStart'); run(1);
+const duo = w.eval(`(()=>{const pal=DD.pal,hits={};let at=0;
+ for(let i=0;i<3000;i++){tick(0.05);
+  S.agents.forEach(a=>{at++;const t=o=>{let ins;
+   if(o.rad!==undefined)ins=Math.hypot(a.x-o.x,a.y-o.y)<o.rad;
+   else{const th=-(o.ang||0)*Math.PI/180,dx=a.x-o.x,dy=a.y-o.y;
+    const lx=dx*Math.cos(th)-dy*Math.sin(th),ly=dx*Math.sin(th)+dy*Math.cos(th);
+    ins=Math.abs(lx)<o.hx&&Math.abs(ly)<o.hy;}
+   if(ins)hits[a.target.id+'↔'+o.t]=1;};
+   DD.LY.robots.forEach(r=>{t({t:'робот'+(r.i+1),x:r.base.x,y:r.base.y,rad:400});
+    r.slots.forEach(sl=>{if(sl.id!==a.target.id)t({t:sl.id,x:sl.cx,y:sl.cy,ang:sl.ang,hx:pal.W/2,hy:pal.L/2});});});});}
+ return{keys:Object.keys(hits),at,exch:S.stats.exch};})()`);
+check('две ячейки: тележка не идёт сквозь оборудование', duo.keys.length === 0, duo.keys.join(', '));
+check('в двухроботной ячейке обмен паллет идёт', duo.exch > 0 && duo.at > 100, `обменов ${duo.exch}, тактов с тележками ${duo.at}`);
+
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();`);
+
 check('нет ошибок выполнения', errs.length === 0, errs.join('; '));
 console.log(failed ? `\nПровалено проверок: ${failed}` : '\nВсе проверки пройдены');
 process.exit(failed ? 1 : 0);
