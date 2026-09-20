@@ -178,12 +178,14 @@ function csvBuildAll(){const c=normalize(CFG),D=derive(c),s=csvSep();
  return{file:`${safeName(cfgTitle())}_таблицы_${fileStamp()}.csv`,text:'﻿'+parts.join('\r\n')};}
 function csvMsg(t,cls){const e=$('csvMsg');if(!e)return;e.textContent=t;e.style.color=cls==='bad'?'var(--badfg)':cls==='ok'?'var(--okfg)':'';}
 function csvShow(txt){const t=$('csvText');if(!t)return;t.hidden=false;t.value=txt;t.focus();t.select();}
-function csvSave(key){try{
-  const r=key==='*'?csvBuildAll():csvBuild(key);if(key!=='*')CSV_LAST=key;
-  const rows=r.text.split('\r\n').length-1;
-  if(download(r.file,'text/csv;charset=utf-8',r.text))csvMsg(`${r.file} — ${rows} строк.`,'ok');
-  else{csvShow(r.text);csvMsg('Скачивание недоступно в этом окне — таблица ниже, скопируйте её в Excel.','bad');}}
- catch(e){csvMsg('Не удалось собрать таблицу: '+e.message,'bad');}}
+async function csvSave(key){let r;
+ try{r=key==='*'?csvBuildAll():csvBuild(key);if(key!=='*')CSV_LAST=key;}
+ catch(e){csvMsg('Не удалось собрать таблицу: '+e.message,'bad');return;}
+ const rows=r.text.split('\r\n').length-1,res=await saveFile(r.file,'csv',r.text);
+ if(res.ok==='saved')csvMsg(`${res.name} — ${rows} строк.`,'ok');
+ else if(res.ok==='download')csvMsg(`${r.file} — ${rows} строк.`,'ok');
+ else if(res.ok==='cancel')csvMsg('Сохранение отменено.','');
+ else{csvShow(r.text);csvMsg('Скачивание недоступно в этом окне — таблица ниже, скопируйте её в Excel.','bad');}}
 // ======================= 2D-СХЕМА УЧАСТКА С ГАБАРИТАМИ =======================
 function planSVG(c,D,W){
  const LY=D.LY,pal=D.pal,F=D.F,r0=LY.robots[0];
@@ -420,19 +422,32 @@ function renderReport(){
 // ======================= ПРИВЯЗКА ВКЛАДКИ =======================
 function initReport(){
  const nm=$('cfgName');if(nm){nm.value=cfgTitle();nm.oninput=()=>{CFG.name=nm.value;saveCfg();};}
- $('bSaveCfg').onclick=()=>{const txt=cfgJSON();
-  if(download(`${safeName(cfgTitle())}_${fileStamp()}.json`,'application/json',txt))repMsg('Конфигурация сохранена в файл.','ok');
+ const CFG_FILE={handle:null,name:''};
+ const cfgFileState=()=>{const b=$('bSaveCfgNow');if(b){b.disabled=!CFG_FILE.handle;
+   b.title=CFG_FILE.handle?`Перезаписать ${CFG_FILE.name}`:'Сначала сохраните конфигурацию в файл или откройте её из файла';}};
+ const cfgSave=async handle=>{const txt=cfgJSON();
+  const r=await saveFile(`${safeName(cfgTitle())}_${fileStamp()}.json`,'json',txt,handle);
+  if(r.ok==='saved'){CFG_FILE.handle=r.handle;CFG_FILE.name=r.name;cfgFileState();repMsg(`Сохранено: ${r.name}`,'ok');}
+  else if(r.ok==='download')repMsg('Конфигурация сохранена в файл.','ok');
+  else if(r.ok==='cancel')repMsg('Сохранение отменено.','');
   else{const t=$('cfgText');t.hidden=false;t.value=txt;t.select();repMsg('Скачивание недоступно в этом окне — скопируйте текст ниже вручную.','bad');}};
+ $('bSaveCfg').onclick=()=>cfgSave(null);
+ if($('bSaveCfgNow'))$('bSaveCfgNow').onclick=()=>cfgSave(CFG_FILE.handle);
+ cfgFileState();
  $('bCopyCfg').onclick=()=>{const txt=cfgJSON(),t=$('cfgText');t.hidden=false;t.value=txt;t.focus();t.select();
   try{navigator.clipboard.writeText(txt);repMsg('Конфигурация скопирована в буфер обмена.','ok');}
   catch(e){repMsg('Текст конфигурации ниже — скопируйте вручную.','');}};
- $('bLoadCfg').onclick=()=>$('fCfg').click();
+ const cfgApply=(txt,name)=>{try{CFG=cfgFromJSON(txt);saveCfg();renderCfg();buildSim();renderArch();
+   if($('cfgName'))$('cfgName').value=cfgTitle();
+   repMsg(`Загружено: ${name} — «${cfgTitle()}». Конфигурация применена.`,'ok');return true;}
+  catch(err){repMsg('Не удалось загрузить: '+err.message,'bad');return false;}};
+ $('bLoadCfg').onclick=async()=>{const r=await openFile('json');
+  if(r.ok==='read'){if(cfgApply(r.text,r.name)){CFG_FILE.handle=r.handle;CFG_FILE.name=r.name;cfgFileState();}return;}
+  if(r.ok==='cancel')return;
+  $('fCfg').click();};
  $('fCfg').onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;
   const rd=new FileReader();
-  rd.onload=()=>{try{CFG=cfgFromJSON(String(rd.result));saveCfg();renderCfg();buildSim();renderArch();
-    if($('cfgName'))$('cfgName').value=cfgTitle();
-    repMsg(`Загружено: ${f.name} — «${cfgTitle()}». Конфигурация применена.`,'ok');}
-   catch(err){repMsg('Не удалось загрузить: '+err.message,'bad');}};
+  rd.onload=()=>cfgApply(String(rd.result),f.name);
   rd.onerror=()=>repMsg('Файл не читается.','bad');
   rd.readAsText(f);e.target.value='';};
  const sp=$('csvSep');if(sp){sp.innerHTML=Object.entries(CSV_SEPS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
@@ -445,9 +460,11 @@ function initReport(){
    catch(e){csvMsg(`«${CSV_TABLES[CSV_LAST].name}» — текст ниже, скопируйте вручную.`,'');}}
   catch(e){csvMsg('Не удалось собрать таблицу: '+e.message,'bad');}};
  $('bMakeRep').onclick=()=>{renderReport();};
- $('bDlRep').onclick=()=>{const {c,D,png}=renderReport();
-  const html=reportStandalone(c,D,png);
-  if(download(`${safeName(cfgTitle())}_отчёт_${fileStamp()}.html`,'text/html;charset=utf-8',html))repMsg('Отчёт сохранён в файл.','ok');
+ $('bDlRep').onclick=async()=>{const {c,D,png}=renderReport();
+  const r=await saveFile(`${safeName(cfgTitle())}_отчёт_${fileStamp()}.html`,'html',reportStandalone(c,D,png));
+  if(r.ok==='saved')repMsg(`Отчёт сохранён: ${r.name}`,'ok');
+  else if(r.ok==='download')repMsg('Отчёт сохранён в файл.','ok');
+  else if(r.ok==='cancel')repMsg('Сохранение отменено.','');
   else repMsg('Скачивание недоступно в этом окне — воспользуйтесь кнопкой «Печать / PDF».','bad');};
  $('bPrintRep').onclick=()=>{if(!$('repOut').innerHTML)renderReport();window.print();};}
 initReport();

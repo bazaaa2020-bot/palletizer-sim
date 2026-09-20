@@ -6,6 +6,9 @@
 <title>Тренажёр РТК паллетизации — конфигуратор, захват, безопасность, ПЛК</title>
 <!-- Ни одной внешней ссылки: файл возят на площадку, где интернета может не быть.
      Шрифт — системный, three.js вшивается сборщиком вместо метки ниже (см. vendor/README.md). -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1E2730">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <!--THREE-->
 <style>
 :root{--bg:#EEF0F2;--panel:#FBFBFC;--ink:#1E2730;--muted:#5C6772;--line:#C9CFD5;--dim:#E1E5E9;--fence:#7B8794;--robot:#E0762C;--yellow:#F5B400;--green:#2A9D5C;--red:#D33B2F;--blue:#3A6EA5;--box:#C9A66B;--box2:#8DB3A0;--box3:#B39DDB;--box4:#E0A0A0;--sheet:#8FA3B5;--off:#B8C0C8;--okbg:#DDF3E5;--okfg:#1B6B3A;--warnbg:#FFF1C6;--warnfg:#7A5A00;--badbg:#FADBD8;--badfg:#8E251C}
@@ -15,6 +18,7 @@
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
 header{padding:18px 22px 0;max-width:1400px;margin:0 auto}
+#bInstall{float:right;margin:0 0 6px 14px}
 h1{font-size:22px;font-weight:600;margin:0 0 4px}
 header p{margin:0;color:var(--muted);max-width:90ch}
 .tabs{display:flex;gap:2px;margin-top:12px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
@@ -167,6 +171,7 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 <header>
 <h1>Тренажёр РТК паллетизации</h1>
 <p>Соберите ячейку в конфигураторе — роботы, захват, коробки, конвейеры, паллеты, тип защиты. Тренажёр рассчитает укладку с перевязкой, вакуумный захват, досягаемость и производительность, предложит оптимальный вариант, выдаст состав АСУ ТП и опишет алгоритм работы обычным языком, а затем даст управлять ячейкой с пульта.</p>
+<button id="bInstall" class="b-apply" hidden title="Поставить тренажёр как приложение: своё окно, ярлык, работа без сети">Установить приложение</button>
 <nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="plc">Логика ПЛК</button><button data-tab="oee">Смена и OEE</button><button data-tab="risk">Оценка риска</button><button data-tab="pl">Безопасность и PL</button><button data-tab="rep">Отчёт и обмен</button><button data-tab="help">Задания и справочник</button></nav>
 </header>
 <main>
@@ -292,9 +297,9 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
  <div class="two">
  <div class="panel"><h2>Конфигурация: сохранить и загрузить</h2>
   <div class="field"><label>Название ячейки</label><input type="text" id="cfgName" value=""><small>Попадёт в имя файла и в заголовок отчёта</small></div>
-  <div class="btns"><button id="bSaveCfg" class="b-apply">Сохранить в файл (.json)</button><button id="bLoadCfg">Загрузить из файла…</button><button id="bCopyCfg">Показать и скопировать</button></div>
+  <div class="btns"><button id="bSaveCfgNow" class="b-apply" disabled>Сохранить</button><button id="bSaveCfg">Сохранить как…</button><button id="bLoadCfg">Открыть…</button><button id="bCopyCfg">Показать и скопировать</button></div>
   <input type="file" id="fCfg" accept=".json,application/json" hidden>
-  <p class="note" id="cfgMsg">Файл хранит все параметры ячейки: робот, захват, движения, коробки, паллеты и схемы укладки, конвейеры, прокладки, обмен паллет, безопасность и шину. Загрузка заменяет текущую конфигурацию и пересобирает симуляцию.</p>
+  <p class="note" id="cfgMsg">«Сохранить» перезаписывает открытый файл — в Chrome и Edge через системный диалог, в остальных браузерах остаётся обычное скачивание. Файл хранит все параметры ячейки: робот, захват, движения, коробки, паллеты и схемы укладки, конвейеры, прокладки, обмен паллет, безопасность и шину. Загрузка заменяет текущую конфигурацию и пересобирает симуляцию.</p>
   <textarea id="cfgText" hidden spellcheck="false"></textarea>
  </div>
  <div class="panel"><h2>Отчёт по ячейке</h2>

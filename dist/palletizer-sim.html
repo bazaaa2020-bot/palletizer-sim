@@ -6,6 +6,9 @@
 <title>Тренажёр РТК паллетизации — конфигуратор, захват, безопасность, ПЛК</title>
 <!-- Ни одной внешней ссылки: файл возят на площадку, где интернета может не быть.
      Шрифт — системный, three.js вшивается сборщиком вместо метки ниже (см. vendor/README.md). -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1E2730">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <script id="three-lib">
 /**
  * @license
@@ -23,6 +26,7 @@
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
 header{padding:18px 22px 0;max-width:1400px;margin:0 auto}
+#bInstall{float:right;margin:0 0 6px 14px}
 h1{font-size:22px;font-weight:600;margin:0 0 4px}
 header p{margin:0;color:var(--muted);max-width:90ch}
 .tabs{display:flex;gap:2px;margin-top:12px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
@@ -175,6 +179,7 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 <header>
 <h1>Тренажёр РТК паллетизации</h1>
 <p>Соберите ячейку в конфигураторе — роботы, захват, коробки, конвейеры, паллеты, тип защиты. Тренажёр рассчитает укладку с перевязкой, вакуумный захват, досягаемость и производительность, предложит оптимальный вариант, выдаст состав АСУ ТП и опишет алгоритм работы обычным языком, а затем даст управлять ячейкой с пульта.</p>
+<button id="bInstall" class="b-apply" hidden title="Поставить тренажёр как приложение: своё окно, ярлык, работа без сети">Установить приложение</button>
 <nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="plc">Логика ПЛК</button><button data-tab="oee">Смена и OEE</button><button data-tab="risk">Оценка риска</button><button data-tab="pl">Безопасность и PL</button><button data-tab="rep">Отчёт и обмен</button><button data-tab="help">Задания и справочник</button></nav>
 </header>
 <main>
@@ -300,9 +305,9 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
  <div class="two">
  <div class="panel"><h2>Конфигурация: сохранить и загрузить</h2>
   <div class="field"><label>Название ячейки</label><input type="text" id="cfgName" value=""><small>Попадёт в имя файла и в заголовок отчёта</small></div>
-  <div class="btns"><button id="bSaveCfg" class="b-apply">Сохранить в файл (.json)</button><button id="bLoadCfg">Загрузить из файла…</button><button id="bCopyCfg">Показать и скопировать</button></div>
+  <div class="btns"><button id="bSaveCfgNow" class="b-apply" disabled>Сохранить</button><button id="bSaveCfg">Сохранить как…</button><button id="bLoadCfg">Открыть…</button><button id="bCopyCfg">Показать и скопировать</button></div>
   <input type="file" id="fCfg" accept=".json,application/json" hidden>
-  <p class="note" id="cfgMsg">Файл хранит все параметры ячейки: робот, захват, движения, коробки, паллеты и схемы укладки, конвейеры, прокладки, обмен паллет, безопасность и шину. Загрузка заменяет текущую конфигурацию и пересобирает симуляцию.</p>
+  <p class="note" id="cfgMsg">«Сохранить» перезаписывает открытый файл — в Chrome и Edge через системный диалог, в остальных браузерах остаётся обычное скачивание. Файл хранит все параметры ячейки: робот, захват, движения, коробки, паллеты и схемы укладки, конвейеры, прокладки, обмен паллет, безопасность и шину. Загрузка заменяет текущую конфигурацию и пересобирает симуляцию.</p>
   <textarea id="cfgText" hidden spellcheck="false"></textarea>
  </div>
  <div class="panel"><h2>Отчёт по ячейке</h2>
@@ -2804,12 +2809,14 @@ function csvBuildAll(){const c=normalize(CFG),D=derive(c),s=csvSep();
  return{file:`${safeName(cfgTitle())}_таблицы_${fileStamp()}.csv`,text:'﻿'+parts.join('\r\n')};}
 function csvMsg(t,cls){const e=$('csvMsg');if(!e)return;e.textContent=t;e.style.color=cls==='bad'?'var(--badfg)':cls==='ok'?'var(--okfg)':'';}
 function csvShow(txt){const t=$('csvText');if(!t)return;t.hidden=false;t.value=txt;t.focus();t.select();}
-function csvSave(key){try{
-  const r=key==='*'?csvBuildAll():csvBuild(key);if(key!=='*')CSV_LAST=key;
-  const rows=r.text.split('\r\n').length-1;
-  if(download(r.file,'text/csv;charset=utf-8',r.text))csvMsg(`${r.file} — ${rows} строк.`,'ok');
-  else{csvShow(r.text);csvMsg('Скачивание недоступно в этом окне — таблица ниже, скопируйте её в Excel.','bad');}}
- catch(e){csvMsg('Не удалось собрать таблицу: '+e.message,'bad');}}
+async function csvSave(key){let r;
+ try{r=key==='*'?csvBuildAll():csvBuild(key);if(key!=='*')CSV_LAST=key;}
+ catch(e){csvMsg('Не удалось собрать таблицу: '+e.message,'bad');return;}
+ const rows=r.text.split('\r\n').length-1,res=await saveFile(r.file,'csv',r.text);
+ if(res.ok==='saved')csvMsg(`${res.name} — ${rows} строк.`,'ok');
+ else if(res.ok==='download')csvMsg(`${r.file} — ${rows} строк.`,'ok');
+ else if(res.ok==='cancel')csvMsg('Сохранение отменено.','');
+ else{csvShow(r.text);csvMsg('Скачивание недоступно в этом окне — таблица ниже, скопируйте её в Excel.','bad');}}
 // ======================= 2D-СХЕМА УЧАСТКА С ГАБАРИТАМИ =======================
 function planSVG(c,D,W){
  const LY=D.LY,pal=D.pal,F=D.F,r0=LY.robots[0];
@@ -3046,19 +3053,32 @@ function renderReport(){
 // ======================= ПРИВЯЗКА ВКЛАДКИ =======================
 function initReport(){
  const nm=$('cfgName');if(nm){nm.value=cfgTitle();nm.oninput=()=>{CFG.name=nm.value;saveCfg();};}
- $('bSaveCfg').onclick=()=>{const txt=cfgJSON();
-  if(download(`${safeName(cfgTitle())}_${fileStamp()}.json`,'application/json',txt))repMsg('Конфигурация сохранена в файл.','ok');
+ const CFG_FILE={handle:null,name:''};
+ const cfgFileState=()=>{const b=$('bSaveCfgNow');if(b){b.disabled=!CFG_FILE.handle;
+   b.title=CFG_FILE.handle?`Перезаписать ${CFG_FILE.name}`:'Сначала сохраните конфигурацию в файл или откройте её из файла';}};
+ const cfgSave=async handle=>{const txt=cfgJSON();
+  const r=await saveFile(`${safeName(cfgTitle())}_${fileStamp()}.json`,'json',txt,handle);
+  if(r.ok==='saved'){CFG_FILE.handle=r.handle;CFG_FILE.name=r.name;cfgFileState();repMsg(`Сохранено: ${r.name}`,'ok');}
+  else if(r.ok==='download')repMsg('Конфигурация сохранена в файл.','ok');
+  else if(r.ok==='cancel')repMsg('Сохранение отменено.','');
   else{const t=$('cfgText');t.hidden=false;t.value=txt;t.select();repMsg('Скачивание недоступно в этом окне — скопируйте текст ниже вручную.','bad');}};
+ $('bSaveCfg').onclick=()=>cfgSave(null);
+ if($('bSaveCfgNow'))$('bSaveCfgNow').onclick=()=>cfgSave(CFG_FILE.handle);
+ cfgFileState();
  $('bCopyCfg').onclick=()=>{const txt=cfgJSON(),t=$('cfgText');t.hidden=false;t.value=txt;t.focus();t.select();
   try{navigator.clipboard.writeText(txt);repMsg('Конфигурация скопирована в буфер обмена.','ok');}
   catch(e){repMsg('Текст конфигурации ниже — скопируйте вручную.','');}};
- $('bLoadCfg').onclick=()=>$('fCfg').click();
+ const cfgApply=(txt,name)=>{try{CFG=cfgFromJSON(txt);saveCfg();renderCfg();buildSim();renderArch();
+   if($('cfgName'))$('cfgName').value=cfgTitle();
+   repMsg(`Загружено: ${name} — «${cfgTitle()}». Конфигурация применена.`,'ok');return true;}
+  catch(err){repMsg('Не удалось загрузить: '+err.message,'bad');return false;}};
+ $('bLoadCfg').onclick=async()=>{const r=await openFile('json');
+  if(r.ok==='read'){if(cfgApply(r.text,r.name)){CFG_FILE.handle=r.handle;CFG_FILE.name=r.name;cfgFileState();}return;}
+  if(r.ok==='cancel')return;
+  $('fCfg').click();};
  $('fCfg').onchange=e=>{const f=e.target.files&&e.target.files[0];if(!f)return;
   const rd=new FileReader();
-  rd.onload=()=>{try{CFG=cfgFromJSON(String(rd.result));saveCfg();renderCfg();buildSim();renderArch();
-    if($('cfgName'))$('cfgName').value=cfgTitle();
-    repMsg(`Загружено: ${f.name} — «${cfgTitle()}». Конфигурация применена.`,'ok');}
-   catch(err){repMsg('Не удалось загрузить: '+err.message,'bad');}};
+  rd.onload=()=>cfgApply(String(rd.result),f.name);
   rd.onerror=()=>repMsg('Файл не читается.','bad');
   rd.readAsText(f);e.target.value='';};
  const sp=$('csvSep');if(sp){sp.innerHTML=Object.entries(CSV_SEPS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
@@ -3071,12 +3091,60 @@ function initReport(){
    catch(e){csvMsg(`«${CSV_TABLES[CSV_LAST].name}» — текст ниже, скопируйте вручную.`,'');}}
   catch(e){csvMsg('Не удалось собрать таблицу: '+e.message,'bad');}};
  $('bMakeRep').onclick=()=>{renderReport();};
- $('bDlRep').onclick=()=>{const {c,D,png}=renderReport();
-  const html=reportStandalone(c,D,png);
-  if(download(`${safeName(cfgTitle())}_отчёт_${fileStamp()}.html`,'text/html;charset=utf-8',html))repMsg('Отчёт сохранён в файл.','ok');
+ $('bDlRep').onclick=async()=>{const {c,D,png}=renderReport();
+  const r=await saveFile(`${safeName(cfgTitle())}_отчёт_${fileStamp()}.html`,'html',reportStandalone(c,D,png));
+  if(r.ok==='saved')repMsg(`Отчёт сохранён: ${r.name}`,'ok');
+  else if(r.ok==='download')repMsg('Отчёт сохранён в файл.','ok');
+  else if(r.ok==='cancel')repMsg('Сохранение отменено.','');
   else repMsg('Скачивание недоступно в этом окне — воспользуйтесь кнопкой «Печать / PDF».','bad');};
  $('bPrintRep').onclick=()=>{if(!$('repOut').innerHTML)renderReport();window.print();};}
 initReport();
+// ======================= УСТАНОВКА КАК ПРИЛОЖЕНИЯ И РАБОТА С ФАЙЛАМИ =======================
+// Тренажёр остаётся одним самодостаточным файлом и работает прямо с диска. Но если его
+// раздают по сети, браузер может поставить его как приложение: своё окно без адресной строки,
+// ярлык, работа без сети. Всё ниже — необязательные надстройки: ни одна из них не должна
+// мешать, когда файл просто открыли двойным щелчком.
+
+// Service worker живёт только на http(s): из file:// он недоступен, и это не ошибка.
+(function(){try{
+ if(!('serviceWorker' in navigator))return;
+ if(location.protocol!=='http:'&&location.protocol!=='https:')return;
+ navigator.serviceWorker.register('sw.js').catch(()=>{});   // нет файла рядом — просто живём без него
+}catch(e){}})();
+
+// Кнопка установки появляется, только когда браузер сам предложил (beforeinstallprompt).
+let PWA_PROMPT=null;
+(function(){try{
+ const btn=$('bInstall');if(!btn)return;
+ const standalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;}catch(e){return false;}};
+ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();PWA_PROMPT=e;if(!standalone())btn.hidden=false;});
+ window.addEventListener('appinstalled',()=>{PWA_PROMPT=null;btn.hidden=true;});
+ btn.onclick=async()=>{if(!PWA_PROMPT)return;btn.hidden=true;const p=PWA_PROMPT;PWA_PROMPT=null;
+  try{p.prompt();await p.userChoice;}catch(e){}};
+}catch(e){}})();
+
+// ---------- файлы: настоящие «Открыть» и «Сохранить как» там, где браузер это умеет ----------
+// File System Access API есть в Chrome и Edge; в остальных остаётся прежний путь через
+// скачивание и <input type=file>. Возвращаем словами, что получилось, — сообщение печатает вызвавший.
+const hasFS=()=>{try{return typeof window.showSaveFilePicker==='function';}catch(e){return false;}};
+const FILE_KINDS={json:{d:'Конфигурация тренажёра',m:'application/json'},
+ csv:{d:'Таблица CSV',m:'text/csv'},html:{d:'Отчёт HTML',m:'text/html'}};
+function fileTypes(ext){const k=FILE_KINDS[ext]||FILE_KINDS.json,a={};a[k.m]=['.'+ext];return[{description:k.d,accept:a}];}
+// Пишем в уже открытый файл, если он есть; иначе спрашиваем куда.
+async function saveFile(name,ext,text,handle){
+ const mime=(FILE_KINDS[ext]||FILE_KINDS.json).m+';charset=utf-8';
+ if(hasFS()){try{
+   const h=handle||await window.showSaveFilePicker({suggestedName:name,types:fileTypes(ext)});
+   const w=await h.createWritable();await w.write(text);await w.close();
+   return{ok:'saved',handle:h,name:h.name||name};
+  }catch(e){if(e&&e.name==='AbortError')return{ok:'cancel'};}}   // передумали — ничего не делаем
+ return download(name,mime,text)?{ok:'download',name}:{ok:'fail'};}
+async function openFile(ext){
+ if(hasFS()){try{
+   const [h]=await window.showOpenFilePicker({types:fileTypes(ext),multiple:false});
+   const f=await h.getFile();return{ok:'read',text:await f.text(),handle:h,name:f.name};
+  }catch(e){if(e&&e.name==='AbortError')return{ok:'cancel'};}}
+ return{ok:'picker'};}                                          // запасной путь — <input type=file>
 </script>
 </body>
 </html>

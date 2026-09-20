@@ -40,6 +40,47 @@ console.log('Офлайн: файл самодостаточный');
     lib ? `${(lib[1].length / 1024).toFixed(0)} КБ` : 'блока нет');
   check('вырезание библиотеки оставляет рабочий файл', html.length > 300000 && html.indexOf('three-lib') < 0); }
 
+console.log('PWA: установка как приложения и работа с файлами');
+{ const dist = path.join(__dirname, '..', 'dist');
+  const man = JSON.parse(fs.readFileSync(path.join(dist, 'manifest.webmanifest'), 'utf8'));
+  check('манифест собран и парсится',
+    man.name.length > 5 && man.display === 'standalone' && man.start_url.indexOf('palletizer-sim.html') > 0);
+  check('в манифесте есть иконки 192, 512 и maskable',
+    man.icons.length === 3 && man.icons.some(i => i.sizes === '192x192') &&
+    man.icons.some(i => i.purpose === 'maskable'));
+  check('иконки лежат рядом и это настоящие PNG нужного размера',
+    man.icons.every(i => { const p = path.join(dist, i.src); if (!fs.existsSync(p)) return false;
+      const b = fs.readFileSync(p), sig = b.slice(0, 8).toString('hex') === '89504e470d0a1a0a';
+      const w = b.readUInt32BE(16), h = b.readUInt32BE(20), want = +i.sizes.split('x')[0];
+      return sig && w === want && h === want; }));
+  const sw = fs.readFileSync(path.join(dist, 'sw.js'), 'utf8');
+  check('версия кэша в service worker проставлена сборщиком',
+    /const CACHE = 'pal-sim-[0-9a-f]{10}'/.test(sw) && sw.indexOf('__CACHE__') < 0);
+  check('service worker кэширует сам тренажёр, манифест и иконки',
+    ['palletizer-sim.html', 'manifest.webmanifest', 'icon-192.png'].every(f => sw.indexOf(f) > 0) &&
+    /addEventListener\('fetch'/.test(sw));
+  check('старые кэши чистятся при активации', /caches\.delete/.test(sw) && /clients\.claim/.test(sw)); }
+
+check('страница ссылается на манифест относительным путём — с диска просто не найдётся',
+  /<link rel="manifest" href="manifest\.webmanifest">/.test(raw) && raw.indexOf('theme-color') > 0);
+check('service worker регистрируется только по http(s)', (() => {
+  const m = raw.match(/if\(location\.protocol!=='http:'&&location\.protocol!=='https:'\)return;/);
+  return !!m && raw.indexOf("navigator.serviceWorker.register('sw.js')") > 0; })());
+check('в jsdom без service worker регистрация ничего не сломала', errs.length === 0, errs.join('; '));
+check('кнопка установки спрятана, пока браузер не предложил',
+  d.getElementById('bInstall').hidden === true);
+
+// Работа с файлами: без File System Access API всё должно падать на прежний путь.
+// Обе функции асинхронные, поэтому здесь только запускаем их, а результат проверяем
+// в самом конце прогона — к тому времени микрозадачи точно успели отработать.
+check('File System Access API в этом окружении нет', w.eval('hasFS()') === false);
+w.eval(`window.__sf='ждём';saveFile('x.json','json','{}').then(r=>{window.__sf=r.ok;},e=>{window.__sf='исключение: '+e;});
+ window.__of='ждём';openFile('json').then(r=>{window.__of=r.ok;},e=>{window.__of='исключение: '+e;});`);
+check('кнопка «Сохранить» заблокирована, пока файл не открыт',
+  d.getElementById('bSaveCfgNow').disabled === true);
+check('кнопки обмена конфигурацией на месте',
+  ['bSaveCfgNow', 'bSaveCfg', 'bLoadCfg', 'bCopyCfg'].every(id => !!d.getElementById(id)));
+
 console.log('Конфигурация по умолчанию');
 check('расчёт проходит по досягаемости', w.eval('DD.reachStatus') !== 'bad');
 check('захват считается', w.eval('DD.grip.status') !== 'bad');
@@ -833,15 +874,26 @@ check('все таблицы одним файлом: каждая со свои
   keys.every(k => all.text.indexOf(w.eval(`CSV_TABLES['${k}'].name`)) > 0), all.file);
 check('сводный файл длиннее любой отдельной таблицы', all.text.length > w.eval(`csvBuild('sig').text`).length);
 
-// кнопки: в jsdom скачивание недоступно, значит должен сработать запасной путь с текстом
+// Кнопки: в jsdom скачивание недоступно, значит должен сработать запасной путь с текстом.
+// Сохранение асинхронное, поэтому нажимаем здесь, а результат проверяем в конце прогона.
 w.eval(`csvShow('');$('csvText').hidden=true;`);
 d.querySelector('#csvBtns button[data-csv="sig"]').click();
-check('кнопка таблицы работает и при запрете скачивания показывает текст',
-  !d.getElementById('csvText').hidden && d.getElementById('csvText').value.indexOf('Тег') > 0);
-check('после кнопки сообщение объясняет, что делать', d.getElementById('csvMsg').textContent.length > 20);
 
 w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();`);
 
-check('нет ошибок выполнения', errs.length === 0, errs.join('; '));
-console.log(failed ? `\nПровалено проверок: ${failed}` : '\nВсе проверки пройдены');
-process.exit(failed ? 1 : 0);
+// Хвост прогона — отдельной задачей event loop: весь тест выше идёт одним синхронным
+// куском, и промисы внутри страницы до этого момента просто не успевают разрешиться.
+setTimeout(() => {
+  console.log('Асинхронное: сохранение файлов');
+  const sf = w.eval('window.__sf'), of = w.eval('window.__of');
+  check('saveFile без пикера уходит в скачивание или в запасной путь',
+    sf === 'download' || sf === 'fail', `вернул «${sf}»`);
+  check('openFile без пикера просит открыть через <input type=file>', of === 'picker', `вернул «${of}»`);
+  check('кнопка таблицы работает и при запрете скачивания показывает текст',
+    !d.getElementById('csvText').hidden && d.getElementById('csvText').value.indexOf('Тег') > 0);
+  check('после кнопки сообщение объясняет, что делать', d.getElementById('csvMsg').textContent.length > 20);
+
+  check('нет ошибок выполнения', errs.length === 0, errs.join('; '));
+  console.log(failed ? `\nПровалено проверок: ${failed}` : '\nВсе проверки пройдены');
+  process.exit(failed ? 1 : 0);
+}, 0);

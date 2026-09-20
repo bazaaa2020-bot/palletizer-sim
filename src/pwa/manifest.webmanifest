@@ -1,0 +1,19 @@
+{
+  "name": "Тренажёр РТК паллетизации",
+  "short_name": "РТК паллетизации",
+  "description": "Конфигуратор роботизированной ячейки паллетизации: расчёт захвата и укладки, компоновка, оценка риска по ISO 12100, Performance Level по ISO 13849-1, логика ПЛК и 3D-вид.",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "./palletizer-sim.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#EEF0F2",
+  "theme_color": "#1E2730",
+  "categories": ["productivity", "education", "utilities"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
