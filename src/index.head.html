@@ -28,7 +28,7 @@ main{max-width:1400px;margin:0 auto;padding:14px 22px 40px}
 .tab{display:none}.tab.on{display:grid;gap:14px}
 #tab-sim{grid-template-columns:minmax(0,1.55fr) minmax(330px,1fr)}
 #tab-cfg{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}
-#tab-arch,#tab-help,#tab-algo,#tab-3d,#tab-pl,#tab-risk,#tab-oee,#tab-plc{grid-template-columns:1fr}
+#tab-arch,#tab-help,#tab-algo,#tab-3d,#tab-pl,#tab-risk,#tab-oee,#tab-plc,#tab-eco{grid-template-columns:1fr}
 #v3wrap{position:relative;width:100%;height:600px;background:linear-gradient(#dfe5ea,#f3f5f7);border-radius:6px;overflow:hidden;touch-action:none}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #v3wrap{background:linear-gradient(#1c2229,#2a313a)}}
 :root[data-theme="dark"] #v3wrap{background:linear-gradient(#1c2229,#2a313a)}
@@ -172,7 +172,7 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 <h1>Тренажёр РТК паллетизации</h1>
 <p>Соберите ячейку в конфигураторе — роботы, захват, коробки, конвейеры, паллеты, тип защиты. Тренажёр рассчитает укладку с перевязкой, вакуумный захват, досягаемость и производительность, предложит оптимальный вариант, выдаст состав АСУ ТП и опишет алгоритм работы обычным языком, а затем даст управлять ячейкой с пульта.</p>
 <button id="bInstall" class="b-apply" hidden title="Поставить тренажёр как приложение: своё окно, ярлык, работа без сети">Установить приложение</button>
-<nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="plc">Логика ПЛК</button><button data-tab="oee">Смена и OEE</button><button data-tab="risk">Оценка риска</button><button data-tab="pl">Безопасность и PL</button><button data-tab="rep">Отчёт и обмен</button><button data-tab="help">Задания и справочник</button></nav>
+<nav class="tabs" id="tabs"><button data-tab="sim" class="on">Симуляция</button><button data-tab="3d">3D-вид</button><button data-tab="cfg">Конфигуратор</button><button data-tab="algo">Алгоритм работы</button><button data-tab="arch">Архитектура АСУ ТП</button><button data-tab="plc">Логика ПЛК</button><button data-tab="oee">Смена и OEE</button><button data-tab="risk">Оценка риска</button><button data-tab="pl">Безопасность и PL</button><button data-tab="eco">Экономика</button><button data-tab="rep">Отчёт и обмен</button><button data-tab="help">Задания и справочник</button></nav>
 </header>
 <main>
 <!-- ================= СИМУЛЯЦИЯ ================= -->
@@ -291,6 +291,26 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
  <div class="panel"><h2>Что означают элементы</h2><dl class="gl" id="gloss"></dl></div>
  </div>
  <div class="panel prose" id="stdText"></div>
+</section>
+<!-- ================= ЭКОНОМИКА ================= -->
+<section id="tab-eco" class="tab">
+ <div class="panel"><h2>Стоимость варианта и окупаемость</h2><div class="cards" id="ecoCards"></div><p class="note" id="ecoNote"></p></div>
+ <div id="tab-cfg-like" class="two">
+  <div class="panel"><h2>Цены оборудования</h2><div id="ecoIn1"></div></div>
+  <div class="panel"><h2>Безопасность, работы, обучение</h2><div id="ecoIn2"></div></div>
+ </div>
+ <div class="two">
+  <div class="panel"><h2>Эксплуатация</h2><div id="ecoIn3"></div></div>
+  <div class="panel"><h2>Ручная укладка и финансы</h2><div id="ecoIn4"></div></div>
+ </div>
+ <div class="panel"><h2>Капитальные затраты</h2><div class="svgwrap"><table id="ecoCap"></table></div></div>
+ <div class="panel"><h2>Текущие затраты за год: ячейка против ручной укладки</h2><div class="svgwrap"><table id="ecoOpex"></table></div></div>
+ <div class="panel"><h2 id="ecoFlowH">Накопленный дисконтированный поток</h2><div class="svgwrap" id="ecoFlow"></div>
+  <div class="two" style="margin-top:10px"><div class="svgwrap"><table id="ecoFlowT"></table></div>
+  <div><div class="svgwrap"><table id="ecoSens"></table></div><p class="note">Срок окупаемости при отклонении ±25 %. Красная область на графике — вложенное ещё не вернулось, зелёная — вернулось с учётом ставки.</p></div></div>
+ </div>
+ <div class="panel"><h2>Потребляемая мощность</h2><div id="ecoPower"></div></div>
+ <div class="panel prose" id="ecoText"></div>
 </section>
 <!-- ================= ОТЧЁТ И ОБМЕН ================= -->
 <section id="tab-rep" class="tab">

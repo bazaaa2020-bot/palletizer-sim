@@ -122,6 +122,29 @@ const CSV_TABLES={
    h.m1.map(x=>x.m.n).join('; '),h.m2.map(x=>x.m.n).join('; '),h.m3.map(x=>x.m.n).join('; '),
    h.todo.map(k=>MEAS[k].n).join('; '),
    h.res.s,h.res.f,h.res.o,h.res.a,RISK_CLS[h.cls],h.ok?'да':'нет',h.sf?h.plr:'',h.sf||''])})},
+ eco:{name:'Экономика и окупаемость',file:'экономика',build:(c,D,s)=>{
+  const E=D.eco,R=[],a=(g,n,v,u,note)=>R.push([g,n,v,u||'',note||'']);
+  E.cap.lines.forEach(l=>a('Капитальные затраты',l.n,csvNum(l.sum,0,s),E.unit,
+   `${csvNum(l.q,1,s)} ${l.unit}${l.price?` × ${csvNum(l.price,0,s)}`:''}; ${l.note}`));
+  a('Капитальные затраты','ИТОГО',csvNum(E.cap.total,0,s),E.unit,`оборудование ${csvNum(E.cap.equip,0,s)}, работы ${csvNum(E.cap.eng+E.cap.inst,0,s)}`);
+  E.pw.lines.forEach(l=>a('Потребляемая мощность',l.n,csvNum(l.kW,2,s),'кВт',l.note));
+  a('Потребляемая мощность','ИТОГО',csvNum(E.pw.kW,2,s),'кВт',`× ${csvNum(E.hours,0,s)} ч × ${csvNum(c.eco.tariff,1,s)} ₽/кВт·ч`);
+  E.cellOpex.forEach(l=>a('Текущие затраты: ячейка',l.n,csvNum(l.v,0,s),E.unit,l.note));
+  a('Текущие затраты: ячейка','ИТОГО в год',csvNum(E.cellYear,0,s),E.unit,'');
+  E.manOpex.forEach(l=>a('Текущие затраты: ручная укладка',l.n,csvNum(l.v,0,s),E.unit,l.note));
+  a('Текущие затраты: ручная укладка','ИТОГО в год',csvNum(E.manYear,0,s),E.unit,`${E.people} человек при ${E.shifts} сменах`);
+  a('Итог','Экономия в год',csvNum(E.save,0,s),E.unit,E.save>0?'':'ячейка дороже ручной укладки');
+  a('Итог','Простой срок окупаемости',E.pay?csvNum(E.pay,2,s):'',E.pay?'лет':'','не окупается при такой экономии');
+  a('Итог','Срок окупаемости с учётом ставки',E.payD!==null?csvNum(E.payD,2,s):'',E.payD!==null?'лет':'',`ставка ${csvNum(c.eco.rate,0,s)} % годовых`);
+  a('Итог','Чистая приведённая стоимость',csvNum(E.npv,0,s),E.unit,`горизонт ${E.years} лет`);
+  a('Итог','Внутренняя норма доходности',E.irr!==null?csvNum(E.irr*100,1,s):'','%','');
+  a('Итог','Себестоимость укладки, ячейка',csvNum(E.unitCost.cellBox,2,s),'₽/коробку',`${csvNum(E.unitCost.cellPal,0,s)} ₽ на паллету`);
+  a('Итог','Себестоимость укладки, вручную',csvNum(E.unitCost.manBox,2,s),'₽/коробку',`${csvNum(E.unitCost.manPal,0,s)} ₽ на паллету`);
+  E.flow.forEach(f=>a('Денежный поток по годам','Год '+f.t,csvNum(f.cum,0,s),E.unit,
+   `поток ${csvNum(f.cf,0,s)}, дисконтированный ${csvNum(f.disc,0,s)}`));
+  E.sens.forEach(x=>a('Чувствительность',x.n,x.base?csvNum(x.base,2,s):'','лет',
+   `−25 % → ${x.low?csvNum(x.low,2,s):'не окупается'}; +25 % → ${x.high?csvNum(x.high,2,s):'не окупается'}`));
+  return{head:['Раздел','Статья','Значение','Ед.','Как посчитано'],rows:R};}},
  mix:{name:'Смешанная паллета: рецепт',file:'рецепт',build:(c,D,s)=>{
   const M=D.mix;
   if(!M||!M.ok)return{head:['Рецепт','Значение'],rows:[['Смешанная паллета','выключена — на паллете один артикул']]};
@@ -166,7 +189,7 @@ const CSV_TABLES={
   return{head:['Показатель','Значение','Ед.','Доля','Накопленная','Категория'],rows:R};}},
  warn:{name:'Замечания расчёта',file:'замечания',build:(c,D,s)=>({
   head:['№','Замечание'],rows:D.warnings.map((w,i)=>[i+1,w])})}};
-const CSV_ORDER=['bom','sig','params','sku','mix','risk','pl','base','plc','oee','warn'];
+const CSV_ORDER=['bom','sig','params','sku','mix','eco','risk','pl','base','plc','oee','warn'];
 let CSV_LAST='bom';
 // Один «лист» на файл; вариант «все таблицы» кладёт их блоками с заголовками.
 function csvBuild(key){const c=normalize(CFG),D=derive(c),s=csvSep(),T=CSV_TABLES[key];
@@ -390,6 +413,21 @@ function reportHTML(c,D,png){
    P.sf.flatMap(f=>f.res.map((r,i)=>[i?'':`${f.id}. ${f.name}`,r.name,r.cat,r.mttfd>=100?'≥ 100':f1(r.mttfd),f0(r.dcavg),r.pl?'PL '+r.pl:'—',
     i?'':(f.pl?`PL ${f.pl} при требуемом ${f.plr}${f.ok?'':' — НЕ СООТВЕТСТВУЕТ'}`:'не определён')]))));
   H.push(`<p class="sub">Упрощённый метод ISO 13849-1: MTTFd канала — по отказам компонентов (электромеханика из B10d и числа срабатываний), DCavg — средневзвешенный диагностический охват, PL подсистемы — по столбчатой диаграмме рис. 5, PL функции — последовательное соединение подсистем по таблице 11. Расчёт не заменяет валидацию по ISO 13849-2.</p>`);}
+ {const E=D.eco;
+  H.push(`<h3>Экономика: стоимость варианта и окупаемость</h3>`+repTable([
+   ['Капитальные затраты',`<b>${f0(E.cap.total)} ${E.unit}</b> — оборудование ${f0(E.cap.equip)}, проектирование и ПНР ${f0(E.cap.eng)}, монтаж ${f0(E.cap.inst)}`],
+   ['Режим работы',`${c.pl.dop} дней × ${c.pl.hop} ч = ${f0(E.hours)} ч в году, ${E.shifts} смен${E.shifts===1?'а':''}`],
+   ['Текущие затраты ячейки',`${f0(E.cellYear)} ${E.unit} в год; потребление ${f1(E.pw.kW)} кВт`],
+   ['Ручная укладка того же потока',`${E.people} человек (${E.perShift} в смену при норме ${f0(c.eco.manRate)} кор/ч на человека) — ${f0(E.manYear)} ${E.unit} в год`],
+   ['Экономия',E.save>0?`${f0(E.save)} ${E.unit} в год`:`нет: ячейка дороже ручной на ${f0(-E.save)} ${E.unit} в год`],
+   ['Окупаемость',`простая ${E.pay?f1(E.pay)+' года':'не окупается'}; с учётом ставки ${f0(c.eco.rate)} % — ${E.payD!==null?f1(E.payD)+' года':`дольше горизонта ${E.years} лет`}`],
+   ['NPV и IRR',`${f0(E.npv)} ${E.unit} за ${E.years} лет${E.irr!==null?`, IRR ${f0(E.irr*100)} %`:''}`],
+   ['Себестоимость укладки',`ячейка ${f2(E.unitCost.cellBox)} ₽/коробку против ${f2(E.unitCost.manBox)} ₽ вручную`]]));
+  H.push(repCols(['Группа','Статья','Кол-во','Цена за ед.','Сумма','Откуда количество'],
+   E.cap.lines.map(l=>[l.g,l.n,`${f1(l.q)} ${l.unit}`,l.price?f0(l.price):'—',f0(l.sum),l.note])));
+  H.push(repCols(['Что меняем','−25 %','как в расчёте','+25 %'],
+   E.sens.map(x=>[x.n,x.low?f1(x.low)+' года':'не окупается',x.base?f1(x.base)+' года':'не окупается',x.high?f1(x.high)+' года':'не окупается'])));
+  H.push(`<p class="sub">Количества взяты из конфигурации и расчёта, цены за единицу задаёт пользователь. Расчёт не учитывает налоги, амортизацию, лизинг и субсидии, а также стоимость простоя линии, брака, травматизма и текучки укладчиков — а это часто и есть настоящая причина роботизации.</p>`);}
  H.push(`<h3>Схема участка с габаритами</h3>`+planSVG(c,D,1000)
   +`<p class="sub">Условные обозначения: серый штрих — ограждение; оранжевый штрих — досягаемость робота; красный отрезок — проём с световой завесой; синий пунктир — маршрут подъезда техники к позиции; пунктирный квадрат — площадка ожидания за ограждением. Размеры в миллиметрах.</p>`);
  H.push(png?`<h3>3D-компоновка</h3><img src="${png}" alt="3D-вид ячейки">`

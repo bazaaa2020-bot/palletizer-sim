@@ -405,13 +405,118 @@ const p4 = pl(`CFG.pl.opsES=200;CFG.pl.opsLC=400;CFG.pl.opsDoor=200;`);
 check('частые срабатывания роняют MTTFd и уровень', !p4.ok || p4.worst !== 'd', `${p4.worst}`);
 const p5 = pl(`CFG.pl.S=1;CFG.pl.F=1;CFG.pl.P=1;`);
 check('лёгкий риск требует всего PL a', p5.plr === 'a' && p5.ok);
-const p6 = pl(`CFG.robot='ur10';CFG.safety='cobot';`);
+const p6 = pl(`CFG.robot='cb20';CFG.safety='cobot';`);
 check('у кобота свой набор функций: поле сканера и снижение скорости',
   p6.n === 3 && /SF4/.test(p6.ids), p6.ids);
 check('вкладка PL отрисовывается', (() => { w.eval('showTab("pl")');
   return d.getElementById('plSF').innerHTML.length > 500 && d.getElementById('plBar').innerHTML.length > 500; })());
 check('раздел PL попадает в отчёт', w.eval(`reportHTML(CFG,derive(CFG),null)`).indexOf('Performance Level') > 0);
 w.eval('showTab("sim")');
+
+console.log('Экономика: стоимость и окупаемость (п. 8)');
+const eco = extra => w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));${extra || ''}normalize(CFG);
+ const D=derive(CFG),E=D.eco;
+ return{cap:E.cap.total,equip:E.cap.equip,lines:E.cap.lines.map(l=>({n:l.n,q:l.q,sum:l.sum})),
+  kW:E.pw.kW,pw:E.pw.lines.map(l=>l.n),cell:E.cellYear,man:E.manYear,people:E.people,perShift:E.perShift,
+  save:E.save,pay:E.pay,payD:E.payD,npv:E.npv,irr:E.irr,years:E.years,hours:E.hours,shifts:E.shifts,
+  flow:E.flow.map(f=>f.cum),sens:E.sens.map(x=>x.base),unit:E.unitCost,warn:E.warn,
+  wAll:D.warnings.filter(x=>/^Экономика/.test(x)).length};})()`);
+
+const E0 = eco();
+check('капитальные затраты складываются из статей',
+  Math.abs(E0.cap - E0.lines.reduce((a, l) => a + l.sum, 0)) < 1e-6 && E0.cap > E0.equip);
+check('количества берутся из конфигурации, а не вводятся', (() => {
+  const one = eco(`CFG.robots=1;CFG.conveyors=[CFG.conveyors[0]];`);
+  const two = eco(`CFG.robots=2;CFG.conveyors.push(JSON.parse(JSON.stringify(CFG.conveyors[0])));`);
+  const r1 = one.lines.find(l => /Кобот|Паллетайзер|Промышленный/.test(l.n));
+  const r2 = two.lines.find(l => /Кобот|Паллетайзер|Промышленный/.test(l.n));
+  return r1.q === 1 && r2.q === 2 && two.cap > one.cap; })());
+check('цена робота масштабируется коэффициентом каталога', (() => {
+  const a = eco(`CFG.robot='cb5';`), b = eco(`CFG.robot='pl185';`);
+  const ra = a.lines.find(l => /Кобот 5/.test(l.n)), rb = b.lines.find(l => /Паллетайзер 185/.test(l.n));
+  return Math.abs(rb.sum / ra.sum - 5.0 / 1.0) < 1e-6; })());
+check('длина конвейеров идёт в смету метрами',
+  Math.abs(E0.lines.find(l => /Конвейеры подачи/.test(l.n)).q -
+    w.eval('CFG.conveyors.reduce((s,x)=>s+x.len,0)')) < 1e-9);
+check('периметр ограждения берётся из компоновки', (() => {
+  const l = E0.lines.find(x => /Ограждение/.test(x.n));
+  return Math.abs(l.q - w.eval('derive(CFG).fencePerim') / 1000) < 1e-6; })());
+check('у кобота без ограждения в смете сканеры, а не завесы', (() => {
+  const k = eco(`CFG.robot='cb20';CFG.safety='cobot';`);
+  return k.lines.some(l => /сканер/i.test(l.n)) && !k.lines.some(l => /ограждение|завеса/i.test(l.n)); })());
+check('работы считаются процентом от оборудования', (() => {
+  const l = E0.lines.filter(x => /Проектирование|Монтаж/.test(x.n));
+  return Math.abs(l[0].sum - E0.equip * w.eval('CFG.eco.engPct') / 100) < 1e-6 &&
+    Math.abs(l[1].sum - E0.equip * w.eval('CFG.eco.instPct') / 100) < 1e-6; })());
+
+check('мощность складывается из роботов, приводов, воздуха и шкафа',
+  E0.kW > 0 && E0.pw.length >= 3 && Math.abs(E0.kW - w.eval('derive(CFG).eco.pw.lines.reduce((s,x)=>s+x.kW,0)')) < 1e-9);
+check('второй робот поднимает потребление', eco(`CFG.robots=2;CFG.conveyors.push(JSON.parse(JSON.stringify(CFG.conveyors[0])));`).kW > E0.kW);
+check('режим работы берётся с вкладки безопасности, а не дублируется',
+  E0.hours === w.eval('CFG.pl.dop') * w.eval('CFG.pl.hop'));
+
+check('людей на ручной укладке считается от потока и нормы', (() => {
+  const a = eco(`CFG.eco.manRate=10000;`), b = eco(`CFG.eco.manRate=50;`);
+  return a.perShift === 1 && b.perShift > a.perShift && b.man > a.man; })());
+check('экономия — это разница текущих затрат', Math.abs(E0.save - (E0.man - E0.cell)) < 1e-9);
+check('простой срок окупаемости — вложения делить на экономию',
+  E0.save > 0 ? Math.abs(E0.pay - E0.cap / E0.save) < 1e-9 : E0.pay === null);
+check('дорогая ручная укладка ускоряет окупаемость',
+  eco(`CFG.eco.manSalary=3000;`).pay < E0.pay);
+check('при нулевой экономии срок не считается, а появляется замечание', (() => {
+  const z = eco(`CFG.eco.manSalary=0;`);
+  return z.pay === null && z.save <= 0 && /Экономии нет/.test(z.warn.join(' ')); })());
+
+check('накопленный поток начинается с минус вложений и растёт',
+  Math.abs(E0.flow[0] + E0.cap) < 1e-6 && E0.flow.every((v, i) => i === 0 || v > E0.flow[i - 1]));
+check('NPV равен последнему накопленному значению',
+  Math.abs(E0.npv - E0.flow[E0.flow.length - 1]) < 1e-6);
+check('при нулевой ставке дисконтированный срок совпадает с простым', (() => {
+  const z = eco(`CFG.eco.rate=0;CFG.eco.years=25;`);
+  return z.payD !== null && Math.abs(z.payD - z.pay) < 0.02; })());
+check('IRR обращает NPV в ноль', (() => {
+  const z = eco(`CFG.eco.manSalary=3000;CFG.eco.years=10;`);
+  if (z.irr === null) return false;
+  const v = w.eval(`npv(${z.irr},${-z.cap},${z.save},10)`);
+  return Math.abs(v) < Math.max(1, z.cap * 1e-4); })());
+check('ставка выше IRR даёт отрицательный NPV', (() => {
+  const z = eco(`CFG.eco.manSalary=3000;CFG.eco.years=10;`);
+  const hi = eco(`CFG.eco.manSalary=3000;CFG.eco.years=10;CFG.eco.rate=${Math.round(z.irr * 100) + 15};`);
+  return hi.npv < 0 && z.npv > 0; })());
+check('окупаемость по простому сроку при отрицательном NPV даёт замечание',
+  E0.pay > 0 && E0.npv < 0 ? /всегда льстит проекту/.test(E0.warn.join(' ')) : true);
+check('замечания экономики попадают в общий список', E0.wAll === E0.warn.length && E0.wAll > 0);
+
+check('чувствительность: дороже оборудование — дольше окупаемость', (() => {
+  const s = w.eval(`derive(CFG).eco.sens`);
+  const cap = s.find(x => /Капитальные/.test(x.n));
+  return cap.low < cap.base && cap.high > cap.base; })());
+check('себестоимость укладки считается на коробку и на паллету',
+  E0.unit.cellBox > 0 && E0.unit.manBox > E0.unit.cellBox && E0.unit.cellPal > E0.unit.cellBox);
+
+check('значения экономики нормализуются', w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));
+  CFG.eco.years=99;CFG.eco.rate=-5;CFG.eco.manRate='мусор';CFG.eco.pRobot=-100;normalize(CFG);
+  return CFG.eco.years===25&&CFG.eco.rate===0&&CFG.eco.manRate===DEF.eco.manRate&&CFG.eco.pRobot===0;})()`));
+check('цены переживают выгрузку и загрузку конфигурации', w.eval(`(()=>{
+  CFG=JSON.parse(JSON.stringify(DEF));CFG.eco.pRobot=4242;CFG.eco.years=9;normalize(CFG);
+  const t=cfgFromJSON(cfgJSON());return t.eco.pRobot===4242&&t.eco.years===9;})()`));
+
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));normalize(CFG);renderCfg();buildSim();showTab('eco');`);
+check('вкладка экономики отрисовывается',
+  d.getElementById('ecoCap').querySelectorAll('tr').length > 5 &&
+  d.getElementById('ecoFlow').innerHTML.indexOf('<svg') === 0 &&
+  d.getElementById('ecoText').innerHTML.length > 800);
+check('график денежного потока рисует точку на каждый год',
+  (d.getElementById('ecoFlow').innerHTML.match(/<circle/g) || []).length === w.eval('CFG.eco.years') + 1);
+check('под графиком есть таблица с теми же числами',
+  d.getElementById('ecoFlowT').querySelectorAll('tr').length === w.eval('CFG.eco.years') + 2);
+{ const inp = d.querySelector('#ecoIn1 input[data-k="eco.pRobot"]');
+  const was = w.eval('derive(CFG).eco.cap.total');
+  inp.value = String(+inp.value * 2); inp.dispatchEvent(new w.Event('input', { bubbles: true }));
+  check('правка цены в конфигураторе пересчитывает смету', w.eval('derive(CFG).eco.cap.total') > was); }
+check('экономика выгружается в CSV', w.eval(`csvBuild('eco').text`).indexOf('Капитальные затраты') > 0);
+check('экономика попадает в отчёт', w.eval(`reportHTML(CFG,derive(CFG),null)`).indexOf('Экономика: стоимость варианта') > 0);
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();showTab('sim');`);
 
 console.log('Смешанная паллета: рецепт укладки (п. 6)');
 const MIXCFG = `CFG=JSON.parse(JSON.stringify(DEF));CFG.robot='pl130';
@@ -755,7 +860,7 @@ check('конвейер паллет заменяет опасность про�
   has(rk(`CFG.exch.out='conveyor';`), 'Конвейер паллет') && !has(rk(`CFG.exch.out='conveyor';`), 'Проезд'));
 check('стеклянная тара добавляет осколки', rk(`CFG.boxes[0].mat='glass';`).n === r0.n + 1);
 check('у кобота удар манипулятором оценён легче, но воздействие чаще', (() => {
-  const a = r0.rows[0], b = rk(`CFG.robot='ur10';CFG.safety='cobot';`).rows[0];
+  const a = r0.rows[0], b = rk(`CFG.robot='cb20';CFG.safety='cobot';`).rows[0];
   return b.s < a.s && b.f > a.f; })());
 
 // связь с ISO 13849-1
@@ -829,7 +934,7 @@ w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.name='Тестовая ячей�
  renderCfg();buildSim();renderArch();$('csvSep').value=';';`);
 
 const keys = w.eval('CSV_ORDER');
-check('таблиц на выгрузку — одиннадцать', keys.length === 11, keys.join(','));
+check('таблиц на выгрузку — двенадцать', keys.length === 12, keys.join(','));
 let ragged = 0, noBom = 0, empty = 0;
 keys.forEach(k => { const t = csvOf(k), n = t.rows[0].length;
   if (!t.bom) noBom++;

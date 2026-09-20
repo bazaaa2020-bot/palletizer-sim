@@ -2,7 +2,7 @@
 // задача worker'а в другом: дать установку как приложения и работу без сети, когда файл
 // раздают по корпоративной сети, а не открывают с диска.
 // Версия кэша подставляется сборщиком из хеша собранного файла — новая сборка вытесняет старую.
-const CACHE = 'pal-sim-cdfac2b0a8';
+const CACHE = 'pal-sim-abf54a74a2';
 const FILES = ['./', './palletizer-sim.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 

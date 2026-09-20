@@ -5,18 +5,20 @@ const f0=v=>Math.round(v).toLocaleString('ru-RU');
 const f1=v=>(Math.round(v*10)/10).toLocaleString('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1});
 const f2=v=>(Math.round(v*100)/100).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
 const deep=o=>JSON.parse(JSON.stringify(o));
+// kW — средняя потребляемая мощность в работе (не установленная): нужна для расчёта
+// энергозатрат в экономике; у коботов это сотни ватт, у паллетайзеров — единицы киловатт.
 const ROBOTS=[
- {id:'cb5',name:'Кобот 5 кг · 850 мм',cls:'cobot',payload:5,reach:850,v:1.0,cpm:8,cost:1.0,ex:'класс UR5e, Dobot CR5, Elite EC66'},
- {id:'cb10l',name:'Кобот 10 кг · 1420 мм',cls:'cobot',payload:10,reach:1418,v:1.0,cpm:8,cost:1.4,ex:'класс FANUC CRX-10iA/L'},
- {id:'cb12',name:'Кобот 12,5 кг · 1300 мм',cls:'cobot',payload:12.5,reach:1300,v:1.0,cpm:8,cost:1.5,ex:'класс UR10e, Doosan M1013'},
- {id:'cb20',name:'Кобот 20 кг · 1750 мм',cls:'cobot',payload:20,reach:1750,v:1.0,cpm:7,cost:2.1,ex:'класс UR20, Doosan H2017 (1700 мм)'},
- {id:'cb25',name:'Кобот 25 кг · 1890 мм',cls:'cobot',payload:25,reach:1889,v:1.0,cpm:7,cost:2.4,ex:'класс FANUC CRX-25iA, Doosan H2515 (1500 мм)'},
- {id:'cb30',name:'Кобот 30 кг · 1300 мм',cls:'cobot',payload:30,reach:1300,v:1.0,cpm:7,cost:2.3,ex:'класс UR30'},
- {id:'ir50',name:'Промышленный 50 кг · 2050 мм',cls:'industrial',payload:50,reach:2050,v:2.0,cpm:12,cost:3.2,ex:'класс FANUC M-710iC/50, KUKA KR 50 R2100'},
- {id:'pl110',name:'Паллетайзер 110 кг · 2400 мм',cls:'industrial',payload:110,reach:2403,v:2.0,cpm:15,cost:4.2,ex:'класс FANUC M-410iC/110'},
- {id:'pl130',name:'Паллетайзер 130 кг · 2400 мм, 6 циклов/мин',cls:'industrial',payload:130,reach:2400,v:2.0,cpm:6,cost:4.4,ex:'по методике оценки REDCARGO PRO130 — 6 циклов укладки в минуту; досягаемость уточнить по паспорту'},
- {id:'pl185',name:'Паллетайзер 185 кг · 3140 мм',cls:'industrial',payload:185,reach:3143,v:2.0,cpm:15,cost:5.0,ex:'класс FANUC M-410iC/185, KUKA KR 180 R3200 PA'},
- {id:'custom',name:'Свой робот — ввести параметры',cls:'custom',payload:10,reach:1300,v:1.0,cpm:8,cost:2.0,ex:''}];
+ {id:'cb5',name:'Кобот 5 кг · 850 мм',cls:'cobot',payload:5,reach:850,v:1.0,cpm:8,cost:1.0,kW:0.35,ex:'класс UR5e, Dobot CR5, Elite EC66'},
+ {id:'cb10l',name:'Кобот 10 кг · 1420 мм',cls:'cobot',payload:10,reach:1418,v:1.0,cpm:8,cost:1.4,kW:0.45,ex:'класс FANUC CRX-10iA/L'},
+ {id:'cb12',name:'Кобот 12,5 кг · 1300 мм',cls:'cobot',payload:12.5,reach:1300,v:1.0,cpm:8,cost:1.5,kW:0.5,ex:'класс UR10e, Doosan M1013'},
+ {id:'cb20',name:'Кобот 20 кг · 1750 мм',cls:'cobot',payload:20,reach:1750,v:1.0,cpm:7,cost:2.1,kW:0.6,ex:'класс UR20, Doosan H2017 (1700 мм)'},
+ {id:'cb25',name:'Кобот 25 кг · 1890 мм',cls:'cobot',payload:25,reach:1889,v:1.0,cpm:7,cost:2.4,kW:0.7,ex:'класс FANUC CRX-25iA, Doosan H2515 (1500 мм)'},
+ {id:'cb30',name:'Кобот 30 кг · 1300 мм',cls:'cobot',payload:30,reach:1300,v:1.0,cpm:7,cost:2.3,kW:0.7,ex:'класс UR30'},
+ {id:'ir50',name:'Промышленный 50 кг · 2050 мм',cls:'industrial',payload:50,reach:2050,v:2.0,cpm:12,cost:3.2,kW:2.0,ex:'класс FANUC M-710iC/50, KUKA KR 50 R2100'},
+ {id:'pl110',name:'Паллетайзер 110 кг · 2400 мм',cls:'industrial',payload:110,reach:2403,v:2.0,cpm:15,cost:4.2,kW:3.5,ex:'класс FANUC M-410iC/110'},
+ {id:'pl130',name:'Паллетайзер 130 кг · 2400 мм, 6 циклов/мин',cls:'industrial',payload:130,reach:2400,v:2.0,cpm:6,cost:4.4,kW:3.5,ex:'по методике оценки REDCARGO PRO130 — 6 циклов укладки в минуту; досягаемость уточнить по паспорту'},
+ {id:'pl185',name:'Паллетайзер 185 кг · 3140 мм',cls:'industrial',payload:185,reach:3143,v:2.0,cpm:15,cost:5.0,kW:4.5,ex:'класс FANUC M-410iC/185, KUKA KR 180 R3200 PA'},
+ {id:'custom',name:'Свой робот — ввести параметры',cls:'custom',payload:10,reach:1300,v:1.0,cpm:8,cost:2.0,kW:1.0,ex:''}];
 // Форма тары: чем она отличается для захвата. seal — доля площади, которая реально
 // уплотняется вакуумом (у решётчатого верха нечему уплотняться, у плёнки складки подсасывают).
 const SHAPES={box:{name:'Коробка (параллелепипед)',seal:1,round:false},
@@ -149,9 +151,12 @@ const DEF={name:'Ячейка паллетизации',robots:1,robot:'cb20',cu
  risk:{org:['train','manual','sign','ppe','permit'],est:{}},
  shift:{len:8,breaks:30},
  plc:{mode:'ref',g1:[],g2:[]},
- mix:{on:false,name:'Заказ',rows:[{box:0,layers:2,sheet:false}]},opt:{target:400,allowCobot:true,maxRobots:2}};
+ mix:{on:false,name:'Заказ',rows:[{box:0,layers:2,sheet:false}]},
+ eco:{pRobot:3500,pGrip:900,pConvM:180,pPalConv:1200,pStation:120,pMag:250,pVision:900,
+  pFenceM:12,pCurtain:180,pScanner:320,pCabinet:1400,engPct:18,instPct:12,trainOnce:300,
+  tariff:7.5,sheetPrice:12,srvPct:4,manRate:300,manSalary:1200,cellMan:0.35,rate:20,years:7},opt:{target:400,allowCobot:true,maxRobots:2}};
 let CFG=deep(DEF);
-try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.vision=Object.assign(deep(DEF.vision),s.vision||{});CFG.pl=Object.assign(deep(DEF.pl),s.pl||{});CFG.risk=Object.assign(deep(DEF.risk),s.risk||{});CFG.shift=Object.assign(deep(DEF.shift),s.shift||{});CFG.plc=Object.assign(deep(DEF.plc),s.plc||{});CFG.mix=Object.assign(deep(DEF.mix),s.mix||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('pal-sim-cfg4')||'null');if(s&&s.boxes&&s.conveyors&&s.grip&&s.exch){CFG=Object.assign(deep(DEF),s);CFG.sheet=Object.assign(deep(DEF.sheet),s.sheet||{});CFG.exch=Object.assign(deep(DEF.exch),s.exch||{});CFG.grip=Object.assign(deep(DEF.grip),s.grip||{});CFG.motion=Object.assign(deep(DEF.motion),s.motion||{});CFG.vision=Object.assign(deep(DEF.vision),s.vision||{});CFG.pl=Object.assign(deep(DEF.pl),s.pl||{});CFG.risk=Object.assign(deep(DEF.risk),s.risk||{});CFG.shift=Object.assign(deep(DEF.shift),s.shift||{});CFG.plc=Object.assign(deep(DEF.plc),s.plc||{});CFG.mix=Object.assign(deep(DEF.mix),s.mix||{});CFG.eco=Object.assign(deep(DEF.eco),s.eco||{});CFG.boxes.forEach(b=>{if(b.rate===undefined)b.rate=0;if(b.layers===undefined)b.layers=0;});}}catch(e){}
 function saveCfg(){try{localStorage.setItem('pal-sim-cfg4',JSON.stringify(CFG));}catch(e){}}
 function robotOf(c){const r=ROBOTS.find(x=>x.id===c.robot)||ROBOTS[3];if(r.id==='custom')return{id:'custom',name:'Свой робот',cls:c.custom.cls,payload:+c.custom.payload,reach:+c.custom.reach,v:c.custom.cls==='cobot'?1:2,cpm:+c.custom.cpm||8,cost:2,ex:''};return r;}
 function safetyMode(c,rob){if(rob.cls!=='cobot')return'fence';return c.safety==='auto'?'cobot':c.safety;}
@@ -166,6 +171,12 @@ function normalize(c){if(c.exch.out==='conveyor')c.exch.in='dispenser';else if(c
  PL.dop=clamp(Math.round(+PL.dop||240),1,365);PL.hop=clamp(Math.round(+PL.hop||16),1,24);
  ['opsES','opsLC','opsDoor'].forEach(k=>{PL[k]=clamp(Math.round(+PL[k]||1),0,500);});
  if(!Array.isArray(PL.ccf))PL.ccf=[];
+ if(!c.eco)c.eco=deep(DEF.eco);
+ {const E=c.eco,lim={engPct:[0,100],instPct:[0,100],srvPct:[0,50],tariff:[0.1,100],sheetPrice:[0,1000],
+   manRate:[10,5000],manSalary:[0,100000],cellMan:[0,4],rate:[0,100],years:[1,25]};
+  Object.keys(DEF.eco).forEach(k=>{const v=+E[k],L=lim[k]||[0,1e9];
+   E[k]=isFinite(v)?clamp(v,L[0],L[1]):DEF.eco[k];});
+  E.years=Math.round(E.years);}
  if(!c.mix)c.mix=deep(DEF.mix);
  c.mix.on=!!c.mix.on;c.mix.name=String(c.mix.name||'Заказ').slice(0,60);
  if(!Array.isArray(c.mix.rows))c.mix.rows=[];
@@ -464,7 +475,10 @@ function derive(c,light){
   if((PL.arch.cat==='3'||PL.arch.cat==='4')&&!c.pl.edm)w.push('Контроль обратной связи контакторов (EDM) выключен: диагностика силовой части падает до 60 %, а по ISO 13849-1 для категорий 3 и 4 отключающие элементы должны контролироваться. Заведите зеркальные контакты на контроллер безопасности.');
   if(PL.arch.ch===1&&PLR_HARD.indexOf(PL.plr)>=0)w.push(`Одноканальная архитектура (${PL.arch.name.split(':')[0].toLowerCase()}) при требуемом PL ${PL.plr}: одиночный отказ приводит к потере функции безопасности. Нужны два канала с диагностикой.`);}
  if(light)return D;
- D.sig=signals(c,D);const cnt=x=>D.sig.filter(s=>s.k===x).length;D.io={DI:cnt('DI'),DO:cnt('DO'),SI:cnt('SI'),SO:cnt('SO'),BUS:cnt('BUS')};D.io.diMod=Math.ceil(D.io.DI*1.2/16);D.io.doMod=Math.ceil(D.io.DO*1.2/16);D.bom=bom(c,D);D.plan=planSKU(c,D);return D;}
+ D.sig=signals(c,D);const cnt=x=>D.sig.filter(s=>s.k===x).length;D.io={DI:cnt('DI'),DO:cnt('DO'),SI:cnt('SI'),SO:cnt('SO'),BUS:cnt('BUS')};D.io.diMod=Math.ceil(D.io.DI*1.2/16);D.io.doMod=Math.ceil(D.io.DO*1.2/16);D.bom=bom(c,D);D.plan=planSKU(c,D);
+ // Экономике нужны сигналы и спецификация, поэтому она идёт последней и только в полном расчёте.
+ D.eco=ecoCalc(c,D);D.eco.warn.forEach(x=>D.warnings.push('Экономика: '+x));
+ return D;}
 // ======================= ПЛАНИРОВЩИК АРТИКУЛОВ =======================
 function planSKU(c,D){
  const rows=c.boxes.map((b,i)=>{const p=choosePattern(b,D.pal,c.patternMode,c.maxStack,c.grip.pick,c.sheet,c.grip,D.tCycle);const cyc=p.groupsPerPallet+p.sheets+(c.exch.in==='robot'?1:0);const tPal=b.rate>0?p.total/(b.rate/60):0;

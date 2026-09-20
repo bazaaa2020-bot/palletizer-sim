@@ -702,6 +702,97 @@ function simEvent(b,i){
  if(b==='vfd'){const cv=S.conv[0];if(cv.type==='mdr'){log('На мотор-роликах нет ЧП: отказ зоны сообщит контроллер зоны по шине','warn');return;}if(cv.vfd.fault)return;cv.vfd.fault=true;S.flags.vfdTripped=true;hold('ЧП 1: авария F0001 перегрузка по току (заклинил ролик)');}
  if(b==='stuck'){S.conv[0].stuck=true;log('Датчик B11 залип в «1» (загрязнён отражатель) — ждите реакции робота','warn');}}
 $('drives').addEventListener('input',e=>{const i=e.target.dataset.acc;if(i===undefined)return;S.conv[+i].vfd.accel=+e.target.value;$('vAccV'+i).textContent=f1(+e.target.value)+' с';});
+// ---------- вкладка «Экономика» ----------
+// Один график: накопленный дисконтированный поток по годам. Он отвечает на единственный
+// вопрос, ради которого экономику и считают, — когда проект выходит в ноль с учётом ставки.
+// Всё остальное — таблицы: в ТКП важны точные суммы, а не форма кривой.
+function ecoFlowSVG(E){
+ const W=884,H=210,L=92,R=16,T=16,B=40,x0=L,x1=W-R,y0=T,y1=H-B;
+ const vals=E.flow.map(f=>f.cum),lo=Math.min(0,...vals),hi=Math.max(0,...vals),span=(hi-lo)||1;
+ const NY=Math.max(1,E.years||1);
+ const X=t=>x0+(x1-x0)*t/NY,Y=v=>y1-(y1-y0)*(v-lo)/span;
+ const zero=Y(0),pts=E.flow.map(f=>[X(f.t),Y(f.cum)]);
+ const line=pts.map((p,i)=>`${i?'L':'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+ const area=`${line} L${pts[pts.length-1][0].toFixed(1)} ${zero.toFixed(1)} L${pts[0][0].toFixed(1)} ${zero.toFixed(1)} Z`;
+ let s=`<defs>
+  <clipPath id="ecoUp"><rect x="${x0}" y="${y0}" width="${x1-x0}" height="${Math.max(0,zero-y0)}"/></clipPath>
+  <clipPath id="ecoDn"><rect x="${x0}" y="${zero}" width="${x1-x0}" height="${Math.max(0,y1-zero)}"/></clipPath></defs>`;
+ // сетка и подписи по оси денег — только три значения, чтобы не спорить с цифрами в таблице
+ [lo,0,hi].forEach(v=>{const y=Y(v);
+  s+=`<line x1="${x0}" y1="${y.toFixed(1)}" x2="${x1}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"${v===0?'':' stroke-dasharray="3 4"'}/>`
+   +`<text x="${x0-8}" y="${y+4}" text-anchor="end" font-size="11" fill="var(--muted)">${f0(v)}</text>`;});
+ s+=`<path d="${area}" fill="var(--green)" opacity=".18" clip-path="url(#ecoUp)"/>`
+  +`<path d="${area}" fill="var(--red)" opacity=".16" clip-path="url(#ecoDn)"/>`
+  +`<path d="${line}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/>`;
+ E.flow.forEach(f=>{const x=X(f.t);
+  s+=`<circle cx="${x.toFixed(1)}" cy="${Y(f.cum).toFixed(1)}" r="4" fill="var(--panel)" stroke="var(--ink)" stroke-width="2"/>`
+   +`<text x="${x.toFixed(1)}" y="${y1+16}" text-anchor="middle" font-size="11" fill="var(--muted)">${f.t}</text>`;});
+ s+=`<text x="${(x0+x1)/2}" y="${y1+33}" text-anchor="middle" font-size="11" fill="var(--muted)">год эксплуатации</text>`;
+ if(E.payD!==null&&E.payD<=NY){const x=X(E.payD);
+  s+=`<line x1="${x.toFixed(1)}" y1="${y0}" x2="${x.toFixed(1)}" y2="${y1}" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="5 4"/>`
+   +`<text x="${(x+8).toFixed(1)}" y="${y0+12}" font-size="11.5" font-weight="600" fill="var(--okfg)">выход в ноль: ${f1(E.payD)} года</text>`;}
+ else s+=`<text x="${x1-4}" y="${y0+12}" text-anchor="end" font-size="11.5" font-weight="600" fill="var(--badfg)">за ${NY} лет в ноль не выходит</text>`;
+ return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;}
+function renderEco(){
+ const c=normalize(CFG),D=derive(c),E=D.eco,U=E.unit,bd=(s,t)=>`<span class="badge ${s}">${t}</span>`;
+ const money=v=>`${f0(v)} ${U}`;
+ const fld=(k,label,step,min,max,note)=>`<div class="field"><label>${label}</label>${num('eco.'+k,c.eco[k],step,min,max)}${note?`<small>${note}</small>`:''}</div>`;
+ $('ecoCards').innerHTML=[
+  ['Капитальные затраты',money(E.cap.total),`оборудование ${f0(E.cap.equip)}, работы ${f0(E.cap.eng+E.cap.inst)}`,'ok'],
+  ['Экономия в год',E.save>0?money(E.save):'нет',E.save>0?`ручная ${f0(E.manYear)} против ячейки ${f0(E.cellYear)}`:'ячейка дороже ручной',E.save>0?'ok':'bad'],
+  ['Простой срок окупаемости',E.pay?`${f1(E.pay)} года`:'не окупается',`без учёта ставки ${f0(c.eco.rate)} % годовых`,E.pay&&E.pay<=c.eco.years?'ok':'bad'],
+  ['С учётом ставки',E.payD!==null?`${f1(E.payD)} года`:`> ${c.eco.years} лет`,`NPV ${f0(E.npv)} ${U}${E.irr!==null?`, IRR ${f0(E.irr*100)} %`:''}`,E.npv>0?'ok':'bad']]
+  .map(x=>`<div class="card"><span>${x[0]}</span><b style="color:var(--${x[3]==='ok'?'okfg':'badfg'})">${x[1]}</b><span>${x[2]}</span></div>`).join('');
+ $('ecoNote').innerHTML=`Количества берутся из конфигурации и расчёта — роботы, метры конвейера, периметр ограждения ${f0(D.fencePerim/1000)} м, проёмы, станции, магазины. Цены за единицу ставите вы: каталожных цен в тренажёре нет и быть не может. Режим работы взят с вкладки «Безопасность и PL»: ${c.pl.dop} дней × ${c.pl.hop} ч = ${f0(E.hours)} ч в году, ${E.shifts} смен${E.shifts===1?'а':''}.`;
+ $('ecoCap').innerHTML='<tr><th>Группа</th><th>Статья</th><th>Кол-во</th><th>Цена за ед.</th><th>Сумма</th><th>Откуда количество</th></tr>'
+  +E.cap.lines.map(l=>`<tr><td class="tag">${l.g}</td><td>${l.n}</td><td>${f1(l.q)} ${l.unit}</td><td>${l.price?f0(l.price):'—'}</td><td><b>${f0(l.sum)}</b></td><td style="color:var(--muted)">${l.note}</td></tr>`).join('')
+  +`<tr><td></td><td><b>Итого капитальных затрат</b></td><td></td><td></td><td><b>${f0(E.cap.total)}</b></td><td style="color:var(--muted)">${U}</td></tr>`;
+ $('ecoOpex').innerHTML='<tr><th>Статья</th><th>Ячейка, в год</th><th>Ручная укладка, в год</th><th>Как посчитано</th></tr>'
+  +E.cellOpex.map(x=>`<tr><td>${x.n}</td><td><b>${f0(x.v)}</b></td><td style="color:var(--muted)">${(E.manOpex.find(m=>m.n===x.n)||{v:0}).v?f0(E.manOpex.find(m=>m.n===x.n).v):'—'}</td><td style="color:var(--muted)">${x.note}</td></tr>`).join('')
+  +E.manOpex.filter(m=>!E.cellOpex.some(x=>x.n===m.n)).map(m=>`<tr><td>${m.n}</td><td style="color:var(--muted)">—</td><td><b>${f0(m.v)}</b></td><td style="color:var(--muted)">${m.note}</td></tr>`).join('')
+  +`<tr><td><b>Итого в год</b></td><td><b>${f0(E.cellYear)}</b></td><td><b>${f0(E.manYear)}</b></td><td style="color:var(--muted)">разница — ${E.save>0?`экономия ${f0(E.save)}`:`перерасход ${f0(-E.save)}`} ${U} в год</td></tr>`
+  +`<tr><td>Себестоимость укладки</td><td>${f2(E.unitCost.cellBox)} ₽/коробку</td><td>${f2(E.unitCost.manBox)} ₽/коробку</td><td style="color:var(--muted)">${f0(E.unitCost.cellPal)} против ${f0(E.unitCost.manPal)} ₽ на паллету при ${f0(E.unitCost.boxYear)} коробках в году</td></tr>`;
+ $('ecoPower').innerHTML=E.pw.lines.map(x=>`<div class="check"><div>${x.n}<small>${x.note}</small></div><span class="badge ok">${f2(x.kW)} кВт</span></div>`).join('')
+  +`<div class="check"><div>Итого потребление<small>× ${f0(E.hours)} ч × ${f1(c.eco.tariff)} ₽/кВт·ч</small></div><span class="badge ok">${f1(E.pw.kW)} кВт</span></div>`;
+ $('ecoFlowH').textContent=`Накопленный дисконтированный поток, ${U} — при ставке ${f0(c.eco.rate)} % годовых`;
+ $('ecoFlow').innerHTML=ecoFlowSVG(E);
+ $('ecoFlowT').innerHTML='<tr><th>Год</th><th>Поток</th><th>Дисконтированный</th><th>Накопленный</th></tr>'
+  +E.flow.map(f=>`<tr><td class="tag">${f.t}</td><td>${f0(f.cf)}</td><td>${f0(f.disc)}</td><td style="color:var(--${f.cum>=0?'okfg':'badfg'})"><b>${f0(f.cum)}</b></td></tr>`).join('');
+ $('ecoSens').innerHTML='<tr><th>Что меняем</th><th>−25 %</th><th>как в расчёте</th><th>+25 %</th></tr>'
+  +E.sens.map(x=>`<tr><td>${x.n}</td><td>${x.low?f1(x.low)+' года':'не окупается'}</td><td><b>${x.base?f1(x.base)+' года':'не окупается'}</b></td><td>${x.high?f1(x.high)+' года':'не окупается'}</td></tr>`).join('');
+ $('ecoIn1').innerHTML=fld('pRobot','Робот базового класса',100,0,100000,`× коэффициент каталога ${f1(D.rob.cost)} для «${D.rob.name}»`)
+  +fld('pGrip','Захват с оснасткой и пневматикой',50,0,50000)
+  +fld('pConvM','Конвейер подачи, за метр',10,0,10000)
+  +(c.exch.out==='conveyor'?fld('pPalConv','Конвейер паллет с диспенсером',50,0,50000):'')
+  +fld('pStation','Оснащение станции обмена',10,0,10000)
+  +(D.mags.length?fld('pMag','Магазин прокладок',10,0,10000):'')
+  +(c.vision.mode!=='none'?fld('pVision','Система технического зрения',50,0,50000):'')
+  +fld('pCabinet','Шкаф АСУ ТП: ПЛК, КБ, ЧП',50,0,50000);
+ $('ecoIn2').innerHTML=(D.safety==='fence'
+   ?fld('pFenceM','Ограждение, за метр периметра',1,0,1000,`периметр ${f0(D.fencePerim/1000)} м по компоновке`)+fld('pCurtain','Световая завеса с мьютингом, за проём',10,0,10000)
+   :fld('pScanner','Лазерный сканер безопасности',10,0,10000,`${2*c.robots} шт.: два поля на робота`))
+  +fld('engPct','Проектирование и ПНР, % от оборудования',1,0,100)
+  +fld('instPct','Монтаж и электромонтаж, % от оборудования',1,0,100)
+  +fld('trainOnce','Обучение персонала, разово',50,0,50000);
+ $('ecoIn3').innerHTML=fld('tariff','Электроэнергия, ₽ за кВт·ч',0.5,0.1,100)
+  +fld('sheetPrice','Прокладочный лист, ₽ за штуку',1,0,1000)
+  +fld('srvPct','Обслуживание, % от капитальных затрат в год',0.5,0,50)
+  +fld('cellMan','Оператор ячейки, доля ставки',0.05,0,4,'сколько времени человека забирает ячейка: обмен паллет, пополнение магазина, реакция на сбой');
+ $('ecoIn4').innerHTML=fld('manRate','Норма укладки вручную, коробок в час на человека',10,10,5000,`при потоке ${f0(D.bottleneck)} кор/ч нужно ${E.perShift} чел. в смену`)
+  +fld('manSalary','Зарплата укладчика в год с налогами',50,0,100000)
+  +fld('rate','Ставка дисконтирования, % годовых',1,0,100,'стоимость денег для предприятия: кредит, альтернативная доходность')
+  +fld('years','Горизонт расчёта, лет',1,1,25);
+ $('ecoText').innerHTML=`<h3>Как это считается</h3>
+<p><b>Количества — из конфигурации, цены — от вас.</b> Тренажёр знает, сколько в ячейке роботов, метров конвейера, проёмов с завесами, станций и магазинов, знает периметр ограждения и состав шкафа. Чего он знать не может — это ваших закупочных цен: они зависят от поставщика, курса, объёма и года. Поэтому в таблице капитальных затрат количество считается, а цена за единицу вводится. Меняете конфигурацию — смета пересчитывается сама.</p>
+<p><b>Электроэнергия считается, а не задаётся.</b> Мощность складывается из средней потребляемой мощности робота по каталогу, приводов конвейеров (от установленной: рольганг около 40 %, мотор-ролики около 50 % — зоны стоят, пока нет коробок), сжатого воздуха на эжектор (0,115 кВт·ч на кубометр свободного воздуха) и постоянной нагрузки шкафа. Для этой ячейки — ${f1(E.pw.kW)} кВт, то есть ${f0(E.pw.kW*E.hours*c.eco.tariff/1000)} ${U} в год. Обычно это копейки рядом с фондом оплаты труда, и это полезно увидеть своими глазами.</p>
+<p><b>База сравнения — ручная укладка того же потока.</b> При норме ${f0(c.eco.manRate)} коробок в час на человека и потоке ${f0(D.bottleneck)} кор/ч нужно ${E.perShift} человек${E.perShift===1?'а':''} в смену, при ${E.shifts} сменах — ${E.people} человек${E.people===1?'':' всего'}. Это и есть главная статья экономии; всё остальное на её фоне мелочь.</p>
+<p><b>Простой срок окупаемости льстит проекту.</b> Он делит вложения на годовую экономию и молча считает, что деньги сегодня и через пять лет стоят одинаково. Поэтому рядом стоит дисконтированный расчёт: при ставке ${f0(c.eco.rate)} % годовых чистая приведённая стоимость за ${c.eco.years} лет ${E.npv>=0?`положительная (${f0(E.npv)} ${U}) — проект создаёт стоимость`:`отрицательная (${f0(E.npv)} ${U}) — на этом горизонте и при этой ставке деньги выгоднее не вкладывать`}${E.irr!==null?`, внутренняя норма доходности ${f0(E.irr*100)} % против ставки ${f0(c.eco.rate)} %`:''}.</p>
+<p><b>Чувствительность важнее точки.</b> Любая смета врёт; вопрос в том, насколько от этого меняется решение. Таблица внизу показывает срок окупаемости при отклонении ±25 % по трём величинам, в которых ошибаются чаще всего: цена оборудования, зарплата, загрузка.</p>
+<h3>Чего этот расчёт не учитывает</h3>
+<p>Не считает налоги, амортизацию, лизинг и субсидии — это финансовая модель предприятия, а не ячейки. Не считает стоимость простоя линии при отказе, потери от брака и травматизма, текучку укладчиков и доплату за тяжёлый труд — а это часто и есть настоящая причина роботизации. Не учитывает высвобождение площади, изменение страховых взносов и стоимость обучения сверх разовой суммы. И не подбирает конфигурацию под бюджет: для этого есть оптимизатор на вкладке «Конфигуратор».</p>`;}
+$('tab-eco').addEventListener('input',e=>{const k=e.target.dataset.k;if(!k)return;
+ const v=+e.target.value;if(!isFinite(v))return;
+ setPath(CFG,k,v);normalize(CFG);saveCfg();renderEco();renderChecks();});
 // ---------- вкладка «Логика ПЛК»: редактор GRAFCET ----------
 // Диаграмма рисуется из той же структуры, которую исполняет интерпретатор: что нарисовано,
 // то и работает. Активный шаг подсвечивается во время работы ячейки.
@@ -912,13 +1003,13 @@ function initHelp(){
  $('gloss').innerHTML=GLOSS.map(g=>`<dt>${g[0]}</dt><dd>${g[1]}</dd>`).join('');
  $('stdText').innerHTML=`<h3>Нормы, к которым привязан тренажёр</h3><ul><li>ГОСТ Р ИСО 12100 — оценка рисков.</li><li>ГОСТ Р ИСО 13849-1/-2 — PL, категории архитектуры, валидация.</li><li>ГОСТ Р МЭК 60204-1 — электрооборудование машин, категории стопов.</li><li>ГОСТ Р ИСО 10218-1/-2, ISO/TS 15066 — роботы, коллаборативные режимы.</li><li>ГОСТ ИСО 13855, 13857, 14119, ISO 14120 — расстояния, ограждения, блокировки.</li><li>EN 415-4 — безопасность паллетайзеров; ISO 3691-4 — безопасность беспилотных транспортных средств (AMR/AGV).</li><li>ISA-TR88.00.02 (PackML), МЭК 60848 (GRAFCET), МЭК 61131-3, МЭК 61439-1.</li><li>Методика расчёта вакуумных захватов — по рекомендациям производителей присосок (три расчётных случая, коэффициент запаса 1,5–2).</li><li>Методика оценки производительности паллетайзера по циклам на паллету (REDCARGO PRO130).</li></ul><h3>Что упрощено в модели</h3><p>Схемы укладки — из семейства сетка / две зоны / пинвил без перевязки внутри слоя; конвейер — установившийся режим; цикл робота — по расстояниям в плане с нормативом циклов; поля сканеров — круги; тележки и люди идут по прямой к проёму; расход через картон и время набора вакуума — оценочные. Все параметры каталога подлежат проверке по паспорту.</p>`;}
 // ======================= ИНИЦИАЛИЗАЦИЯ =======================
-function showTab(t){if(t==='plc')renderGraf();if(t==='pl')renderPL();if(t==='risk')renderRisk();if(t==='oee')renderOEE();document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));if(t==='3d'&&typeof resize3D==='function')resize3D();}
+function showTab(t){if(t==='eco')renderEco();if(t==='plc')renderGraf();if(t==='pl')renderPL();if(t==='risk')renderRisk();if(t==='oee')renderOEE();document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));if(t==='3d'&&typeof resize3D==='function')resize3D();}
 $('tabs').addEventListener('click',e=>{const t=e.target.dataset.tab;if(t)showTab(t);});
 $('scenSel').innerHTML=SCEN_ORDER.map(k=>`<option value="${k}">${SCEN[k].n}</option>`).join('');
 $('scenSel').onchange=()=>{S.scen={key:$('scenSel').value,t:0,i:0,on:false};$('scenNote').textContent=SCEN[S.scen.key].note;log(`Выбран сценарий: ${SCEN[S.scen.key].n.toLowerCase()}. Он начнётся с ближайшего пуска`,'warn');};
 $('scenNote').textContent=SCEN.none.note;
 $('bShift').onclick=()=>shiftReset();
-initHelp();renderCfg();renderPL();renderRisk();if(typeof init3D==='function')init3D();buildSim();renderArch();renderOEE();renderGraf();
+initHelp();renderCfg();renderPL();renderRisk();if(typeof init3D==='function')init3D();buildSim();renderArch();renderOEE();renderGraf();renderEco();
 $('gcMode').addEventListener('click',e=>{if(e.target.id==='bGcCopy'){const R=grafRef(CFG);CFG.plc.g1=deep(R.g1);CFG.plc.g2=deep(R.g2);CFG.plc.mode='user';normalize(CFG);saveCfg();buildSim();renderGraf();}
  if(e.target.id==='bGcReset'){CFG.plc.g1=[];CFG.plc.g2=[];CFG.plc.mode='ref';normalize(CFG);saveCfg();buildSim();renderGraf();}});
 let last=performance.now();
