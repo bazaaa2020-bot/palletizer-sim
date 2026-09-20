@@ -359,6 +359,132 @@ check('вкладка PL отрисовывается', (() => { w.eval('showTab
 check('раздел PL попадает в отчёт', w.eval(`reportHTML(CFG,derive(CFG),null)`).indexOf('Performance Level') > 0);
 w.eval('showTab("sim")');
 
+console.log('Редактор логики ПЛК — GRAFCET (п. 4)');
+const gc = extra => w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));${extra || ''}normalize(CFG);
+ const P=grafProg(CFG);return{g1:P.g1.length,g2:P.g2.length,mode:CFG.plc.mode,
+  warn:grafCheck(P,CFG),diff:grafDiff(P,grafRef(CFG)).map(x=>x.t),
+  acts:P.g1.concat(P.g2).reduce((a,s)=>a.concat(s.act||[]),[])};})()`);
+
+const R = gc();
+check('по умолчанию исполняется эталонная программа', R.mode === 'ref' && R.g1 >= 4 && R.g2 === 2);
+check('эталон проходит собственную проверку без замечаний', R.warn.length === 0, R.warn.join(' | '));
+check('эталон не отличается сам от себя', R.diff.length === 0);
+check('в эталоне есть все нужные разрешения',
+  ['feed', 'job', 'jobSheet', 'call', 'lamp'].every(a => R.acts.indexOf(a) >= 0), R.acts.join(','));
+check('подача паллет роботом добавляет задание на паллету',
+  gc(`CFG.exch.in='robot';`).acts.indexOf('jobPallet') >= 0 &&
+  gc(`CFG.exch.in='vehicle';`).acts.indexOf('jobPallet') < 0);
+
+// интерпретатор
+check('интерпретатор проходит цепочку истинных переходов за один такт', w.eval(`(()=>{
+  const st=[{id:'A',n:'',act:[],tr:[{c:'always',to:'B'}]},{id:'B',n:'',act:[],tr:[{c:'always',to:'C'}]},
+   {id:'C',n:'',act:[],tr:[{c:'run',to:'A'}]}];
+  return grafRun(st,'A',{})==='C';})()`));
+check('кольцо безусловных переходов не подвешивает интерпретатор', w.eval(`(()=>{
+  const st=[{id:'A',n:'',act:[],tr:[{c:'always',to:'B'}]},{id:'B',n:'',act:[],tr:[{c:'always',to:'A'}]}];
+  return ['A','B'].indexOf(grafRun(st,'A',{}))>=0;})()`));
+check('переход в несуществующий шаг не двигает программу',
+  w.eval(`grafRun([{id:'A',n:'',act:[],tr:[{c:'always',to:'X'}]}],'A',{})`) === 'A');
+
+// проверка программы ловит ошибки структуры
+const gcBad = extra => gc(`CFG.plc.mode='user';${extra}`).warn.join(' | ');
+check('тупиковый шаг виден проверке',
+  /нет ни одного перехода/.test(gcBad(`CFG.plc.g1=[{id:'S0',n:'Тупик',act:['job','feed','jobSheet','call'],tr:[]}];CFG.plc.g2=[{id:'T0',n:'x',act:['call'],tr:[{c:'always',to:'T0'}]}];`)));
+check('недостижимый шаг виден проверке',
+  /недостижим/.test(gcBad(`CFG.plc.g1=[{id:'S0',n:'a',act:['job','feed','jobSheet'],tr:[{c:'run',to:'S0'}]},{id:'S9',n:'b',act:[],tr:[{c:'always',to:'S0'}]}];CFG.plc.g2=[{id:'T0',n:'x',act:['call'],tr:[{c:'always',to:'T0'}]}];`)));
+check('переход в несуществующий шаг виден проверке',
+  /несуществующий шаг/.test(gcBad(`CFG.plc.g1=[{id:'S0',n:'a',act:['job','feed','jobSheet'],tr:[{c:'always',to:'S7'}]}];CFG.plc.g2=[{id:'T0',n:'x',act:['call'],tr:[{c:'always',to:'T0'}]}];`)));
+check('мьютинг вместе с заданием роботу — отдельное замечание о безопасности',
+  /мьютинг/i.test(gcBad(`CFG.plc.g1=[{id:'S0',n:'a',act:['job','feed','jobSheet','mute'],tr:[{c:'run',to:'S0'}]}];CFG.plc.g2=[{id:'T0',n:'x',act:['call'],tr:[{c:'always',to:'T0'}]}];`)));
+check('программа без задания роботу отвергается проверкой',
+  /нет задания роботу/.test(gcBad(`CFG.plc.g1=[{id:'S0',n:'a',act:['feed'],tr:[{c:'run',to:'S0'}]}];CFG.plc.g2=[{id:'T0',n:'x',act:['call'],tr:[{c:'always',to:'T0'}]}];`)));
+check('программа без вызова обмена отвергается проверкой',
+  /вызова обмена/.test(gcBad(`CFG.plc.g1=[{id:'S0',n:'a',act:['feed','job','jobSheet'],tr:[{c:'run',to:'S0'}]}];CFG.plc.g2=[{id:'T0',n:'x',act:[],tr:[{c:'always',to:'T0'}]}];`)));
+
+// нормализация и обмен конфигурацией
+check('битые шаги и неизвестные действия отбрасываются при нормализации', w.eval(`(()=>{
+  CFG=JSON.parse(JSON.stringify(DEF));CFG.plc.mode='user';
+  CFG.plc.g1=[null,{id:'S0',n:'a',act:['job','нетТакого'],tr:[{c:'always',to:'S0'},{c:'нетТакого',to:'S0'}]}];
+  normalize(CFG);return CFG.plc.g1.length===1&&CFG.plc.g1[0].act.length===1&&CFG.plc.g1[0].tr.length===1;})()`));
+check('пустая пользовательская программа откатывает режим на эталон',
+  w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));CFG.plc.mode='user';CFG.plc.g1=[];normalize(CFG);return CFG.plc.mode==='ref';})()`));
+check('программа переживает выгрузку и загрузку конфигурации', w.eval(`(()=>{
+  CFG=JSON.parse(JSON.stringify(DEF));const R=grafRef(CFG);CFG.plc.g1=JSON.parse(JSON.stringify(R.g1));
+  CFG.plc.g2=JSON.parse(JSON.stringify(R.g2));CFG.plc.mode='user';CFG.plc.g1[0].n='Мой шаг';
+  const t=cfgFromJSON(cfgJSON());return t.plc.mode==='user'&&t.plc.g1[0].n==='Мой шаг';})()`));
+
+// исполнение: эталон работает как раньше, кривая программа ломает ячейку
+const runProg = (extra, sec) => {
+  w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.conveyors[0].feed='rate';CFG.conveyors[0].rate=25;
+   CFG.exch.reaction=4;${extra || ''}normalize(CFG);renderCfg();buildSim();`);
+  click('#bReset'); run(2); click('#bStart'); run(sec);
+  return { placed: w.eval('S.stats.placed'), sheets: w.eval('S.stats.sheets'),
+    state: w.eval('S.packml'), why: w.eval('S.why'), boxes: w.eval('S.conv[0].boxes.length'),
+    step: w.eval('S.plc.g1[0].cur'), acts: w.eval('[...S.plc.actR[0]]') }; };
+
+const ref = runProg('', 150);
+check('на эталонной программе ячейка укладывает и кладёт прокладки',
+  ref.placed > 8 && ref.sheets > 0 && ref.state === 'Execute', `${ref.placed} коробок, ${ref.sheets} листов`);
+check('активный шаг и его разрешения видны в состоянии',
+  !!ref.step && ref.acts.indexOf('feed') >= 0);
+
+const noJob = runProg(`CFG.plc.mode='user';
+  CFG.plc.g1=[{id:'S0',n:'Только подача',act:['feed'],tr:[{c:'run',to:'S0'}]}];
+  CFG.plc.g2=[{id:'T0',n:'Ждём',act:['call','lamp'],tr:[{c:'always',to:'T0'}]}];`, 60);
+check('без задания роботу ячейка не укладывает ничего', noJob.placed === 0, `уложено ${noJob.placed}`);
+check('и уходит в Suspended с внятной причиной',
+  noJob.state === 'Suspended' && /разрешения нет|не выдала/.test(noJob.why), noJob.why);
+check('подача при этом работает — разрешение в программе есть', noJob.boxes > 0, `${noJob.boxes} коробок на конвейере`);
+
+const noFeed = runProg(`CFG.plc.mode='user';const R=grafRef(CFG);
+  CFG.plc.g1=JSON.parse(JSON.stringify(R.g1));CFG.plc.g2=JSON.parse(JSON.stringify(R.g2));
+  CFG.plc.g1.forEach(s=>{s.act=s.act.filter(a=>a!=='feed');});`, 60);
+check('без разрешения подачи коробки на конвейер не приходят', noFeed.boxes === 0 && noFeed.placed === 0);
+
+const noSheetJob = runProg(`CFG.plc.mode='user';const R=grafRef(CFG);
+  CFG.plc.g1=JSON.parse(JSON.stringify(R.g1));CFG.plc.g2=JSON.parse(JSON.stringify(R.g2));
+  CFG.plc.g1.forEach(s=>{s.act=s.act.filter(a=>a!=='jobSheet');});`, 150);
+check('без задания на прокладку ячейка встаёт на первом же слое с листом',
+  noSheetJob.sheets === 0 && noSheetJob.placed > 0 && noSheetJob.state === 'Suspended',
+  `${noSheetJob.placed} коробок, состояние ${noSheetJob.state}`);
+
+const noCall = runProg(`CFG.stations=1;CFG.boxes[0].layers=1;CFG.plc.mode='user';const R=grafRef(CFG);
+  CFG.plc.g1=JSON.parse(JSON.stringify(R.g1));
+  CFG.plc.g2=[{id:'T0',n:'Обмен не вызывается',act:['lamp'],tr:[{c:'always',to:'T0'}]}];`, 200);
+check('без вызова обмена готовая паллета так и стоит', w.eval('S.stats.exch') === 0);
+
+// вкладка
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));normalize(CFG);renderCfg();buildSim();showTab('plc');`);
+check('вкладка логики ПЛК отрисовывается',
+  d.getElementById('gcG1').innerHTML.length > 500 && d.getElementById('gcCheck').innerHTML.length > 100 &&
+  d.getElementById('gcText').innerHTML.length > 500);
+check('эталон не редактируется, пока не скопирован', d.querySelectorAll('#gcT1 input[type=checkbox]').length === 0);
+d.getElementById('bGcCopy').click();
+check('кнопка копирует эталон в свою программу и включает её',
+  w.eval('CFG.plc.mode') === 'user' && w.eval('CFG.plc.g1.length') > 0 &&
+  w.eval('grafDiff(grafProg(CFG),grafRef(CFG)).length') === 0);
+check('после копирования появляется таблица шагов',
+  d.querySelectorAll('#gcT1 tr').length - 1 === w.eval('CFG.plc.g1.length') &&
+  d.querySelectorAll('#gcT1 input[type=checkbox]').length > 10);
+{ const cb = d.querySelector('#gcT1 input[data-a="jobSheet"]');
+  const was = w.eval(`CFG.plc.g1.filter(s=>s.act.indexOf('jobSheet')>=0).length`);
+  cb.checked = !cb.checked; cb.dispatchEvent(new w.Event('input', { bubbles: true }));
+  check('галочка действия правит программу и отличие видно против эталона',
+    w.eval(`CFG.plc.g1.filter(s=>s.act.indexOf('jobSheet')>=0).length`) !== was &&
+    w.eval('grafDiff(grafProg(CFG),grafRef(CFG)).length') > 0); }
+{ const n = w.eval('CFG.plc.g1.length');
+  d.querySelector('#gcT1 button[data-act="addStep"]').click();
+  check('кнопка добавляет шаг с переходом', w.eval('CFG.plc.g1.length') === n + 1 &&
+    w.eval('CFG.plc.g1[CFG.plc.g1.length-1].tr.length') === 1);
+  d.querySelectorAll('#gcT1 button[data-act="delStep"]')[n].click();
+  check('кнопка удаляет шаг и чистит переходы на него', w.eval('CFG.plc.g1.length') === n &&
+    w.eval(`CFG.plc.g1.every(s=>s.tr.every(t=>CFG.plc.g1.some(x=>x.id===t.to)))`)); }
+d.getElementById('bGcReset').click();
+check('кнопка очистки возвращает эталон', w.eval('CFG.plc.mode') === 'ref' && w.eval('CFG.plc.g1.length') === 0);
+check('программа выгружается в CSV', w.eval(`csvBuild('plc').text`).indexOf('G1') > 0);
+check('программа попадает в отчёт', w.eval(`reportHTML(CFG,derive(CFG),null)`).indexOf('Логика ПЛК') > 0);
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();showTab('sim');`);
+
 console.log('Смена, простои и OEE (п. 7)');
 // прогон смены: оператор реагирует на остановки сбросом и пуском
 const shift = (scen, sec, extra) => {
@@ -553,7 +679,7 @@ w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.name='Тестовая ячей�
  renderCfg();buildSim();renderArch();$('csvSep').value=';';`);
 
 const keys = w.eval('CSV_ORDER');
-check('таблиц на выгрузку — девять', keys.length === 9, keys.join(','));
+check('таблиц на выгрузку — десять', keys.length === 10, keys.join(','));
 let ragged = 0, noBom = 0, empty = 0;
 keys.forEach(k => { const t = csvOf(k), n = t.rows[0].length;
   if (!t.bom) noBom++;

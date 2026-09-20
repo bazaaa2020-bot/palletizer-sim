@@ -122,6 +122,13 @@ const CSV_TABLES={
    h.m1.map(x=>x.m.n).join('; '),h.m2.map(x=>x.m.n).join('; '),h.m3.map(x=>x.m.n).join('; '),
    h.todo.map(k=>MEAS[k].n).join('; '),
    h.res.s,h.res.f,h.res.o,h.res.a,RISK_CLS[h.cls],h.ok?'да':'нет',h.sf?h.plr:'',h.sf||''])})},
+ plc:{name:'Программа ПЛК (GRAFCET)',file:'логика-ПЛК',build:(c,D,s)=>{
+  const P=grafProg(c);
+  const rows=[];const push=(g,gn)=>g.forEach(st=>{
+   const tr=(st.tr||[]).map(t=>`${GC_COND[t.c]?GC_COND[t.c].n:t.c} → ${t.to}`);
+   rows.push([gn,st.id,st.n,(st.act||[]).map(a=>GC_ACT[a].n).join('; ')||'нет',tr.join(' ; ')||'нет',String(tr.length)]);});
+  push(P.g1,'G1 — цикл укладки');push(P.g2,'G2 — обмен паллет');
+  return{head:['Диаграмма','Шаг','Название','Действия','Переходы: условие → шаг','Переходов'],rows};}},
  oee:{name:'Смена: простои и OEE',file:'смена-OEE',build:(c,D,s)=>{
   if(typeof S==='undefined'||!S||!S.oee||S.oee.obs<=0)
    return{head:['Показатель','Значение','Ед.'],rows:[['Смена','не запускалась — прогоните ячейку на вкладке «Симуляция»','']]};
@@ -149,7 +156,7 @@ const CSV_TABLES={
   return{head:['Показатель','Значение','Ед.','Доля','Накопленная','Категория'],rows:R};}},
  warn:{name:'Замечания расчёта',file:'замечания',build:(c,D,s)=>({
   head:['№','Замечание'],rows:D.warnings.map((w,i)=>[i+1,w])})}};
-const CSV_ORDER=['bom','sig','params','sku','risk','pl','base','oee','warn'];
+const CSV_ORDER=['bom','sig','params','sku','risk','pl','base','plc','oee','warn'];
 let CSV_LAST='bom';
 // Один «лист» на файл; вариант «все таблицы» кладёт их блоками с заголовками.
 function csvBuild(key){const c=normalize(CFG),D=derive(c),s=csvSep(),T=CSV_TABLES[key];
@@ -308,6 +315,16 @@ function reportHTML(c,D,png){
   ['Промышленная сеть',c.fieldbus],
   ['Сигналы',`${D.io.DI} DI / ${D.io.DO} DO / ${D.io.SI} безопасных входов / ${D.io.SO} безопасных выходов / ${D.io.BUS} объектов по шине`],
   ['Модули ввода-вывода',`${D.io.diMod} × DI16, ${D.io.doMod} × DO16 (с запасом 20 %)`]]));
+ {const P=grafProg(c),wr=grafCheck(P,c),df=c.plc.mode==='user'?grafDiff(P,grafRef(c)):[];
+  H.push(`<h3>Логика ПЛК: последовательность ячейки (GRAFCET)</h3>`+repTable([
+   ['Источник программы',c.plc.mode==='user'?'программа пользователя':'эталонная программа тренажёра'],
+   ['Состав',`${P.g1.length} шаг${P.g1.length===1?'':'ов'} в цикле укладки (экземпляр на каждого робота), ${P.g2.length} — в обмене паллет (экземпляр на каждую станцию)`],
+   ['Проверка структуры',wr.length?`${wr.length} замечани${wr.length===1?'е':'й'}: ${wr.join('; ')}`:'замечаний нет'],
+   ['Отличия от эталона',c.plc.mode==='user'?(df.length?df.map(x=>x.t).join('; '):'совпадает с эталоном'):'—']]));
+  H.push(repCols(['Диаграмма','Шаг','Название','Действия','Переходы: условие → шаг'],
+   P.g1.map(st=>['G1',st.id,st.n,(st.act||[]).map(x=>GC_ACT[x].n).join('; ')||'нет',(st.tr||[]).map(t=>`${GC_COND[t.c]?GC_COND[t.c].n:t.c} → ${t.to}`).join('<br>')||'нет'])
+   .concat(P.g2.map(st=>['G2',st.id,st.n,(st.act||[]).map(x=>GC_ACT[x].n).join('; ')||'нет',(st.tr||[]).map(t=>`${GC_COND[t.c]?GC_COND[t.c].n:t.c} → ${t.to}`).join('<br>')||'нет']))));
+  H.push(`<p class="sub">Программа исполняется тренажёром: её действия дают разрешение подачи, задание роботу и вызов обмена. Выбор станции и группы остаётся за программой робота; цепи безопасности программе ПЛК не подчиняются.</p>`);}
  if(typeof S!=='undefined'&&S&&S.oee&&S.oee.obs>20){const K=oeeCalc(S.oee,S.stats,D),SH=shiftProj(K,c.shift,D),PR=dtPareto(S.oee);
   H.push(`<h3>Смена: простои и OEE</h3>`+repTable([
    ['Наблюдаемое время',`${f0(K.obs)} с, из них работа ${f0(K.run)} с; сценарий тревог — ${SCEN[S.scen.key].n.toLowerCase()}`],

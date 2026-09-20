@@ -313,8 +313,9 @@ function buildSim(){
   stacks:DD.stacks.map(p=>({id:p.id,robot:p.robot,slot:p,n:c.exch.stack})),
   agents:[],stats:{placed:0,run:0,pallets:0,dropped:0,missed:0,exch:0,refills:0,sheets:0,setPallets:0},nextId:1,timer:0,tasks:TASKSTATE,
   oee:newShift(),scen:{key:($('scenSel')||{}).value||'none',t:0,i:0,on:false},
+  plc:null,
   flags:{lcTripped:false,estopTripped:false,palletDone:false,palletRemoved:false,vfdTripped:false,typesPlaced:new Set(),optApplied:prevOpt,agentSeen:new Set()}};
- if(c.sheet.mode==='bottom')S.st.forEach(s=>{if(s.present)s.needSheet=S.mags.length>0;});
+ plcInit(); if(c.sheet.mode==='bottom')S.st.forEach(s=>{if(s.present)s.needSheet=S.mags.length>0;});
  $('ovr').value=c.speedPct;$('ovrV').textContent=c.speedPct+' %';
  $('log').innerHTML='';buildStatic();buildButtons();buildIO();
  $('steps').innerHTML=STEPS.map((st,i)=>`<li id="st-${st[0]}"><span>${i+1}</span>${st[1]}</li>`).join('');
@@ -377,7 +378,7 @@ function buildIO(){
  S.stacks.forEach(p=>LIVE_DI.push([`B5.${p.id}`,`Стопка паллет: есть`,()=>p.n>0]));
  LIVE_DI.push(['PS1',GRIPPERS[c.grip.type].vac?'Вакуум достигнут (робот 1)':'Захват закрыт (робот 1)',()=>S.robots[0].carryKind!==null],['PA','Давление воздуха в норме',()=>true],['R1','Робот 1 в исходной',()=>near(S.robots[0],S.robots[0].home)]);
  LIVE_DO=[];c.conveyors.forEach((cv,i)=>{LIVE_DO.push([`K${i+1}`,cv.type==='mdr'?`Мотор-ролики ${i+1}: разрешение`:`Конвейер ${i+1} RUN → ЧП`,()=>S.conv[i].vfd.run]);if(cv.type!=='mdr')LIVE_DO.push([`STO${i+1}`,`STO ЧП ${i+1}`,()=>S.conv[i].vfd.sto,'alarm']);if(cv.feed!=='manual')LIVE_DO.push([`UP${i+1}`,`Разрешение подачи ${i+1}`,()=>['Execute','Suspended','Starting'].includes(S.packml)&&!S.conv[i].boxes.some(b=>b.p<.12)]);});
- S.st.forEach(s=>{if(c.exch.out!=='conveyor')LIVE_DO.push([`H${s.id}`,`Лампа «освобождено» ${s.id}`,()=>released(s),'warn']);});
+ S.st.forEach(s=>{if(c.exch.out!=='conveyor')LIVE_DO.push([`H${s.id}`,`Лампа «освобождено» ${s.id}`,()=>plcLamp(s),'warn']);});
  S.mags.forEach(m=>LIVE_DO.push([`H4.${m.id}`,`Лампа «магазин ${m.id} освобождён»`,()=>m.loading,'warn']));
  if(D.safety==='fence')LIVE_DO.push(['Q1','Замок двери (питание)',()=>S.lock]);else LIVE_DO.push(['R.RS','Робот: сниженная скорость',()=>S.speedFactor<1,'warn']);
  LIVE_DO.push(['EN','Разрешение движения роботов',()=>S.robots[0].power],['Y1',GRIPPERS[c.grip.type].vac?'Вакуум ВКЛ (робот 1)':'Захват закрыть (робот 1)',()=>S.robots[0].carryKind!==null],['H1','Лампа красная',()=>lamp().r,'alarm'],['H2','Лампа жёлтая',()=>lamp().y,'warn'],['H3','Лампа зелёная',()=>lamp().g]);
@@ -468,7 +469,11 @@ function robotTick(r,dt){
  if(S.packml==='Suspended'){if(!noPallet()&&!noSheet())setState('Execute','Условие возобновления выполнено');else return;}
  const s=r.job?r.job.st:null;const b=s?boxOf(c,s.bi):DD.heaviest;
  switch(r.step){
-  case 'wait':{moveZ(r,zTravel(r),M.vZ,dt);if(S.packml==='Stopping')break;const j=findJob(r.i);if(!j){if(noPallet())suspend(c.exch.in==='robot'&&S.stacks.every(p=>p.n===0)?'Стопка паллет пуста — пополните (B5=0)':'Нет свободной паллеты — ожидание обмена');else if(noSheet())suspend('Магазин прокладок пуст или загружается — ожидание (B4=0)');break;}r.job=j;r.step=j.kind==='sheet'?'toMag':j.kind==='pallet'?'toStack':'toPick';break;}
+  case 'wait':{moveZ(r,zTravel(r),M.vZ,dt);if(S.packml==='Stopping')break;const j=plcJob(r.i);if(!j){const jb=S.plc?S.plc.job[r.i]:null;
+   if(jb){const need=jb.kind==='box'?'job':jb.kind==='sheet'?'jobSheet':'jobPallet';
+    suspend(`Программа ПЛК не выдала «${GC_ACT[need].n}»: работа есть, разрешения нет — проверьте действия активного шага`);
+    if(!r.plcWarn){r.plcWarn=true;log(`Робот ${r.i+1} ждёт: задание вида «${GC_ACT[need].n}» не разрешено ни одним активным шагом программы ПЛК`,'warn');}break;}
+   r.plcWarn=false;if(noPallet())suspend(c.exch.in==='robot'&&S.stacks.every(p=>p.n===0)?'Стопка паллет пуста — пополните (B5=0)':'Нет свободной паллеты — ожидание обмена');else if(noSheet())suspend('Магазин прокладок пуст или загружается — ожидание (B4=0)');break;}r.job=j;r.step=j.kind==='sheet'?'toMag':j.kind==='pallet'?'toStack':'toPick';break;}
   // ---- коробки: подход сверху, опускание на подводе, отрыв строго вверх ----
   case 'toPick':{const okXY=moveTo(r,pickWorld(r.job.conv,r.job.g),dt),zA=zPickOf(r.job.conv)+M.hAppr;
    const okZ=moveZ(r,okXY?zA:Math.max(zA,zSafe(r,0)),M.vZ,dt),okT=turnTo(r,0,dt);if(okXY&&okZ&&okT)r.step='downPick';break;}
@@ -558,7 +563,7 @@ function agentTick(a,dt){
  return true;}
 function autoExchange(dt){
  const c=CFG,ex=c.exch;if(!['Execute','Suspended','Starting','Idle','Stopping'].includes(S.packml))return;
- if(ex.out!=='conveyor'){S.st.forEach(s=>{const need=(s.complete||(!s.present&&ex.in==='vehicle'))&&!s.agent;if(need&&ex.auto){s.waitT+=dt;if(s.waitT>=ex.reaction)dispatch('pallet',s,ex.out);}else if(!need)s.waitT=0;});}
+ if(ex.out!=='conveyor'){S.st.forEach(s=>{const need=(s.complete||(!s.present&&ex.in==='vehicle'))&&!s.agent&&plcS(s,'call');if(need&&ex.auto){s.waitT+=dt;if(s.waitT>=ex.reaction)dispatch('pallet',s,ex.out);}else if(!need)s.waitT=0;});}
  S.mags.forEach(m=>{const need=m.sheets<=c.sheet.low&&!m.agent&&!m.loading;if(need&&ex.auto){m.waitT+=dt;if(m.waitT>=ex.reaction)dispatch('sheets',m,ex.sheetsBy==='amr'?'amr':'person');}else if(!need)m.waitT=0;});}
 function tick(dt){
  S.timer+=dt;const D=DD,c=CFG;
@@ -568,7 +573,7 @@ function tick(dt){
   else if(v.actual<v.target)v.actual=Math.min(v.target,v.actual+(cv.type==='mdr'?rate*4:rate));else if(v.actual>v.target)v.actual=Math.max(v.target,v.actual-rate);
   const g=D.LY.convs[i],b=g.b,spd=(cv.nom/60*1000)*(v.actual/50)*dt/(g.len-b.l),gap=gapOf(i);
   cv.boxes.sort((a,x)=>x.p-a.p);cv.boxes.forEach((bx,j)=>{const lim=j===0?1:cv.boxes[j-1].p-gap;bx.p=Math.min(lim,bx.p+spd);});
-  if(cf.feed!=='manual'&&['Execute','Suspended','Starting'].includes(S.packml)){cv.feedT+=dt;const per=cf.feed==='interval'?cf.interval:60/cf.rate;if(cv.feedT>=per){if(!cv.boxes.some(x=>x.p<.13)){cv.boxes.push({p:0,id:S.nextId++});cv.fed++;cv.feedT=0;}}}});
+  if(cf.feed!=='manual'&&['Execute','Suspended','Starting'].includes(S.packml)&&plcR(cv.robot,'feed')){cv.feedT+=dt;const per=cf.feed==='interval'?cf.interval:60/cf.rate;if(cv.feedT>=per){if(!cv.boxes.some(x=>x.p<.13)){cv.boxes.push({p:0,id:S.nextId++});cv.fed++;cv.feedT=0;}}}});
  const centerX=(i,p)=>{const g=D.LY.convs[i];return g.x0+g.b.l/2+p*(g.len-g.b.l);};
  if(D.safety==='fence'){S.lc.muted=S.conv.some((cv,i)=>cv.boxes.some(b=>Math.abs(centerX(i,b.p)-D.F.x0)<D.LY.convs[i].b.l/2+220));
   if(S.lc.timer>0){S.lc.timer-=dt;if(S.lc.timer<=0)S.lc.broken=false;}
@@ -583,9 +588,40 @@ function tick(dt){
  if(S.packml==='Execute')S.stats.run+=dt;
  shiftTick(dt);scenTick(dt);
  if($('tab-oee').classList.contains('on')){S.oeeT=(S.oeeT||0)+dt;if(S.oeeT>.5){S.oeeT=0;renderOEE();}}
+ if($('tab-plc').classList.contains('on')){S.gcT=(S.gcT||0)+dt;if(S.gcT>.4){S.gcT=0;renderGraf();}}
+ if(S.plc)plcTick();
  S.robots.forEach(r=>robotTick(r,dt));
  if(S.packml==='Execute'){if(!S.tasks.t3&&S.flags.lcTripped)done('t3');if(!S.tasks.t6&&S.flags.estopTripped)done('t6');if(!S.tasks.t9&&S.flags.vfdTripped)done('t9');if(!S.tasks.t8&&c.conveyors.length>=2&&S.flags.typesPlaced.size>=2)done('t8');if(!S.tasks.t17&&S.flags.agentSeen.has('amr')&&S.stats.exch>0)done('t17');}
  render();}
+// ---------- исполнение программы ПЛК (GRAFCET) ----------
+// Программа — данные; интерпретатор на каждом такте гоняет переходы и собирает действия
+// активных шагов. Разрешения читают подача, робот и вызов обмена — больше ничего не зашито.
+function plcInit(){const P=grafProg(CFG);
+ S.plc={P,g1:S.robots.map(()=>({cur:P.g1[0]?P.g1[0].id:null,busy:false})),
+  g2:S.st.map(()=>({cur:P.g2[0]?P.g2[0].id:null})),
+  actR:S.robots.map(()=>new Set()),actS:S.st.map(()=>new Set()),job:S.robots.map(()=>null)};}
+function plcTick(){const P=S.plc.P;
+ S.robots.forEach((rb,ri)=>{const inst=S.plc.g1[ri],jb=findJob(ri);
+  // «робот занят» — по шагу его собственной программы, а не по полю job: оно живёт до
+  // следующего задания и для логики ПЛК ничего не значит.
+  const busyNow=rb.step!=='wait'||rb.carryKind!==null;inst.busy=inst.busy||busyNow;
+  const ctx={ri,rb,jb,st:null,done:inst.busy&&!busyNow};
+  const next=grafRun(P.g1,inst.cur,ctx);
+  if(next!==inst.cur){inst.cur=next;inst.busy=busyNow;}
+  const st=P.g1.find(x=>x.id===inst.cur);
+  S.plc.actR[ri]=new Set(st?st.act:[]);S.plc.job[ri]=jb;});
+ S.st.forEach((sn,si)=>{const inst=S.plc.g2[si];
+  const ctx={ri:sn.robot,rb:S.robots[sn.robot],jb:null,st:sn,done:false};
+  inst.cur=grafRun(P.g2,inst.cur,ctx);
+  const st=P.g2.find(x=>x.id===inst.cur);
+  S.plc.actS[si]=new Set(st?st.act:[]);});}
+const plcR=(ri,a)=>!!S.plc&&S.plc.actR[ri]&&S.plc.actR[ri].has(a);
+const plcS=(s,a)=>{const i=S.st.indexOf(s);return i>=0&&!!S.plc&&S.plc.actS[i]&&S.plc.actS[i].has(a);};
+// Робот берёт задание только того вида, который разрешила программа.
+function plcJob(ri){const j=S.plc?S.plc.job[ri]:findJob(ri);if(!j)return null;
+ const need=j.kind==='box'?'job':j.kind==='sheet'?'jobSheet':'jobPallet';
+ return plcR(ri,need)?j:null;}
+function plcLamp(s){return released(s)&&plcS(s,'lamp');}
 // ---------- смена, простои, OEE ----------
 // Учёт идёт от первого пуска: до него ячейка ещё не «в смене» и простой не копится.
 function newShift(){return{on:false,obs:0,by:{run:0,fault:0,starve:0,chg:0,idle:0},log:[],cur:null,t:0};}
@@ -643,6 +679,86 @@ function simEvent(b,i){
  if(b==='vfd'){const cv=S.conv[0];if(cv.type==='mdr'){log('На мотор-роликах нет ЧП: отказ зоны сообщит контроллер зоны по шине','warn');return;}if(cv.vfd.fault)return;cv.vfd.fault=true;S.flags.vfdTripped=true;hold('ЧП 1: авария F0001 перегрузка по току (заклинил ролик)');}
  if(b==='stuck'){S.conv[0].stuck=true;log('Датчик B11 залип в «1» (загрязнён отражатель) — ждите реакции робота','warn');}}
 $('drives').addEventListener('input',e=>{const i=e.target.dataset.acc;if(i===undefined)return;S.conv[+i].vfd.accel=+e.target.value;$('vAccV'+i).textContent=f1(+e.target.value)+' с';});
+// ---------- вкладка «Логика ПЛК»: редактор GRAFCET ----------
+// Диаграмма рисуется из той же структуры, которую исполняет интерпретатор: что нарисовано,
+// то и работает. Активный шаг подсвечивается во время работы ячейки.
+function grafSVG(steps,cur,title){
+ const W=884,x0=58,bw=300,bh=46,gap=46,y0=16;
+ if(!steps.length)return `<text x="${W/2}" y="40" text-anchor="middle" font-size="13" fill="var(--muted)">${title}: шагов нет</text>`;
+ const pos={};steps.forEach((s,i)=>pos[s.id]=y0+i*(bh+gap));
+ const H=y0+steps.length*(bh+gap);let s='';
+ steps.forEach((st,i)=>{const y=pos[st.id],on=st.id===cur;
+  s+=`<rect x="${x0}" y="${y}" width="${bw}" height="${bh}" fill="${on?'var(--robot)':'var(--panel)'}" stroke="${on?'var(--robot)':'var(--ink)'}" stroke-width="${on?2:1.5}"/>`
+   +`<rect x="${x0+5}" y="${y+5}" width="${bw-10}" height="${bh-10}" fill="none" stroke="${on?'#fff':'var(--line)'}" stroke-width="1"/>`
+   +`<text x="${x0+14}" y="${y+21}" font-size="12.5" font-weight="600" fill="${on?'#fff':'var(--ink)'}">${st.id}</text>`
+   +`<text x="${x0+46}" y="${y+21}" font-size="12" fill="${on?'#fff':'var(--ink)'}">${st.n.length>34?st.n.slice(0,33)+'…':st.n}</text>`
+   +`<text x="${x0+14}" y="${y+37}" font-size="11" fill="${on?'#fff':'var(--muted)'}">${(()=>{const t=(st.act||[]).map(a=>GC_ACT[a]?GC_ACT[a].n.replace('Задание роботу: ','задание: '):a).join(' · ')||'действий нет';return t.length>48?t.slice(0,47)+'…':t;})()}</text>`;
+  // переходы: вниз к следующему шагу прямо, остальные — дугой справа
+  (st.tr||[]).forEach((t,k)=>{const yt=y+bh+8+k*13,tx=x0+bw/2;
+   s+=`<line x1="${tx-26}" y1="${yt}" x2="${tx+26}" y2="${yt}" stroke="var(--ink)" stroke-width="2"/>`
+    +`<text x="${tx+34}" y="${yt+4}" font-size="11" fill="var(--muted)">${GC_COND[t.c]?GC_COND[t.c].n:t.c} → ${t.to}</text>`;
+   const ty=pos[t.to];if(ty===undefined)return;
+   if(ty>y){s+=`<line x1="${tx}" y1="${yt}" x2="${tx}" y2="${ty}" stroke="var(--ink)" stroke-width="1.5" marker-end="url(#gca)"/>`;}
+   // возврат наверх уводим в левую полосу, чтобы дуга не перечёркивала подпись перехода
+   else{const rx=Math.max(6,x0-16-k*13);
+    s+=`<path d="M${tx-26} ${yt} L${rx} ${yt} L${rx} ${ty+bh/2} L${x0} ${ty+bh/2}" fill="none" stroke="var(--blue)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#gca)"/>`;}});});
+ return `<svg viewBox="0 0 ${W} ${H+10}" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="gca" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="var(--ink)"/></marker></defs>${s}</svg>`;}
+function grafTable(steps,g){
+ const ids=steps.map(s=>s.id);
+ return `<table><tr><th>Шаг</th><th>Название</th><th>Действия</th><th>Переходы: условие → шаг</th><th></th></tr>`
+  +steps.map((st,i)=>`<tr><td class="tag">${st.id}</td>
+   <td><input type="text" data-g="${g}" data-i="${i}" data-f="n" value="${st.n.replace(/"/g,'&quot;')}"></td>
+   <td>${GC_ACT_ORDER.map(a=>`<label class="gcact" title="${GC_ACT[a].d}"><input type="checkbox" data-g="${g}" data-i="${i}" data-a="${a}" ${(st.act||[]).indexOf(a)>=0?'checked':''}><span>${GC_ACT[a].n}</span></label>`).join('')}</td>
+   <td>${(st.tr||[]).map((t,k)=>`<div class="gctr"><select data-g="${g}" data-i="${i}" data-t="${k}" data-f="c">${GC_COND_ORDER.map(c=>`<option value="${c}" ${c===t.c?'selected':''}>${GC_COND[c].n}</option>`).join('')}</select>
+     <select data-g="${g}" data-i="${i}" data-t="${k}" data-f="to">${ids.map(id=>`<option value="${id}" ${id===t.to?'selected':''}>${id}</option>`).join('')}</select>
+     <button data-act="delTr" data-g="${g}" data-i="${i}" data-t="${k}" title="Удалить переход">×</button></div>`).join('')
+    +`<div class="gctr"><button data-act="addTr" data-g="${g}" data-i="${i}">Добавить переход</button></div>`}</td>
+   <td><button data-act="delStep" data-g="${g}" data-i="${i}" title="Удалить шаг" ${steps.length<2?'disabled':''}>×</button></td></tr>`).join('')
+  +`</table><div class="btns"><button data-act="addStep" data-g="${g}">Добавить шаг</button></div>`;}
+function renderGraf(){
+ const c=normalize(CFG),P=grafProg(c),R=grafRef(c),user=c.plc.mode==='user';
+ const cur1=S&&S.plc?S.plc.g1[0].cur:null,cur2=S&&S.plc?S.plc.g2[0].cur:null;
+ $('gcMode').innerHTML=`<div class="field"><label>Чья логика исполняется</label>${sel('plc.mode',[['ref','Эталонная (зашита в тренажёр)'],['user','Моя программа']],c.plc.mode)}<small>${user?'Ячейка работает по вашей программе — ошибки в ней сразу видны на пульте':'Эталон можно скопировать к себе и править'}</small></div>
+ <div class="btns"><button id="bGcCopy">Скопировать эталон в свою программу</button><button id="bGcReset" ${user?'':'disabled'}>Очистить свою программу</button></div>
+ <p class="note">Интерпретатор за один такт проходит цепочку истинных переходов и останавливается на шаге, из которого выхода нет, — как ПЛК за один скан. Предел цепочки ${GC_MAX_FIRE} переходов, чтобы кольцо из безусловных переходов не подвесило ячейку.</p>`;
+ const wr=grafCheck(P,c),df=user?grafDiff(P,R):[];
+ $('gcCheck').innerHTML=`<div class="check"><div>Проверка программы<small>${user?'Ваша программа':'Эталонная программа'}: ${P.g1.length} шаг${P.g1.length===1?'':'ов'} в цикле укладки, ${P.g2.length} — в обмене паллет</small></div><span class="badge ${wr.length?'bad':'ok'}">${wr.length?`${wr.length} замечан${wr.length===1?'ие':'ий'}`:'замечаний нет'}</span></div>
+ ${wr.length?`<ul class="warnings">${wr.map(x=>`<li>${x}</li>`).join('')}</ul>`:'<p class="note">Структура связная: недостижимых шагов и тупиков нет, все нужные действия в программе есть.</p>'}
+ ${user?`<div class="check"><div>Отличия от эталона<small>Сравниваются шаги, их действия и переходы</small></div><span class="badge ${df.length?'warn':'ok'}">${df.length?`${df.length} отлич${df.length===1?'ие':'ий'}`:'совпадает с эталоном'}</span></div>
+  ${df.length?`<ul class="warnings">${df.map(x=>`<li>${x.t}</li>`).join('')}</ul>`:''}`:''}`;
+ $('gcG1').innerHTML=grafSVG(P.g1,cur1,'Цикл укладки');
+ $('gcG2').innerHTML=grafSVG(P.g2,cur2,'Обмен паллет');
+ $('gcT1').innerHTML=user?grafTable(P.g1,'g1'):'<p class="note">Эталонная программа редактированию не подлежит — скопируйте её в свою и правьте.</p>';
+ $('gcT2').innerHTML=user?grafTable(P.g2,'g2'):'';
+ $('gcLive').innerHTML=S&&S.plc?`<div class="cards">${S.robots.map((r,i)=>{const st=P.g1.find(x=>x.id===S.plc.g1[i].cur);
+   return `<div class="card"><span>Робот ${i+1}: шаг ${S.plc.g1[i].cur}</span><b>${st?st.n:'—'}</b><span>${[...S.plc.actR[i]].map(a=>GC_ACT[a].n).join('; ')||'действий нет'}</span></div>`;}).join('')
+  +S.st.map((s,i)=>{const st=P.g2.find(x=>x.id===S.plc.g2[i].cur);
+   return `<div class="card"><span>Станция ${s.id}: шаг ${S.plc.g2[i].cur}</span><b>${st?st.n:'—'}</b><span>${[...S.plc.actS[i]].map(a=>GC_ACT[a].n).join('; ')||'действий нет'}</span></div>`;}).join('')}</div>`:'';
+ $('gcText').innerHTML=`<h3>Что здесь исполняется</h3>
+<p>Программа — это данные, а не код: шаги с действиями и переходы с условиями. Интерпретатор читает её на каждом такте и выдаёт разрешения, которые ячейка и слушает: <b>разрешение подачи</b> (без него упаковочная машина не отправит коробку), <b>задание роботу</b> трёх видов (без нужного вида робот не возьмёт ни коробку, ни прокладку, ни паллету), <b>вызов обмена</b> (без него готовая паллета так и стоит) и <b>лампа «станция освобождена»</b>.</p>
+<p><b>Выбор, что именно брать, остаётся за роботом.</b> ПЛК разрешает вид работы, а какую станцию и какую группу взять — решает программа робота, как и в жизни: контроллер робота исполняет свою траекторию, ПЛК ведёт последовательность ячейки. Поэтому в шагах нет координат — только разрешения и ожидания.</p>
+<p><b>Безопасность программе не подчиняется.</b> Мьютинг, блокировка двери, остановка по завесе и снятие питания — это контроллер безопасности, отдельная цепь. Действие «разрешение мьютинга» в программе есть, но физический байпас им не управляется: проверка предупредит, если вы держите мьютинг одновременно с заданием роботу, — в реальной ячейке это нарушение.</p>
+<h3>Что попробовать</h3>
+<ul><li>Скопируйте эталон к себе и снимите действие «задание роботу: положить прокладку» с шага S3 — ячейка встанет на первом же слое, которому нужен лист, и это будет видно как Suspended.</li>
+<li>Уберите из S1 переход по условию «станции нужна пустая паллета» — при подаче паллет роботом станции останутся без паллет.</li>
+<li>Поставьте в S2 переход «1 — безусловно» вместо «робот закончил ход»: задание будет сниматься на следующем же такте, робот начнёт дёргаться, а такт вырастет.</li>
+<li>Добавьте мьютинг в шаг с заданием роботу и посмотрите, что скажет проверка.</li></ul>`;}
+$('tab-plc').addEventListener('input',e=>{const t=e.target,g=t.dataset.g;
+ if(t.dataset.k==='plc.mode'){CFG.plc.mode=t.value;normalize(CFG);saveCfg();buildSim();renderGraf();return;}
+ if(!g)return;const i=+t.dataset.i,P=CFG.plc[g];if(!P||!P[i])return;
+ if(t.dataset.a){const a=t.dataset.a,k=P[i].act.indexOf(a);if(t.checked){if(k<0)P[i].act.push(a);}else if(k>=0)P[i].act.splice(k,1);}
+ else if(t.dataset.t!==undefined){const tr=P[i].tr[+t.dataset.t];if(tr)tr[t.dataset.f]=t.value;}
+ else if(t.dataset.f==='n')P[i].n=t.value;
+ normalize(CFG);saveCfg();buildSim();renderGraf();});
+$('tab-plc').addEventListener('click',e=>{const a=e.target.dataset.act;if(!a)return;
+ const g=e.target.dataset.g,i=+e.target.dataset.i,P=CFG.plc[g];if(!P)return;
+ if(a==='addStep'){const pre=g==='g1'?'S':'T';let n=P.length;while(P.some(s=>s.id===pre+n))n++;
+  P.push({id:pre+n,n:'Новый шаг',act:[],tr:[{c:'always',to:P[0]?P[0].id:pre+n}]});}
+ if(a==='delStep'){const id=P[i].id;P.splice(i,1);P.forEach(s=>{s.tr=(s.tr||[]).filter(t=>t.to!==id);});}
+ if(a==='addTr')P[i].tr.push({c:'always',to:P[0].id});
+ if(a==='delTr')P[i].tr.splice(+e.target.dataset.t,1);
+ normalize(CFG);saveCfg();buildSim();renderGraf();});
 // ---------- вкладка «Смена и OEE» ----------
 const mmss=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
 const hhmm=t=>t>=3600?`${Math.floor(t/3600)} ч ${Math.round(t%3600/60)} мин`:`${Math.round(t/60)} мин`;
@@ -727,7 +843,7 @@ function render(){
  if(D.safety==='cobot'){const rad=S.person==='away'?G.rDraw+200:S.person==='slow'?Math.min(D.rSlow,G.rDraw)-250:D.rStop-200;const [px,py]=P(rad*0.6,rad*0.8);const col=S.person==='stop'?'var(--red)':S.person==='slow'?'var(--warnfg)':'var(--muted)';dyn+=`<circle cx="${px}" cy="${py-8}" r="7" fill="none" stroke="${col}" stroke-width="2"/><line x1="${px}" y1="${py-1}" x2="${px}" y2="${py+14}" stroke="${col}" stroke-width="2"/>`;}
  $('dyn').innerHTML=dyn;
  S.mags.forEach(m=>{const e=$('sheets-'+m.id);if(e)e.textContent=m.sheets;});S.stacks.forEach(p=>{const e=$('stack-'+p.id);if(e)e.textContent=p.n;});
- S.st.forEach(s=>{const g=$('gate-'+s.id);if(g)g.setAttribute('stroke',s.phase==='out'||(released(s)&&c.exch.out!=='conveyor')?'var(--off)':'var(--red)');const l=$('lamp-'+s.id);if(l)l.setAttribute('fill',released(s)&&c.exch.out!=='conveyor'?'var(--green)':'var(--off)');});
+ S.st.forEach(s=>{const g=$('gate-'+s.id);if(g)g.setAttribute('stroke',s.phase==='out'||(released(s)&&c.exch.out!=='conveyor')?'var(--off)':'var(--red)');const l=$('lamp-'+s.id);if(l)l.setAttribute('fill',plcLamp(s)&&c.exch.out!=='conveyor'?'var(--green)':'var(--off)');});
  S.mags.forEach(m=>{const g=$('gate-'+m.id);if(g)g.setAttribute('stroke',m.loading?'var(--off)':'var(--red)');const l=$('lamp-'+m.id);if(l)l.setAttribute('fill',m.sheets<=c.sheet.low?'var(--yellow)':'var(--off)');});
  if(D.safety==='fence'){S.conv.forEach((cv,i)=>{const e=$('lc'+i);e.setAttribute('stroke',S.lc.broken?'var(--yellow)':S.lc.muted?'var(--off)':'var(--red)');e.setAttribute('stroke-width',S.lc.broken?6:3);});
   const d=$('doorLine'),x1=+d.getAttribute('x1'),y1=+d.getAttribute('y1');d.setAttribute('x2',S.door==='open'?x1+40:+d.dataset.x2);d.setAttribute('y2',S.door==='open'?y1-40:y1);$('lockDot').setAttribute('fill',S.lock?'var(--green)':'var(--yellow)');}
@@ -773,13 +889,15 @@ function initHelp(){
  $('gloss').innerHTML=GLOSS.map(g=>`<dt>${g[0]}</dt><dd>${g[1]}</dd>`).join('');
  $('stdText').innerHTML=`<h3>Нормы, к которым привязан тренажёр</h3><ul><li>ГОСТ Р ИСО 12100 — оценка рисков.</li><li>ГОСТ Р ИСО 13849-1/-2 — PL, категории архитектуры, валидация.</li><li>ГОСТ Р МЭК 60204-1 — электрооборудование машин, категории стопов.</li><li>ГОСТ Р ИСО 10218-1/-2, ISO/TS 15066 — роботы, коллаборативные режимы.</li><li>ГОСТ ИСО 13855, 13857, 14119, ISO 14120 — расстояния, ограждения, блокировки.</li><li>EN 415-4 — безопасность паллетайзеров; ISO 3691-4 — безопасность беспилотных транспортных средств (AMR/AGV).</li><li>ISA-TR88.00.02 (PackML), МЭК 60848 (GRAFCET), МЭК 61131-3, МЭК 61439-1.</li><li>Методика расчёта вакуумных захватов — по рекомендациям производителей присосок (три расчётных случая, коэффициент запаса 1,5–2).</li><li>Методика оценки производительности паллетайзера по циклам на паллету (REDCARGO PRO130).</li></ul><h3>Что упрощено в модели</h3><p>Схемы укладки — из семейства сетка / две зоны / пинвил без перевязки внутри слоя; конвейер — установившийся режим; цикл робота — по расстояниям в плане с нормативом циклов; поля сканеров — круги; тележки и люди идут по прямой к проёму; расход через картон и время набора вакуума — оценочные. Все параметры каталога подлежат проверке по паспорту.</p>`;}
 // ======================= ИНИЦИАЛИЗАЦИЯ =======================
-function showTab(t){if(t==='pl')renderPL();if(t==='risk')renderRisk();if(t==='oee')renderOEE();document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));if(t==='3d'&&typeof resize3D==='function')resize3D();}
+function showTab(t){if(t==='plc')renderGraf();if(t==='pl')renderPL();if(t==='risk')renderRisk();if(t==='oee')renderOEE();document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+t));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));if(t==='3d'&&typeof resize3D==='function')resize3D();}
 $('tabs').addEventListener('click',e=>{const t=e.target.dataset.tab;if(t)showTab(t);});
 $('scenSel').innerHTML=SCEN_ORDER.map(k=>`<option value="${k}">${SCEN[k].n}</option>`).join('');
 $('scenSel').onchange=()=>{S.scen={key:$('scenSel').value,t:0,i:0,on:false};$('scenNote').textContent=SCEN[S.scen.key].note;log(`Выбран сценарий: ${SCEN[S.scen.key].n.toLowerCase()}. Он начнётся с ближайшего пуска`,'warn');};
 $('scenNote').textContent=SCEN.none.note;
 $('bShift').onclick=()=>shiftReset();
-initHelp();renderCfg();renderPL();renderRisk();if(typeof init3D==='function')init3D();buildSim();renderArch();renderOEE();
+initHelp();renderCfg();renderPL();renderRisk();if(typeof init3D==='function')init3D();buildSim();renderArch();renderOEE();renderGraf();
+$('gcMode').addEventListener('click',e=>{if(e.target.id==='bGcCopy'){const R=grafRef(CFG);CFG.plc.g1=deep(R.g1);CFG.plc.g2=deep(R.g2);CFG.plc.mode='user';normalize(CFG);saveCfg();buildSim();renderGraf();}
+ if(e.target.id==='bGcReset'){CFG.plc.g1=[];CFG.plc.g2=[];CFG.plc.mode='ref';normalize(CFG);saveCfg();buildSim();renderGraf();}});
 let last=performance.now();
 function loop(now){const dt=Math.min(.1,(now-last)/1000)*(S.timeScale||1);last=now;tick(dt);if(typeof render3D==='function'&&$('tab-3d').classList.contains('on'))render3D();requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
