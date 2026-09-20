@@ -172,13 +172,18 @@ function palletMesh(pal){const g=new THREE.Group(),mm=1/1000,W=pal.W*mm,Lz=pal.L
  [-1,0,1].forEach(k=>{const b=new THREE.Mesh(new THREE.BoxGeometry(W,h*0.3,0.1),m);b.position.set(0,h*0.15,k*(Lz/2-0.06));g.add(b);});
  const top=new THREE.Mesh(new THREE.BoxGeometry(W,h*0.2,Lz),m);top.position.y=h*0.9;g.add(top);
  [-1,0,1].forEach(k=>{const b=new THREE.Mesh(new THREE.BoxGeometry(0.1,h*0.5,Lz),m);b.position.set(k*(W/2-0.06),h*0.55,0);g.add(b);});return g;}
-function buildStation3(s){const c=CFG,pal=DD.pal,mm=1/1000,b=boxOf(c,s.bi),col=COL3.box[s.bi%4],g=V3.stations[s.id].g;clear3(g);if(!s.present)return;
- g.add(palletMesh(pal));const geo={0:taraGeom(b,0),1:taraGeom(b,1)},m=mat(col);
+function buildStation3(s){const c=CFG,pal=DD.pal,mm=1/1000,g=V3.stations[s.id].g;clear3(g);if(!s.present)return;
+ g.add(palletMesh(pal));
+ // У смешанной паллеты каждый слой — свой артикул: геометрия и цвет берутся из рецепта слоя.
+ const geo={},mt={};const gOf=(bi,b,rot)=>{const kk=bi+'|'+rot;if(!geo[kk])geo[kk]=taraGeom(b,rot);return geo[kk];};
+ const mOf=bi=>{if(!mt[bi])mt[bi]=mat(COL3.box[bi%4]);return mt[bi];};
  const sheetsBelow=j=>s.sheetLayers.filter(x=>x<=j).length*4;
- const addLayer=(cells,idx,j)=>{const y=(pal.h+j*b.h+sheetsBelow(j))*mm;idx.forEach(i=>{const cl=cells[i];const mesh=new THREE.Mesh(geo[cl.rot],m);mesh.position.set(cl.x*mm,y+b.h*mm/2,cl.y*mm);g.add(mesh);});};
- for(let j=0;j<s.layer;j++){const cells=(s.pat.interlock&&j%2)?s.pat.cellsB:s.pat.cells;addLayer(cells,cells.map((x,i)=>i),j);}
+ const hBelow=j=>{let z=0;for(let i=0;i<Math.min(j,s.rec.length);i++)z+=s.rec[i].b.h;return z;};
+ const addLayer=(cells,idx,j)=>{const r=recAt(s,j),y=(pal.h+hBelow(j)+sheetsBelow(j))*mm;
+  idx.forEach(i=>{const cl=cells[i];const mesh=new THREE.Mesh(gOf(r.bi,r.b,cl.rot),mOf(r.bi));mesh.position.set(cl.x*mm,y+r.b.h*mm/2,cl.y*mm);g.add(mesh);});};
+ for(let j=0;j<s.layer;j++){const p=recAt(s,j).pat,cells=(p.interlock&&j%2)?p.cellsB:p.cells;addLayer(cells,cells.map((x,i)=>i),j);}
  if(s.placed.length)addLayer(curCells(s),s.placed,s.layer);
- s.sheetLayers.forEach(l=>{const y=(pal.h+l*b.h+s.sheetLayers.filter(x=>x<l).length*4)*mm;const sh=box3(pal.W*mm-0.02,0.004,pal.L*mm-0.02,COL3.sheet);sh.position.y=y+0.002;g.add(sh);});}
+ s.sheetLayers.forEach(l=>{const y=(pal.h+hBelow(l)+s.sheetLayers.filter(x=>x<l).length*4)*mm;const sh=box3(pal.W*mm-0.02,0.004,pal.L*mm-0.02,COL3.sheet);sh.position.y=y+0.002;g.add(sh);});}
 function agentMesh(a){const c=CFG,pal=DD.pal,mm=1/1000,g=new THREE.Group();
  if(a.kind==='person'||a.kind==='jack'){const body=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.2,1.3,14),mat(COL3.agent));body.position.set(0,0.65,0);const head=new THREE.Mesh(new THREE.SphereGeometry(0.13,14,12),mat(0xE8C39E));head.position.set(0,1.5,0);const person=new THREE.Group();person.add(body,head);
   if(a.kind==='jack'){person.position.x=0.9;const forks=box3(1.2,0.06,0.55,COL3.agent);forks.position.set(0,0.06,0);const handle=box3(0.05,1.1,0.05,COL3.agent);handle.position.set(0.65,0.6,0);g.add(forks,handle);}g.add(person);}
@@ -196,7 +201,7 @@ function agentMesh(a){const c=CFG,pal=DD.pal,mm=1/1000,g=new THREE.Group();
   g.add(body,cw);}
  else{const body=box3(1.3,0.35,0.95,COL3.amr);body.position.set(0,0.18,0);const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.05,10,8),mat(COL3.green));lamp.position.set(-0.6,0.4,0.4);g.add(body,lamp);}
  const carry=new THREE.Group();carry.position.set(0,a.kind==='amr'?0.36:a.kind==='forklift'?0.1:0.09,0);g.add(carry);const pm=palletMesh(pal);carry.add(pm);
- const lh=Math.max(0.15,(a.target&&a.target.pat?a.target.pat.layers*boxOf(c,a.target.bi).h:500)*mm);
+ const lh=Math.max(0.15,(a.target&&a.target.rec?a.target.rec.reduce((z,r)=>z+r.b.h,0):500)*mm);
  const load=box3(pal.W*mm-0.05,lh,pal.L*mm-0.05,COL3.box[0]);load.position.y=pal.h*mm+lh/2;carry.add(load);const sheets=box3(pal.W*mm-0.05,0.12,pal.L*mm-0.05,COL3.sheet);sheets.position.y=pal.h*mm+0.06;carry.add(sheets);
  const hand=box3(0.5,0.06,0.4,COL3.sheet);hand.position.set(a.kind==='jack'?1.2:0.45,1.0,0);hand.visible=false;g.add(hand);
  g.userData={carry,pm,load,sheets,hand};V3.dyn.add(g);return g;}

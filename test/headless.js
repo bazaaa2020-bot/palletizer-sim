@@ -359,6 +359,102 @@ check('вкладка PL отрисовывается', (() => { w.eval('showTab
 check('раздел PL попадает в отчёт', w.eval(`reportHTML(CFG,derive(CFG),null)`).indexOf('Performance Level') > 0);
 w.eval('showTab("sim")');
 
+console.log('Смешанная паллета: рецепт укладки (п. 6)');
+const MIXCFG = `CFG=JSON.parse(JSON.stringify(DEF));CFG.robot='pl130';
+ CFG.boxes.push({name:'Ящик малый',l:300,w:200,h:150,m:4,rate:0,layers:0,shape:'box',mat:'carton'});
+ CFG.boxes.push({name:'Тяжёлый',l:400,w:300,h:200,m:18,rate:0,layers:0,shape:'box',mat:'carton'});
+ CFG.conveyors.push(JSON.parse(JSON.stringify(CFG.conveyors[0])));CFG.conveyors[1].box=1;
+ CFG.conveyors.forEach(x=>{x.feed='rate';x.rate=25;});CFG.exch.reaction=4;`;
+const mix = (rows, extra) => w.eval(`(()=>{${MIXCFG}${extra || ''}
+ CFG.mix.on=true;CFG.mix.rows=${JSON.stringify(rows)};normalize(CFG);
+ const D=derive(CFG,true),M=D.mix;
+ return{ok:M.ok,layers:M.layers,total:M.total,mass:M.mass,height:M.height,sheets:M.sheets,groups:M.groups,
+  arts:M.arts,rows:M.rows.map(r=>({bi:r.bi,n:r.n,inLayer:r.pat.n,fill:r.pat.fill,sheet:r.sheet})),
+  rec:M.rec.map(r=>r.bi),recSheet:M.rec.map(r=>!!r.sheet),warn:M.warn,
+  wAll:D.warnings.filter(x=>/Рецепт|Смешанная/.test(x)).length,cyc:D.cyclesPerPallet};})()`);
+
+const M = mix([{ box: 0, layers: 2, sheet: false }, { box: 1, layers: 2, sheet: true }]);
+check('рецепт разворачивается в слои снизу вверх',
+  M.layers === 4 && M.rec.join(',') === '0,0,1,1', M.rec.join(','));
+check('лист ложится под первым слоем своего яруса',
+  M.recSheet.join(',') === 'false,false,true,false' && M.sheets === 1, M.recSheet.join(','));
+check('итоги считаются по ярусам, а не по одной схеме',
+  M.total === M.rows.reduce((a, r) => a + r.n * r.inLayer, 0) && M.total > 0, `${M.total} шт.`);
+check('высота — сумма высот слоёв плюс листы',
+  Math.abs(M.height - (w.eval('DD.pal.h') + 2 * 250 + 2 * 150 + 4)) < 1e-6, `${M.height} мм`);
+check('масса — сумма по слоям плюс паллета',
+  Math.abs(M.mass - (M.rows[0].n * M.rows[0].inLayer * 8 + M.rows[1].n * M.rows[1].inLayer * 4 + w.eval('DD.pal.m'))) < 1e-6);
+check('в рецепте видны оба артикула', M.arts.length === 2 && M.arts.indexOf(0) >= 0 && M.arts.indexOf(1) >= 0);
+check('циклов на паллету считается по ходам всех слоёв', M.cyc >= M.groups, `${M.cyc} против ${M.groups} ходов`);
+check('исправный рецепт не даёт замечаний по ярусам', M.warn.length === 0, M.warn.join(' | '));
+
+check('тяжёлый артикул сверху лёгкого — замечание',
+  /тяжелее яруса под ним/.test(mix([{ box: 1, layers: 2, sheet: false }, { box: 2, layers: 1, sheet: true }],
+    `CFG.conveyors[1].box=2;`).warn.join(' ')));
+check('артикул без конвейера — замечание',
+  /нет ни на одном конвейере/.test(mix([{ box: 0, layers: 2, sheet: false }, { box: 2, layers: 1, sheet: false }]).warn.join(' ')));
+check('стопа выше лимита — замечание',
+  /выше лимита/.test(mix([{ box: 0, layers: 8, sheet: false }, { box: 1, layers: 8, sheet: true }], `CFG.maxStack=900;`).warn.join(' ')));
+check('один ярус — это не смешанная паллета',
+  /один артикул/.test(mix([{ box: 0, layers: 3, sheet: false }]).warn.join(' ')));
+check('замечания рецепта попадают в общий список', mix([{ box: 0, layers: 2, sheet: false }, { box: 2, layers: 1, sheet: false }]).wAll > 0);
+
+// нормализация и обмен конфигурацией
+check('битые ярусы чинятся при нормализации', w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));
+  CFG.mix.on=true;CFG.mix.rows=[null,{box:99,layers:-3,sheet:'да'},{box:'0',layers:'2'}];normalize(CFG);
+  return CFG.mix.rows.length===2&&CFG.mix.rows[0].box===CFG.boxes.length-1&&CFG.mix.rows[0].layers===1&&CFG.mix.rows[0].sheet===true;})()`));
+check('пустой рецепт выключает режим',
+  w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));CFG.mix.on=true;CFG.mix.rows=[];normalize(CFG);return CFG.mix.on===false&&CFG.mix.rows.length===1;})()`));
+check('рецепт переживает выгрузку и загрузку', w.eval(`(()=>{${MIXCFG}
+  CFG.mix.on=true;CFG.mix.name='Заказ №17';CFG.mix.rows=[{box:0,layers:2,sheet:false},{box:1,layers:3,sheet:true}];
+  normalize(CFG);const t=cfgFromJSON(cfgJSON());
+  return t.mix.on&&t.mix.name==='Заказ №17'&&t.mix.rows.length===2&&t.mix.rows[1].layers===3&&t.mix.rows[1].sheet===true;})()`));
+
+// исполнение
+const runMix = (rows, sec) => { w.eval(`${MIXCFG}CFG.mix.on=true;CFG.mix.rows=${JSON.stringify(rows)};
+  normalize(CFG);renderCfg();buildSim();`);
+  click('#bReset'); run(2); click('#bStart'); run(sec);
+  return { placed: w.eval('S.stats.placed'), sheets: w.eval('S.stats.sheets'), pallets: w.eval('S.stats.pallets'),
+    layer: w.eval('S.st[0].layer'), layers: w.eval('S.st[0].layers'), state: w.eval('S.packml'),
+    bi: w.eval('biOf(S.st[0])'), conv: w.eval('convOf(S.st[0])'), mixOn: w.eval('S.st[0].mix') }; };
+
+const mixRun = runMix([{ box: 0, layers: 1, sheet: false }, { box: 1, layers: 1, sheet: true }], 420);
+check('станция знает, что собирает смешанную паллету', mixRun.mixOn === true && mixRun.layers === 2);
+check('смешанная паллета собирается целиком', mixRun.pallets > 0, `паллет ${mixRun.pallets}, уложено ${mixRun.placed}`);
+check('разделительный лист между артикулами уложен', mixRun.sheets > 0, `листов ${mixRun.sheets}`);
+check('робот берёт тару с конвейера нужного артикула',
+  w.eval(`S.st.every(s=>convOf(s)===CFG.conveyors.findIndex(x=>x.box===biOf(s)))`));
+
+// моно-паллета не сломалась
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.conveyors[0].feed='rate';CFG.conveyors[0].rate=25;
+ CFG.exch.reaction=4;normalize(CFG);renderCfg();buildSim();`);
+click('#bReset'); run(2); click('#bStart'); run(150);
+check('моно-паллета работает как раньше: рецепт из одинаковых слоёв',
+  w.eval('S.st[0].mix') === false && w.eval('S.st[0].layers') === w.eval('S.st[0].pat.layers') &&
+  w.eval('S.st[0].rec.every(r=>r.bi===S.st[0].bi)') && w.eval('S.stats.placed') > 5);
+
+// вкладки и выгрузка
+w.eval(`${MIXCFG}CFG.mix.on=true;CFG.mix.rows=[{box:0,layers:2,sheet:false},{box:1,layers:2,sheet:true}];
+ normalize(CFG);renderCfg();buildSim();`);
+check('панель рецепта появляется в конфигураторе',
+  d.querySelectorAll('#cfgMix .row.mix').length - 1 === w.eval('CFG.mix.rows.length'));
+{ const sel = d.querySelector('#cfgMix select[data-k="mix.rows.1.box"]');
+  sel.value = '2'; sel.dispatchEvent(new w.Event('input', { bubbles: true }));
+  check('смена артикула яруса через конфигуратор пересчитывает рецепт',
+    w.eval('CFG.mix.rows[1].box') === 2 && w.eval('derive(CFG,true).mix.warn.length') > 0);
+  sel.value = '1'; sel.dispatchEvent(new w.Event('input', { bubbles: true })); }
+{ const n = w.eval('CFG.mix.rows.length');
+  d.querySelector('#cfgMix button[data-act="addMixRow"]').click();
+  check('ярус добавляется', w.eval('CFG.mix.rows.length') === n + 1);
+  d.querySelectorAll('#cfgMix button[data-act="delMixRow"]')[n].click();
+  check('ярус удаляется', w.eval('CFG.mix.rows.length') === n); }
+check('рецепт выгружается в CSV', w.eval(`csvBuild('mix').text`).indexOf('Ярус снизу') >= 0);
+check('рецепт попадает в отчёт', w.eval(`reportHTML(CFG,derive(CFG),null)`).indexOf('Смешанная паллета: рецепт') > 0);
+check('без рецепта выгрузка сообщает, что режим выключен',
+  w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));normalize(CFG);buildSim();
+   return csvBuild('mix').text.indexOf('выключена')>0;})()`));
+w.eval(`CFG=JSON.parse(JSON.stringify(DEF));renderCfg();buildSim();renderArch();`);
+
 console.log('Редактор логики ПЛК — GRAFCET (п. 4)');
 const gc = extra => w.eval(`(()=>{CFG=JSON.parse(JSON.stringify(DEF));${extra || ''}normalize(CFG);
  const P=grafProg(CFG);return{g1:P.g1.length,g2:P.g2.length,mode:CFG.plc.mode,
@@ -679,7 +775,7 @@ w.eval(`CFG=JSON.parse(JSON.stringify(DEF));CFG.name='Тестовая ячей�
  renderCfg();buildSim();renderArch();$('csvSep').value=';';`);
 
 const keys = w.eval('CSV_ORDER');
-check('таблиц на выгрузку — десять', keys.length === 10, keys.join(','));
+check('таблиц на выгрузку — одиннадцать', keys.length === 11, keys.join(','));
 let ragged = 0, noBom = 0, empty = 0;
 keys.forEach(k => { const t = csvOf(k), n = t.rows[0].length;
   if (!t.bom) noBom++;

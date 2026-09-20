@@ -122,6 +122,16 @@ const CSV_TABLES={
    h.m1.map(x=>x.m.n).join('; '),h.m2.map(x=>x.m.n).join('; '),h.m3.map(x=>x.m.n).join('; '),
    h.todo.map(k=>MEAS[k].n).join('; '),
    h.res.s,h.res.f,h.res.o,h.res.a,RISK_CLS[h.cls],h.ok?'да':'нет',h.sf?h.plr:'',h.sf||''])})},
+ mix:{name:'Смешанная паллета: рецепт',file:'рецепт',build:(c,D,s)=>{
+  const M=D.mix;
+  if(!M||!M.ok)return{head:['Рецепт','Значение'],rows:[['Смешанная паллета','выключена — на паллете один артикул']]};
+  const rows=M.rows.map((r,i)=>[String(i+1),r.b.name,SHAPES[r.b.shape].name,MATS[r.b.mat].name,
+   `${SHAPES[r.b.shape].round?'Ø'+r.b.l:r.b.l+'×'+r.b.w}×${r.b.h}`,csvNum(r.b.m,1,s),csvNum(r.n,0,s),
+   csvNum(r.pat.n,0,s),csvNum(r.n*r.pat.n,0,s),csvNum(r.pat.fill*100,0,s),r.pat.name,r.sheet?'да':'нет']);
+  rows.push(['','ИТОГО','','','',csvNum(M.mass,1,s),csvNum(M.layers,0,s),'',csvNum(M.total,0,s),'',
+   `высота ${csvNum(M.height,0,s)} мм, ходов ${csvNum(M.groups,0,s)}, листов ${csvNum(M.sheets,0,s)}`,'']);
+  return{head:['Ярус снизу','Артикул','Форма','Материал','Д×Ш×В, мм','Масса шт., кг','Слоёв','В слое','Всего, шт.',
+   'Заполнение слоя, %','Схема укладки','Лист под ярусом'],rows};}},
  plc:{name:'Программа ПЛК (GRAFCET)',file:'логика-ПЛК',build:(c,D,s)=>{
   const P=grafProg(c);
   const rows=[];const push=(g,gn)=>g.forEach(st=>{
@@ -156,7 +166,7 @@ const CSV_TABLES={
   return{head:['Показатель','Значение','Ед.','Доля','Накопленная','Категория'],rows:R};}},
  warn:{name:'Замечания расчёта',file:'замечания',build:(c,D,s)=>({
   head:['№','Замечание'],rows:D.warnings.map((w,i)=>[i+1,w])})}};
-const CSV_ORDER=['bom','sig','params','sku','risk','pl','base','plc','oee','warn'];
+const CSV_ORDER=['bom','sig','params','sku','mix','risk','pl','base','plc','oee','warn'];
 let CSV_LAST='bom';
 // Один «лист» на файл; вариант «все таблицы» кладёт их блоками с заголовками.
 function csvBuild(key){const c=normalize(CFG),D=derive(c),s=csvSep(),T=CSV_TABLES[key];
@@ -283,6 +293,18 @@ function reportHTML(c,D,png){
     fi.s==='ok'?'годится':`${fi.s==='warn'?'с оговоркой':'НЕ ГОДИТСЯ'} — просится ${gripBest(b).map(t=>GRIPPERS[t].name.toLowerCase()).join(' или ')||'подхват снизу'}`];})));
  H.push(repCols(['Схема','В слое','Слоёв','Всего','Заполнение','Перевязка','Ходов'],
   Object.values(D.pats).map(p=>[p.name,String(p.n),String(p.layers),String(p.total),f0(p.fill*100)+' %',p.interlock?'да':'нет',String(p.groupsPerPallet)])));
+ if(D.mix&&D.mix.ok){const M=D.mix;
+  H.push(`<h3>Смешанная паллета: рецепт «${c.mix.name}»</h3>`+repTable([
+   ['Состав',`${M.rows.length} ярус${M.rows.length===1?'':'а'}, ${M.layers} слоёв, ${M.total} единиц тары`],
+   ['Масса и габарит',`${f0(M.mass)} кг брутто, высота ${f0(M.height)} мм${M.sheets?`, разделительных листов ${M.sheets}`:''}`],
+   ['Ходов робота на паллету',`${M.groups}${M.sheets?` + ${M.sheets} с листом`:''}; в среднем ${f1(M.kEff)} единиц тары за ход`],
+   ['Артикулы и конвейеры',M.arts.map(bi=>{const ci=c.conveyors.findIndex(x=>x.box===bi);
+     return `${c.boxes[bi].name} — ${ci>=0?`конвейер ${ci+1}`:'НЕ ПОДАЁТСЯ НИ ОДНИМ КОНВЕЙЕРОМ'}`;}).join('; ')],
+   ['Замечания рецепта',M.warn.length?M.warn.join(' ')+'':'нет']]));
+  H.push(repCols(['Ярус снизу','Артикул','Д×Ш×В, мм','кг/шт.','Слоёв','В слое','Всего','Заполнение','Схема','Лист под ярусом'],
+   M.rows.map((r,i)=>[String(i+1),r.b.name,`${SHAPES[r.b.shape].round?'Ø'+r.b.l:r.b.l+'×'+r.b.w}×${r.b.h}`,f1(r.b.m),
+    String(r.n),String(r.pat.n),String(r.n*r.pat.n),f0(r.pat.fill*100)+' %',r.pat.name,r.sheet?'да':'нет'])));
+  H.push(`<p class="sub">Ярусы идут снизу вверх. У каждого слоя своя схема укладки и свой конвейер подачи: робот берёт тару того артикула, который сейчас нужен паллете.</p>`);}
  H.push(`<h3>Паллеты, станции и обмен</h3>`+repTable([
   ['Паллета',`${c.pallet} (${pal.W}×${pal.L}×${pal.h} мм, ${pal.m} кг)`],
   ['Станций / магазинов',`${c.stations} / ${c.magazines} у каждого робота; радиус расстановки ${f0(LY.R)} мм`],
