@@ -4,16 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Тренажёр РТК паллетизации — конфигуратор, захват, безопасность, ПЛК</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- Ни одной внешней ссылки: файл возят на площадку, где интернета может не быть.
+     Шрифт — системный, three.js вшивается сборщиком вместо метки ниже (см. vendor/README.md). -->
+<!--THREE-->
 <style>
 :root{--bg:#EEF0F2;--panel:#FBFBFC;--ink:#1E2730;--muted:#5C6772;--line:#C9CFD5;--dim:#E1E5E9;--fence:#7B8794;--robot:#E0762C;--yellow:#F5B400;--green:#2A9D5C;--red:#D33B2F;--blue:#3A6EA5;--box:#C9A66B;--box2:#8DB3A0;--box3:#B39DDB;--box4:#E0A0A0;--sheet:#8FA3B5;--off:#B8C0C8;--okbg:#DDF3E5;--okfg:#1B6B3A;--warnbg:#FFF1C6;--warnfg:#7A5A00;--badbg:#FADBD8;--badfg:#8E251C}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171B20;--panel:#21262C;--ink:#E6E9EC;--muted:#9AA4AE;--line:#363C44;--dim:#2C3239;--fence:#8A97A5;--off:#4A525B;--okbg:#1E3A2A;--okfg:#8FDCAA;--warnbg:#3D3212;--warnfg:#F2CF6B;--badbg:#42211F;--badfg:#F0A39B}}
 :root[data-theme="dark"]{--bg:#171B20;--panel:#21262C;--ink:#E6E9EC;--muted:#9AA4AE;--line:#363C44;--dim:#2C3239;--fence:#8A97A5;--off:#4A525B;--okbg:#1E3A2A;--okfg:#8FDCAA;--warnbg:#3D3212;--warnfg:#F2CF6B;--badbg:#42211F;--badfg:#F0A39B}
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans",system-ui,"Segoe UI",Roboto,sans-serif}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
 header{padding:18px 22px 0;max-width:1400px;margin:0 auto}
 h1{font-size:22px;font-weight:600;margin:0 0 4px}
 header p{margin:0;color:var(--muted);max-width:90ch}

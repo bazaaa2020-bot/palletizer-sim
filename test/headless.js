@@ -7,10 +7,12 @@ const fs = require('fs');
 const path = require('path');
 
 const file = path.join(__dirname, '..', 'dist', 'palletizer-sim.html');
-let html = fs.readFileSync(file, 'utf8')
+const raw = fs.readFileSync(file, 'utf8');
+// three.js вшит в файл; вырезаем его, чтобы проверить, что 3D-вид корректно отключается
+// без библиотеки — и заодно не гонять 600 КБ чужого кода через jsdom на каждом прогоне.
+let html = raw
   .replace(/requestAnimationFrame\(loop\);/g, '')              // цикл крутим вручную
-  .replace(/<link href="https:\/\/fonts[^>]+>/, '')
-  .replace(/<script src="https:\/\/cdnjs[^>]+><\/script>/, '');
+  .replace(/<script id="three-lib">[\s\S]*?<\/script>/, '');
 
 const dom = new JSDOM(html, { runScripts: 'dangerously' });
 const w = dom.window, d = w.document;
@@ -26,6 +28,17 @@ const check = (name, cond, info) => {
   if (cond) console.log(`  ok   ${name}`);
   else { console.log(`  FAIL ${name}${info ? ' — ' + info : ''}`); failed++; }
 };
+
+console.log('Офлайн: файл самодостаточный');
+{ const NS_OK = ['http://www.w3.org/2000/svg', 'http://www.w3.org/1999/xlink',
+    'http://www.w3.org/2000/xmlns/', 'http://www.w3.org/1999/xhtml'];
+  const urls = [...new Set((raw.match(/https?:\/\/[^"'\s<>)]+/g) || []))].filter(u => NS_OK.indexOf(u) < 0);
+  check('в собранном файле нет ни одной внешней ссылки', urls.length === 0, urls.join(', '));
+  check('нет внешних <link> и <script src>', !/<link[^>]+href="https?:/.test(raw) && !/<script[^>]+src="https?:/.test(raw));
+  const lib = raw.match(/<script id="three-lib">([\s\S]*?)<\/script>/);
+  check('three.js вшит в файл', !!lib && lib[1].length > 300000 && lib[1].indexOf('Three.js Authors') > 0,
+    lib ? `${(lib[1].length / 1024).toFixed(0)} КБ` : 'блока нет');
+  check('вырезание библиотеки оставляет рабочий файл', html.length > 300000 && html.indexOf('three-lib') < 0); }
 
 console.log('Конфигурация по умолчанию');
 check('расчёт проходит по досягаемости', w.eval('DD.reachStatus') !== 'bad');
