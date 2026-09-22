@@ -35,16 +35,18 @@ header p{margin:0;color:var(--muted);max-width:90ch}
 main{max-width:1400px;margin:0 auto;padding:14px 22px 40px}
 .tab{display:none}.tab.on{display:grid;gap:14px}
 #tab-sim{grid-template-columns:minmax(0,1.55fr) minmax(330px,1fr)}
-#tab-cfg{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}
+/* 450 px — чтобы колонка либо была шире 460 (подпись и поле в строку), либо её не было вовсе */
+#tab-cfg{grid-template-columns:repeat(auto-fit,minmax(450px,1fr));align-items:start}
+/* ниже 960 px колонка одна, и span 2 создал бы лишнюю неявную — отсюда порог */
+@media (min-width:960px){#tab-cfg .w2{grid-column:span 2}}
 #tab-arch,#tab-help,#tab-algo,#tab-3d,#tab-pl,#tab-risk,#tab-oee,#tab-plc,#tab-eco{grid-template-columns:1fr}
 #v3wrap{position:relative;width:100%;height:600px;background:linear-gradient(#dfe5ea,#f3f5f7);border-radius:6px;overflow:hidden;touch-action:none}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #v3wrap{background:linear-gradient(#1c2229,#2a313a)}}
 :root[data-theme="dark"] #v3wrap{background:linear-gradient(#1c2229,#2a313a)}
 #v3wrap canvas{display:block;width:100%!important;height:100%!important}
 #v3msg{position:absolute;left:12px;top:10px;font-size:13px;color:var(--muted);pointer-events:none}
-.row.box{grid-template-columns:1.2fr .7fr .7fr .7fr .6fr .8fr .6fr auto}
 @media (max-width:980px){#tab-sim{grid-template-columns:1fr}}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;min-width:0;container-type:inline-size}
 .panel h2{font-size:14px;font-weight:600;margin:0 0 8px;color:var(--muted)}
 .col{display:flex;flex-direction:column;gap:14px;min-width:0}
 svg{width:100%;height:auto;display:block}
@@ -54,6 +56,7 @@ button:hover:not(:disabled){filter:brightness(.96)}
 button:disabled{opacity:.45;cursor:not-allowed}
 button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center}
+.btns>select{flex:0 1 auto;width:auto;max-width:min(100%,360px)}
 .btns.group{padding-top:8px;border-top:1px dashed var(--line)}
 .b-start{background:var(--green);color:#fff;border-color:var(--green)}
 .b-stop{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -102,19 +105,42 @@ input[type=range]{flex:1}
 .note{font-size:13px;color:var(--muted);margin:6px 0 0}
 .legend{font-size:12.5px;color:var(--muted);margin-top:6px}
 .legend i{display:inline-block;width:10px;height:10px;margin:0 4px 0 10px;vertical-align:middle;border-radius:2px}
-.field.wide{grid-template-columns:1fr 230px}
-.field{display:grid;grid-template-columns:1fr 140px;gap:5px 10px;align-items:center;font-size:13.5px;margin-bottom:5px}
-.field label{color:var(--muted)}
-.field small{color:var(--muted);grid-column:1/-1;margin-top:-3px}
-input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);width:100%}
-.row{display:grid;gap:4px;align-items:center;margin-bottom:5px;font-size:13px}
-.row.box{grid-template-columns:1.3fr .8fr .8fr .8fr .8fr auto}
-.row.conv{grid-template-columns:1.6fr .7fr .7fr .9fr .9fr auto}
-.row.feed{grid-template-columns:1.2fr 1fr 1fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
-.row.tara{grid-template-columns:1.1fr 1fr 2.2fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
-.row.mix{grid-template-columns:.5fr 1.6fr .8fr 1fr auto}
-.row.base{grid-template-columns:1.3fr 1.5fr 2.4fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
-.fitn{font-size:11px;color:var(--muted)}.fitn.warn{color:var(--warnfg)}.fitn.bad{color:var(--badfg)}
+.field{display:grid;grid-template-columns:minmax(0,1fr);gap:3px 12px;align-items:center;font-size:13.5px;margin-bottom:9px}
+.field label{color:var(--muted);line-height:1.25;align-self:center}
+.field small{color:var(--muted);grid-column:1/-1;margin-top:1px;line-height:1.35}
+.field>input,.field>select{justify-self:stretch}
+/* Числовому полю хватает узкой колонки — остальное отдаём подписи, чтобы она была в одну строку */
+@container (min-width:320px){
+ .field:has(>input[type=number]){grid-template-columns:minmax(0,1fr) 104px}
+ .field:has(>input[type=text]){grid-template-columns:minmax(0,1fr) minmax(140px,40%)}
+}
+/* Выпадающий список встаёт в строку, только когда его текст туда влезет */
+@container (min-width:460px){.field:has(>select){grid-template-columns:minmax(0,1fr) minmax(210px,55%)}}
+@container (min-width:640px){.field:has(>select){grid-template-columns:minmax(0,1fr) minmax(260px,54%)}}
+/* На очень широкой панели поле не растягивается во всю ширину: подпись и значение рядом */
+@container (min-width:700px){.field{max-width:720px}.field:has(>select){grid-template-columns:minmax(0,1fr) 420px}}
+input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding:5px 7px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);width:100%;min-width:0}
+select{text-overflow:ellipsis}
+.row{display:grid;gap:4px 6px;align-items:center;margin-bottom:5px;font-size:13px}
+.row>*{min-width:0}
+.row.box{grid-template-columns:minmax(120px,1.7fr) .7fr .7fr .7fr .6fr .9fr .7fr auto}
+.row.conv{grid-template-columns:minmax(150px,2fr) .55fr .55fr .75fr minmax(110px,1.1fr) auto}
+.row.feed{grid-template-columns:minmax(150px,1.5fr) minmax(0,1.4fr) auto;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
+.row.feed>span{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.row.feed>span>select{flex:1}
+.row.feed input{width:76px;flex:0 0 auto}
+.row.tara{grid-template-columns:minmax(150px,1.3fr) minmax(145px,1.1fr) minmax(0,2fr);margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
+.row.mix{grid-template-columns:auto minmax(140px,1.9fr) .7fr .9fr auto}
+.row.base{grid-template-columns:minmax(175px,1.5fr) minmax(155px,1.3fr) minmax(0,2fr);margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
+/* Заголовок таблицы выравнивается по полям: у полей есть внутренний отступ 7px */
+.row.h{color:var(--muted);font-size:12px;margin-bottom:2px}
+.row.h>*{padding:0 7px}
+.fitn{font-size:11.5px;color:var(--muted);line-height:1.35}
+.fitn.warn,.fitn.bad{padding:4px 7px;border-radius:4px}
+/* Плотные таблицы на узкой панели прокручиваются вбок, а не сминаются в кашу */
+@container (max-width:560px){
+ #cfgBoxes,#cfgConv,#cfgMix{overflow-x:auto}
+ .row.box,.row.conv,.row.mix,.row.tara,.row.base,.row.feed{min-width:520px}}
 .gcact{display:block;font-size:11.5px;color:var(--muted);white-space:nowrap}
 .gcact input{margin-right:4px}
 .gctr{display:flex;gap:4px;align-items:center;margin-bottom:3px}
@@ -138,7 +164,9 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 .row .h{color:var(--muted);font-size:12px}
 .badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:12.5px;font-weight:500;white-space:nowrap}
 .ok{background:var(--okbg);color:var(--okfg)}.warn{background:var(--warnbg);color:var(--warnfg)}.bad{background:var(--badbg);color:var(--badfg)}
-.check{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px;align-items:baseline}
+.check{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 14px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px;align-items:baseline}
+.check>div{min-width:min(100%,220px);flex:1 1 220px}
+.check>.badge{flex:0 0 auto}
 .check small{display:block;color:var(--muted)}
 .warnings li{font-size:13px;margin-bottom:4px}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:12.5px;color:var(--muted)}
@@ -225,9 +253,9 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 <section id="tab-cfg" class="tab">
  <div class="panel"><h2>Роботы</h2><div id="cfgRobot"></div></div>
  <div class="panel"><h2>Захват</h2><div id="cfgGrip"></div></div>
- <div class="panel"><h2>Коробки, паллеты, схема укладки</h2><div id="cfgBoxes"></div></div>
- <div class="panel"><h2>Смешанная паллета: рецепт укладки</h2><div id="cfgMix"></div></div>
- <div class="panel"><h2>Конвейеры и подача</h2><div id="cfgConv"></div></div>
+ <div class="panel w2"><h2>Коробки, паллеты, схема укладки</h2><div id="cfgBoxes"></div></div>
+ <div class="panel w2"><h2>Смешанная паллета: рецепт укладки</h2><div id="cfgMix"></div></div>
+ <div class="panel w2"><h2>Конвейеры и подача</h2><div id="cfgConv"></div></div>
  <div class="panel"><h2>Безопасность, сеть, компоновка</h2><div id="cfgSafety"></div></div>
  <div class="panel"><h2>Прокладочные листы</h2><div id="cfgSheet"></div></div>
  <div class="panel"><h2>Обмен паллет и пополнение</h2><div id="cfgExch"></div></div>
@@ -336,7 +364,7 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
  </div>
  </div>
  <div class="panel"><h2>Таблицы в CSV — для ТКП, Excel и проекта</h2>
-  <div class="field wide"><label>Формат файла</label><select id="csvSep"></select><small>Файл идёт с BOM, поэтому кириллица открывается в Excel без «кракозябр»; числа — без разделителя разрядов, чтобы Excel принял их за числа</small></div>
+  <div class="field"><label>Формат файла</label><select id="csvSep"></select><small>Файл идёт с BOM, поэтому кириллица открывается в Excel без «кракозябр»; числа — без разделителя разрядов, чтобы Excel принял их за числа</small></div>
   <div class="btns" id="csvBtns"></div>
   <div class="btns"><button id="bCsvAll" class="b-apply">Все таблицы одним файлом</button><button id="bCsvShow">Показать и скопировать</button></div>
   <p class="note" id="csvMsg">Каждая кнопка скачивает свою таблицу отдельным файлом. «Все таблицы» — один файл, где таблицы идут блоками с заголовками. Если скачивание в этом окне запрещено, текст появится ниже — его можно вставить в Excel как есть.</p>
@@ -364,7 +392,7 @@ const ROBOTS=[
  {id:'cb30',name:'Кобот 30 кг · 1300 мм',cls:'cobot',payload:30,reach:1300,v:1.0,cpm:7,cost:2.3,kW:0.7,ex:'класс UR30'},
  {id:'ir50',name:'Промышленный 50 кг · 2050 мм',cls:'industrial',payload:50,reach:2050,v:2.0,cpm:12,cost:3.2,kW:2.0,ex:'класс FANUC M-710iC/50, KUKA KR 50 R2100'},
  {id:'pl110',name:'Паллетайзер 110 кг · 2400 мм',cls:'industrial',payload:110,reach:2403,v:2.0,cpm:15,cost:4.2,kW:3.5,ex:'класс FANUC M-410iC/110'},
- {id:'pl130',name:'Паллетайзер 130 кг · 2400 мм, 6 циклов/мин',cls:'industrial',payload:130,reach:2400,v:2.0,cpm:6,cost:4.4,kW:3.5,ex:'по методике оценки REDCARGO PRO130 — 6 циклов укладки в минуту; досягаемость уточнить по паспорту'},
+ {id:'pl130',name:'Паллетайзер 130 кг · 2400 мм',cls:'industrial',payload:130,reach:2400,v:2.0,cpm:6,cost:4.4,kW:3.5,ex:'по методике оценки REDCARGO PRO130 — 6 циклов укладки в минуту; досягаемость уточнить по паспорту'},
  {id:'pl185',name:'Паллетайзер 185 кг · 3140 мм',cls:'industrial',payload:185,reach:3143,v:2.0,cpm:15,cost:5.0,kW:4.5,ex:'класс FANUC M-410iC/185, KUKA KR 180 R3200 PA'},
  {id:'custom',name:'Свой робот — ввести параметры',cls:'custom',payload:10,reach:1300,v:1.0,cpm:8,cost:2.0,kW:1.0,ex:''}];
 // Форма тары: чем она отличается для захвата. seal — доля площади, которая реально
@@ -430,7 +458,7 @@ const ALIGN={none:{name:'Без направляющих',dx:1e9,da:1e9},
 // Техническое зрение: точность позы и время кадра.
 const VISION={none:{name:'Без технического зрения',dx:1e9,da:1e9,t:0},
  '2d':{name:'2D-камера: положение и угол в плоскости',dx:1.5,da:0.5,t:0.15},
- '3d':{name:'3D: стереопара, ToF или лазерный профилометр',dx:3,da:1,t:0.35},
+ '3d':{name:'3D-камера: стереопара, ToF или профилометр',dx:3,da:1,t:0.35},
  struct:{name:'3D со структурированным светом (прозрачная и блестящая тара)',dx:2,da:0.7,t:0.5}};
 const VIS_ORDER=['none','2d','3d','struct'];
 // Допуск захвата на промах по положению и углу.
@@ -458,9 +486,9 @@ function baseCalc(c,G){const V=VISION[c.vision.mode]||VISION.none;
 function visionOK(mode,need){return VIS_ORDER.indexOf(mode)>=VIS_ORDER.indexOf(need);}
 const FEEDS={manual:'Ручная (оператор кладёт)',interval:'Автомат: коробка каждые N секунд',rate:'Автомат: N коробок в минуту'};
 const SHEET_MODES={none:'Без листов',bottom:'Один лист на поддоне (снизу)',between:'Лист между каждым слоем',everyN:'Лист через каждые N слоёв'};
-const EXCH_OUT={jack:'Человек с рохлей (ручная гидравлическая тележка)',forklift:'Погрузчик (кар)',amr:'Роботизированная тележка (AMR/AGV)',conveyor:'Цепной конвейер паллет + диспенсер'};
-const EXCH_IN={vehicle:'Та же тележка привозит пустую паллету',robot:'Робот берёт пустую паллету из стопки (магазин паллет)',dispenser:'Диспенсер на конвейере паллет'};
-const SHEETS_BY={person:'Человек докладывает листы в магазин',amr:'AMR привозит паллету с листами (замена магазина целиком)'};
+const EXCH_OUT={jack:'Человек с рохлей (гидротележка)',forklift:'Погрузчик (кар)',amr:'Роботизированная тележка (AMR/AGV)',conveyor:'Цепной конвейер паллет + диспенсер'};
+const EXCH_IN={vehicle:'Та же тележка, с пустой паллетой',robot:'Робот берёт из стопки паллет',dispenser:'Диспенсер на конвейере паллет'};
+const SHEETS_BY={person:'Человек кладёт листы в магазин',amr:'AMR привозит паллету с листами'};
 const AGENT={person:{v:1.0,lift:2,name:'человек'},jack:{v:0.8,lift:4,name:'человек с рохлей'},forklift:{v:1.5,lift:3,name:'погрузчик'},amr:{v:1.0,lift:5,name:'AMR'}};
 const CUP_D=[30,40,50,60,80,100,125];
 // Транспорт обмена: габарит по ширине и вылет площадки ожидания за ограждением.
@@ -1831,46 +1859,50 @@ function render3D(){
  V3.ren.render(V3.scene,cam);}
 // ======================= КОНФИГУРАТОР (UI) =======================
 const num=(k,v,step,min,max,title)=>`<input type="number" data-k="${k}" value="${v}" step="${step||1}" min="${min||0}" max="${max||100000}" title="${title||''}">`;
-const sel=(k,opts,v,dis)=>`<select data-k="${k}" ${dis?'disabled':''}>${opts.map(o=>`<option value="${o[0]}" ${String(o[0])===String(v)?'selected':''}>${o[1]}</option>`).join('')}</select>`;
+// В плотных таблицах в списке показываем короткое имя, полное — подсказкой при наведении.
+const shortName=n=>String(n).split(' (')[0].split(': ')[0];
+const sel=(k,opts,v,dis)=>{const cur=opts.find(o=>String(o[0])===String(v));
+ return `<select data-k="${k}" ${dis?'disabled':''} title="${cur?String(cur[2]||cur[1]).replace(/"/g,'&quot;'):''}">`
+  +opts.map(o=>`<option value="${o[0]}" ${String(o[0])===String(v)?'selected':''}>${o[1]}</option>`).join('')+'</select>';};
 function renderCfg(){
  const c=normalize(CFG),rob=robotOf(c),D=derive(c,true),G=D.grip,vac=GRIPPERS[c.grip.type].vac,ex=c.exch,sh=c.sheet;
- $('cfgRobot').innerHTML=`<div class="field"><label>Количество роботов</label>${sel('robots',[[1,'1 робот'],[2,'2 робота (параллельные модули)']],c.robots)}<small>Второй робот получает свой конвейер и свои станции; ячейка общая</small></div>
+ $('cfgRobot').innerHTML=`<div class="field"><label>Количество роботов</label>${sel('robots',[[1,'1 робот'],[2,'2 робота']],c.robots)}<small>Параллельные модули: второй робот получает свой конвейер и свои станции, ячейка общая</small></div>
  <div class="field"><label>Модель</label>${sel('robot',ROBOTS.map(r=>[r.id,r.name]),c.robot)}<small>${rob.ex||'—'}</small></div>
  ${c.robot==='custom'?`<div class="field"><label>Грузоподъёмность, кг</label>${num('custom.payload',c.custom.payload,.5,1,500)}</div><div class="field"><label>Досягаемость, мм</label>${num('custom.reach',c.custom.reach,10,500,4000)}</div><div class="field"><label>Тип</label>${sel('custom.cls',[['cobot','Коллаборативный'],['industrial','Промышленный']],c.custom.cls)}</div><div class="field"><label>Норматив, циклов/мин</label>${num('custom.cpm',c.custom.cpm,.5,1,30)}</div>`:`<div class="field"><label>Норматив робота</label><span class="badge ok">${rob.cpm} циклов/мин</span><small>Циклы «взял — положил» с подходами и отходами; методика оценки производительности паллетайзера</small></div>`}
- <div class="field"><label>Скорость робота, % от максимальной</label>${num('speedPct',c.speedPct,5,10,100)}<small>Влияет на такт, ускорение груза и требуемую силу захвата (a = v / 0,25 с)</small></div>
+ <div class="field"><label>Скорость робота, %</label>${num('speedPct',c.speedPct,5,10,100)}<small>Влияет на такт, ускорение груза и требуемую силу захвата (a = v / 0,25 с)</small></div>
  <div class="field"><label>Высота постамента, мм</label>${num('baseH',c.baseH,50,0,1500)}<small>Кобот на постаменте 600–900 мм, напольный паллетайзер — 0</small></div>
- <div class="field"><label>Скорость подвода и отрыва, мм/с</label>${num('motion.vPlace',c.motion.vPlace,10,20,400)}<small>Последние миллиметры к коробке и к слою робот идёт медленно, 50–150 мм/с — именно это отличает укладку от броска</small></div>
+ <div class="field"><label>Скорость подвода, мм/с</label>${num('motion.vPlace',c.motion.vPlace,10,20,400)}<small>Последние миллиметры к коробке и к слою робот идёт медленно, 50–150 мм/с — именно это отличает укладку от броска</small></div>
  <div class="field"><label>Высота точки подхода, мм</label>${num('motion.hAppr',c.motion.hAppr,10,5,400)}<small>С этой высоты над поверхностью начинается опускание на пониженной скорости</small></div>
- <div class="field"><label>Скорость вертикали на переносе, мм/с</label>${num('motion.vZ',c.motion.vZ,50,100,2000)}<small>Быстрый участок подъёма и опускания</small></div>
- <div class="field"><label>Время нарастания ускорения, с</label>${num('motion.tJerk',c.motion.tJerk,.05,0,1)}<small>Ограничение рывка (S-образный профиль): чем больше, тем плавнее разгон и тем меньше тара ведёт в захвате</small></div>
+ <div class="field"><label>Скорость вертикали, мм/с</label>${num('motion.vZ',c.motion.vZ,50,100,2000)}<small>Быстрый участок подъёма и опускания</small></div>
+ <div class="field"><label>Нарастание ускорения, с</label>${num('motion.tJerk',c.motion.tJerk,.05,0,1)}<small>Ограничение рывка (S-образный профиль): чем больше, тем плавнее разгон и тем меньше тара ведёт в захвате</small></div>
  <div class="field"><label>Скорость доворота кисти, °/с</label>${num('motion.wSpeed',c.motion.wSpeed,10,20,720)}<small>Захват доворачивается по стороне паллеты на переносе, а не при опускании</small></div>
  <div class="check"><div>Такт по фазам<small>перенос + подвод ${f2(D.tAppr)} с × 3 + подъём над слоем ${f2(D.tClear)} с + захват ${f2(G.tGrip)} с + сброс ${f2(G.tRel)} с</small></div><span class="badge ${D.tCycleModel>D.tCycleNorm?'warn':'ok'}">модель ${f1(D.tCycleModel)} с · норматив ${f1(D.tCycleNorm)} с</span></div>`;
- $('cfgGrip').innerHTML=`<div class="field"><label>Тип захвата</label>${sel('grip.type',Object.entries(GRIPPERS).map(([k,v])=>[k,v.name]),c.grip.type)}</div>
+ $('cfgGrip').innerHTML=`<div class="field"><label>Тип захвата</label>${sel('grip.type',Object.entries(GRIPPERS).map(([k,v])=>[k,shortName(v.name),v.name]),c.grip.type)}</div>
  ${c.grip.type==='cups'?`<div class="field"><label>Тип присосок</label>${sel('grip.cup',Object.entries(CUPS).map(([k,v])=>[k,v.name]),c.grip.cup)}<small>${CUPS[c.grip.cup].note}; μ = ${CUPS[c.grip.cup].mu}, вакуум до ${CUPS[c.grip.cup].vacMax} кПа</small></div>
  <div class="field"><label>Диаметр присоски</label>${sel('grip.cupD',[[0,'авто (подбор)']].concat(CUP_D.map(d=>[d,'Ø'+d+' мм'])),c.grip.cupD)}</div>`:''}
- ${vac?`<div class="field"><label>Уровень вакуума, кПа (−)</label>${num('grip.vac',c.grip.vac,5,20,90)}<small>Картон: 40–60 кПа; выше — расслоение и «продавливание»</small></div><div class="field"><label>Давление сжатого воздуха, бар</label>${num('grip.pressure',c.grip.pressure,.5,2,8)}<small>Эжектору нужно 4–6 бар; при пенной рамке — насос/нагнетатель</small></div>`:`<div class="field"><label>Давление сжатого воздуха, бар</label>${num('grip.pressure',c.grip.pressure,.5,2,8)}</div>`}
- <div class="field"><label>Коробок за один захват</label>${sel('grip.pick',[1,2,3,4,5,6,7,8].map(x=>[x,String(x)]),c.grip.pick,!GRIPPERS[c.grip.type].multi)}<small>${GRIPPERS[c.grip.type].multi?'Группа собирается у упора конвейера вплотную; каждая единица тары — своя зона захвата':'Групповой захват — только для вакуумных и магнитных типов'}</small></div>
- ${vac&&c.grip.pick>1?`<div class="field"><label>Шаг зон захвата</label>${sel('grip.pitch',[['fixed','Фиксированный: балка, группа — только ряд'],['adj','Регулируемый: зоны разводятся, группа — блок']],c.grip.pitch)}<small>Регулируемый шаг даёт подбор групп по форме слоя: 14 коробок берутся не рядами, а блоками 4+4+2+4</small></div>
+ ${vac?`<div class="field"><label>Вакуум, кПа</label>${num('grip.vac',c.grip.vac,5,20,90)}<small>Картон: 40–60 кПа; выше — расслоение и «продавливание»</small></div><div class="field"><label>Давление сжатого воздуха, бар</label>${num('grip.pressure',c.grip.pressure,.5,2,8)}<small>Эжектору нужно 4–6 бар; при пенной рамке — насос/нагнетатель</small></div>`:`<div class="field"><label>Давление сжатого воздуха, бар</label>${num('grip.pressure',c.grip.pressure,.5,2,8)}</div>`}
+ <div class="field"><label>Коробок за захват</label>${sel('grip.pick',[1,2,3,4,5,6,7,8].map(x=>[x,String(x)]),c.grip.pick,!GRIPPERS[c.grip.type].multi)}<small>${GRIPPERS[c.grip.type].multi?'Группа собирается у упора конвейера вплотную; каждая единица тары — своя зона захвата':'Групповой захват — только для вакуумных и магнитных типов'}</small></div>
+ ${vac&&c.grip.pick>1?`<div class="field"><label>Шаг зон захвата</label>${sel('grip.pitch',[['fixed','Фиксированный'],['adj','Регулируемый']],c.grip.pitch)}<small>Фиксированный — балка, группа только ряд вплотную. Регулируемый — зоны разводятся в блок под форму слоя: 14 коробок берутся не рядами, а блоками 4+4+2+4</small></div>
  <div class="field"><label>Время перестроения зон, с</label>${num('grip.tShift',c.grip.tShift,.1,0,10)}<small>На каждый блок два перестроения: развести после захвата с конвейера и собрать обратно в ряд перед следующим</small></div>
  ${(()=>{const P=Object.values(D.pats)[0];if(!P)return'';return`<div class="check"><div>Группы по форме слоя<small>${P.adjUsed?`формы ${P.shapes}; ${P.shifts} перестроений на паллету (${f1(P.shifts*P.tShift)} с)`:`только ряды${P.planAdj?`; блоки дали бы ${P.planAdj.groups} ходов против ${P.rowGroups}, но не окупают ${P.planAdj.shifts} перестроений`:''}`}</div><span class="badge ${P.adjUsed?'ok':'warn'}">${P.groupsPerPallet} ходов на паллету</span></div>`;})()}`:''}
- <div class="field"><label>Масса захвата, кг (0 = авто)</label>${num('grip.mass',c.grip.mass,.5,0,80)}<small>Расчётная масса: ${f1(G.mass)} кг</small></div>
- <div class="field"><label>Высота захвата (фланец → контакт), мм</label>${num('gripH',c.gripH,10,50,600)}</div>
+ <div class="field"><label>Масса захвата, кг</label>${num('grip.mass',c.grip.mass,.5,0,80)}<small>0 — считать автоматически; расчётная масса ${f1(G.mass)} кг</small></div>
+ <div class="field"><label>Высота захвата, мм</label>${num('gripH',c.gripH,10,50,600)}</div>
  <div class="check"><div>Расчёт захвата<small>${G.case}; a = ${f1(G.a)} м/с², S = ${G.S}</small></div><span class="badge ${G.status}">${f0(G.Fth)} / ${f0(G.Fcap)} Н</span></div>
  ${vac?`<div class="check"><div>${c.grip.type==='cups'?`Присоски: ${G.nPerBox} × Ø${G.cupD} мм на коробку, всего ${G.nCups}`:`Пенная рамка: площадь ${f0(G.A)} см²`}<small>${G.pump}; утечка ${f0(G.qLeak)} л/мин; воздух ≈ ${f0(G.air)} л/мин</small></div><span class="badge ok">захват ${f2(G.tGrip)} с · сброс ${f2(G.tRel)} с</span></div>`:`<div class="check"><div>${G.pump}<small>время захвата ${f2(G.tGrip)} с, отпускания ${f2(G.tRel)} с</small></div><span class="badge ok">${c.grip.type==='clamp'?'Ø'+G.cylD+' мм':'—'}</span></div>`}
  ${G.notes.map(n=>`<p class="note">${n}</p>`).join('')}`;
  $('cfgBoxes').innerHTML=`<div class="field"><label>Паллета</label>${sel('pallet',Object.keys(PALLETS).map(p=>[p,p]),c.pallet)}</div>
- <div class="field"><label>Макс. высота стопы с паллетой, мм</label>${num('maxStack',c.maxStack,50,300,2400)}</div>
+ <div class="field"><label>Высота стопы с паллетой, мм</label>${num('maxStack',c.maxStack,50,300,2400)}</div>
  <div class="field"><label>Станций паллет у каждого робота</label>${sel('stations',[[1,'1'],[2,'2'],[3,'3'],[4,'4']],c.stations)}<small>Позиции вокруг робота: станции + магазины${ex.in==='robot'?' + стопка паллет':''} ≤ 6</small></div>
- <div class="field"><label>Схема укладки</label>${sel('patternMode',[['auto','Авто: максимум коробок, перевязка если возможна'],['interlock','Перекрёстная (перевязка обязательна)'],['column','Колонная (простая сетка)']],c.patternMode)}</div>
+ <div class="field"><label>Схема укладки</label>${sel('patternMode',[['auto','Авто'],['interlock','Перекрёстная'],['column','Колонная']],c.patternMode)}<small>Авто — максимум коробок с перевязкой, если она возможна; перекрёстная — перевязка обязательна; колонная — простая сетка</small></div>
  <div class="row box h"><span>Тара</span><span>L (Ø), мм</span><span>W, мм</span><span>H, мм</span><span>кг</span><span>выпуск шт/ч</span><span>слоёв</span><span></span></div>
  ${c.boxes.map((b,i)=>`<div class="row box"><input type="text" data-k="boxes.${i}.name" value="${b.name}">${num(`boxes.${i}.l`,b.l,10,100,1200)}${num(`boxes.${i}.w`,b.w,10,100,1000)}${num(`boxes.${i}.h`,b.h,10,2,800)}${num(`boxes.${i}.m`,b.m,.5,0.1,150)}${num(`boxes.${i}.rate`,b.rate,10,0,5000,'производительность выпуска, шт/ч (0 — не задана)')}${num(`boxes.${i}.layers`,b.layers,1,0,30,'0 — авто по высоте стопы')}<button data-act="delBox" data-i="${i}" title="Удалить" ${c.boxes.length<2?'disabled':''}>×</button></div>
- <div class="row tara">${sel(`boxes.${i}.shape`,Object.entries(SHAPES).map(([k,v])=>[k,v.name]),b.shape)}${sel(`boxes.${i}.mat`,Object.entries(MATS).map(([k,v])=>[k,v.name]),b.mat)}<span class="fitn ${gripFit(b,c.grip.type).s==='ok'?'':gripFit(b,c.grip.type).s}">${(()=>{const fi=gripFit(b,c.grip.type);return fi.s==='ok'?`${GRIPPERS[c.grip.type].name.toLowerCase()} подходит`:`${fi.n} Просится: ${gripBest(b).map(t=>GRIPPERS[t].name.toLowerCase()).join(' или ')||'подхват снизу'}`;})()}</span></div>`).join('')}
+ <div class="row tara">${sel(`boxes.${i}.shape`,Object.entries(SHAPES).map(([k,v])=>[k,shortName(v.name),v.name]),b.shape)}${sel(`boxes.${i}.mat`,Object.entries(MATS).map(([k,v])=>[k,shortName(v.name),v.name]),b.mat)}<span class="fitn ${gripFit(b,c.grip.type).s==='ok'?'':gripFit(b,c.grip.type).s}">${(()=>{const fi=gripFit(b,c.grip.type);return fi.s==='ok'?`${GRIPPERS[c.grip.type].name.toLowerCase()} подходит`:`${fi.n}. Просится: ${gripBest(b).map(t=>GRIPPERS[t].name.toLowerCase()).join(' или ')||'подхват снизу'}`;})()}</span></div>`).join('')}
  <div class="btns"><select id="boxPreset">${BOX_PRESETS.map((b,i)=>`<option value="${i}">${b.name} ${b.l}×${b.w}×${b.h}, ${b.m} кг${b.rate?', '+b.rate+' шт/ч':''}</option>`).join('')}</select><button data-act="addBox">Добавить коробку</button></div>
  <p class="note">Артикулы М5П … МС10 — из оценки производительности REDCARGO PRO130 (выпуск и число слоёв по документу). «Слоёв» 0 — авто по лимиту высоты.</p>
  ${Object.values(D.pats).map(p=>`<div class="check"><div>${p.name}<small>${p.stability}${p.loss>0?`; перевязка стоит ${p.loss} шт. в слое`:''}; ${p.groupsPerPallet} ходов${p.sheets?` + ${p.sheets} листов`:''} на паллету${p.adjUsed?`; группы ${p.shapes}, ${p.shifts} перестроений`:''}</small></div><span class="badge ${p.interlock?'ok':'warn'}">${p.n} в слое · ${p.layers} слоёв · ${p.total} шт.</span></div>`).join('')}`;
- $('cfgMix').innerHTML=`<div class="field"><label>Смешанная паллета</label>${sel('mix.on',[['false','Нет: на паллете один артикул'],['true','Да: укладка по рецепту']],c.mix.on)}<small>Ярусы идут снизу вверх; у каждого яруса свой артикул, своя схема слоя и свой конвейер</small></div>
+ $('cfgMix').innerHTML=`<div class="field"><label>Смешанная паллета</label>${sel('mix.on',[['false','Нет, один артикул'],['true','Да, по рецепту']],c.mix.on)}<small>Ярусы идут снизу вверх; у каждого яруса свой артикул, своя схема слоя и свой конвейер</small></div>
  ${c.mix.on?`<div class="field"><label>Название рецепта</label><input type="text" data-k="mix.name" value="${(c.mix.name||'').replace(/"/g,'&quot;')}"></div>
- <div class="row mix h"><span>Ярус снизу вверх</span><span>Артикул</span><span>Слоёв</span><span>Лист под ярусом</span><span></span></div>
+ <div class="row mix h"><span>№</span><span>Артикул</span><span>Слоёв</span><span>Лист под ярусом</span><span></span></div>
  ${c.mix.rows.map((r,i)=>`<div class="row mix"><span class="h">${i+1}</span>${sel(`mix.rows.${i}.box`,c.boxes.map((b,j)=>[j,b.name]),r.box)}${num(`mix.rows.${i}.layers`,r.layers,1,1,40)}${sel(`mix.rows.${i}.sheet`,[['false','нет'],['true','да']],r.sheet)}<button data-act="delMixRow" data-i="${i}" ${c.mix.rows.length<2?'disabled':''}>×</button></div>`).join('')}
  <div class="btns"><button data-act="addMixRow" ${c.mix.rows.length>=8?'disabled':''}>Добавить ярус</button></div>
  ${(()=>{const M=D.mix;if(!M||!M.ok)return'';
@@ -1879,21 +1911,21 @@ function renderCfg(){
   ${M.warn.map(x=>`<p class="note" style="color:var(--warnfg)">${x}</p>`).join('')}`;})()}`
  :'<p class="note">Моно-паллета: станция набирает один артикул со своего конвейера. Рецепт нужен, когда на одну паллету собирают заказ из нескольких артикулов — тогда у каждого яруса своя схема укладки и свой конвейер подачи.</p>'}`;
  $('cfgConv').innerHTML=`<div class="row conv h"><span>Тип</span><span>L, м</span><span>м/мин</span><span>Накопление</span><span>Коробка</span><span></span></div>
- ${c.conveyors.map((cv,i)=>`<div class="row conv">${sel(`conveyors.${i}.type`,Object.entries(CONV_TYPES).map(([k,v])=>[k,v.name]),cv.type)}${num(`conveyors.${i}.len`,cv.len,.5,1,12)}${num(`conveyors.${i}.speed`,cv.speed,1,3,60)}${sel(`conveyors.${i}.accum`,[['true','да'],['false','нет']],cv.accum,cv.type==='mdr')}${sel(`conveyors.${i}.box`,c.boxes.map((b,j)=>[j,b.name]),cv.box)}<button data-act="delConv" data-i="${i}" ${c.conveyors.length<2?'disabled':''}>×</button></div>
+ ${c.conveyors.map((cv,i)=>`<div class="row conv">${sel(`conveyors.${i}.type`,Object.entries(CONV_TYPES).map(([k,v])=>[k,shortName(v.name),v.name]),cv.type)}${num(`conveyors.${i}.len`,cv.len,.5,1,12)}${num(`conveyors.${i}.speed`,cv.speed,1,3,60)}${sel(`conveyors.${i}.accum`,[['true','да'],['false','нет']],cv.accum,cv.type==='mdr')}${sel(`conveyors.${i}.box`,c.boxes.map((b,j)=>[j,b.name]),cv.box)}<button data-act="delConv" data-i="${i}" ${c.conveyors.length<2?'disabled':''}>×</button></div>
  <div class="row feed"><span>${sel(`conveyors.${i}.feed`,Object.entries(FEEDS),cv.feed)}</span>${cv.feed==='interval'?`<span>каждые ${num(`conveyors.${i}.interval`,cv.interval,1,2,120)} с</span>`:cv.feed==='rate'?`<span>${num(`conveyors.${i}.rate`,cv.rate,.5,0.5,60)} кор/мин</span>`:`<span>оператор ≈ ${num(`conveyors.${i}.rate`,cv.rate,.5,0.5,30)} кор/мин</span>`}<span class="h">→ робот ${i%c.robots+1}</span></div>
- <div class="row base">${sel(`conveyors.${i}.infeed`,Object.entries(INFEED).map(([k,v])=>[k,v.name]),cv.infeed)}${sel(`conveyors.${i}.align`,Object.entries(ALIGN).map(([k,v])=>[k,v.name]),cv.align)}<span class="fitn ${(()=>{const x=D.base[i];return x.ok?'':visionOK(c.vision.mode,x.need)?'warn':'bad';})()}">${(()=>{const x=D.base[i];
+ <div class="row base">${sel(`conveyors.${i}.infeed`,Object.entries(INFEED).map(([k,v])=>[k,shortName(v.name),v.name]),cv.infeed)}${sel(`conveyors.${i}.align`,Object.entries(ALIGN).map(([k,v])=>[k,shortName(v.name),v.name]),cv.align)}<span class="fitn ${(()=>{const x=D.base[i];return x.ok?'':visionOK(c.vision.mode,x.need)?'warn':'bad';})()}">${(()=>{const x=D.base[i];
   return x.ok?`остаётся ±${f0(x.dx)} мм${x.round?'':` и ±${f1(x.da)}°`} при допуске ±${f0(x.tol.dx)} мм — центрирования хватает`
    :visionOK(c.vision.mode,x.need)?`направляющие дают ±${f0(x.gx)} мм, позу доводит ${VISION[c.vision.mode].name.split(':')[0].toLowerCase()}`
    :`±${f0(x.gx)} мм${x.round?'':` и ±${f1(x.ga)}°`} больше допуска ±${f0(x.tol.dx)} мм — нужно ${VISION[x.need].name.split(':')[0].toLowerCase()}`;})()}</span></div>`).join('')}
  <div class="btns"><button data-act="addConv" ${c.conveyors.length>=4?'disabled':''}>Добавить конвейер</button></div>
  <div class="field"><label>Высота конвейера, мм</label>${num('convH',c.convH,50,300,1200)}</div>
- <div class="field"><label>Техническое зрение</label>${sel('vision.mode',Object.entries(VISION).map(([k,v])=>[k,v.name]),c.vision.mode)}<small>${D.visNeed==='none'?'По базированию камера не требуется — направляющие выводят тару в допуск захвата':`Требуется минимум: ${VISION[D.visNeed].name.toLowerCase()}`}${c.vision.mode!=='none'?`; кадр добавляет ${f2(D.tVision)} с к такту`:''}</small></div>
+ <div class="field"><label>Техническое зрение</label>${sel('vision.mode',Object.entries(VISION).map(([k,v])=>[k,shortName(v.name),v.name]),c.vision.mode)}<small>${D.visNeed==='none'?'По базированию камера не требуется — направляющие выводят тару в допуск захвата':`Требуется минимум: ${VISION[D.visNeed].name}`}${c.vision.mode!=='none'?`; кадр добавляет ${f2(D.tVision)} с к такту`:''}</small></div>
  <p class="note">Один конвейер кормит все станции своего робота одной коробкой; второй конвейер — следующие станции другой коробкой.</p>`;
  $('cfgSheet').innerHTML=`<div class="field"><label>Режим прокладок</label>${sel('sheet.mode',Object.entries(SHEET_MODES),sh.mode)}</div>
  ${sh.mode==='everyN'?`<div class="field"><label>Лист через каждые N слоёв</label>${num('sheet.everyN',sh.everyN,1,1,10)}</div>`:''}
  ${sh.mode!=='none'?`<div class="field"><label>Магазинов у каждого робота</label>${sel('magazines',[[1,'1'],[2,'2']],c.magazines)}</div>
  <div class="field"><label>Ёмкость магазина, листов</label>${num('sheet.cap',sh.cap,5,5,200)}<small>Пополнений в час при расчётной производительности: ${f1(D.refillsPerHour)}</small></div>
- <div class="field"><label>Вызов пополнения при остатке ≤</label>${num('sheet.low',sh.low,1,0,50)}</div>
+ <div class="field"><label>Вызов пополнения при остатке</label>${num('sheet.low',sh.low,1,0,50)}</div>
  <div class="field"><label>Скорость робота с листом, %</label>${num('sheet.speedPct',sh.speedPct,5,10,100)}<small>Лист лёгкий и парусит: обычно 50–70 % скорости</small></div>
  <div class="field"><label>Время захвата листа, с</label>${num('sheet.tGrip',sh.tGrip,.1,0.2,5)}<small>Цикл с листом: ${f1(D.tSheet)} с; ${D.stations[0].pat.sheets} листов на паллету</small></div>
  <div class="field"><label>Секций отпускания листа</label>${num('sheet.sect',sh.sect,1,1,8)}<small>Вакуум сбрасывается не разом, а по секциям за ${f2(D.tRelSheet)} с — иначе лист парусит и сползает со слоя</small></div>`:'<p class="note">Листы не используются: магазины убраны из компоновки. Допустимо только для жёстких коробок с перевязкой.</p>'}`;
@@ -1901,13 +1933,13 @@ function renderCfg(){
  <div class="field"><label>Подача пустых паллет</label>${sel('exch.in',Object.entries(EXCH_IN).filter(([k])=>ex.out==='conveyor'?k==='dispenser':k!=='dispenser'),ex.in)}<small>${ex.in==='robot'?`Стопка паллет занимает позицию у робота; хватает на ${f1(D.stackHours)} ч`:ex.in==='vehicle'?'Тележка увозит полную и привозит пустую за один выезд':'Диспенсер на 15 паллет на конвейере'}</small></div>
  ${ex.in==='robot'?`<div class="field"><label>Паллет в стопке</label>${num('exch.stack',ex.stack,1,2,25)}</div>`:''}
  ${sh.mode!=='none'?`<div class="field"><label>Пополнение прокладок</label>${sel('exch.sheetsBy',Object.entries(SHEETS_BY),ex.sheetsBy)}</div>`:''}
- ${ex.out!=='conveyor'?`<div class="field"><label>Режим обмена в симуляции</label>${sel('exch.auto',[['true','Автоматически: тележка/человек приезжают сами'],['false','По команде с пульта (кнопки)']],ex.auto)}</div>
+ ${ex.out!=='conveyor'?`<div class="field"><label>Режим обмена в симуляции</label>${sel('exch.auto',[['true','Автоматически'],['false','По команде с пульта']],ex.auto)}<small>Автоматически — тележка или человек приезжают сами через заданное время; иначе обмен вызывается кнопкой на пульте</small></div>
  <div class="field"><label>Время подъезда, с</label>${num('exch.reaction',ex.reaction,5,0,300)}<small>От сигнала «паллета готова» до появления у проёма</small></div>`:'<p class="note">Конвейер паллет: обмен всегда автоматический — готовая паллета уезжает, диспенсер ставит пустую.</p>'}
  <div class="check"><div>Обменов паллет в час<small>${EXCH_OUT[ex.out]}</small></div><span class="badge ${D.palletsPerHour>8&&ex.out==='jack'?'warn':'ok'}">${f1(D.palletsPerHour)}</span></div>`;
- $('cfgSafety').innerHTML=`<div class="field"><label>Защита</label>${sel('safety',[['auto','Авто по типу робота'],['fence','Ограждение + световые завесы'],['cobot','Без ограждения: сканеры + снижение скорости']],c.safety,rob.cls!=='cobot')}<small>${rob.cls!=='cobot'?'Промышленный робот — только ограждение':'Кобот: допустима работа без ограждения при оценке риска по ISO/TS 15066'}</small></div>
+ $('cfgSafety').innerHTML=`<div class="field"><label>Защита</label>${sel('safety',[['auto','Авто по типу робота'],['fence','Ограждение и завесы'],['cobot','Сканеры без ограждения']],c.safety,rob.cls!=='cobot')}<small>${rob.cls!=='cobot'?'Промышленный робот — только ограждение':'Кобот: допустима работа без ограждения при оценке риска по ISO/TS 15066'}</small></div>
  <div class="field"><label>Время останова робота T, с</label>${num('tStop',c.tStop,.05,0.1,2)}<small>Из паспорта робота + реакция КБ; входит в S = K·T + C</small></div>
  <div class="field"><label>Связь ПЛК ↔ робот ↔ ЧП</label>${sel('fieldbus',FIELDBUS.map(f=>[f,f]),c.fieldbus)}</div>
- <div class="field"><label>Радиус расстановки паллет и магазинов, мм</label>${num('slotR',c.slotR,25,600,3000)}<small>Фактически ${f0(D.LY.R)} мм${D.LY.R>c.slotR?' (увеличен, чтобы позиции не перекрывались)':''}</small></div>
+ <div class="field"><label>Радиус расстановки, мм</label>${num('slotR',c.slotR,25,600,3000)}<small>Фактически ${f0(D.LY.R)} мм${D.LY.R>c.slotR?' (увеличен, чтобы позиции не перекрывались)':''}</small></div>
  <div class="field"><label>База → точка захвата, мм</label>${num('pickDist',c.pickDist,25,400,3000)}</div>`;
  $('cfgOpt').innerHTML=`<div class="field"><label>Целевая производительность, кор/ч</label>${num('opt.target',c.opt.target,10,10,5000)}</div>
  <div class="field"><label>Допускать коботов</label>${sel('opt.allowCobot',[['true','да'],['false','нет — только промышленные']],c.opt.allowCobot)}</div>
@@ -1930,7 +1962,7 @@ function renderChecks(D){
   rows.push(['Базирование тары',bd(bad.length?'bad':vis.length?'warn':'ok',bad.length?`не в допуске: ${bad.length} конв.`:vis.length?'позу даёт камера':'центрирования хватает'),
    D.base.map(x=>`конв. ${x.i+1}: ${INFEED[x.cv.infeed].name.toLowerCase()}, ${ALIGN[x.cv.align].name.toLowerCase()} → ±${f0(x.dx)} мм при допуске ±${f0(x.tol.dx)} мм`).join('; ')]);
   rows.push(['Техническое зрение',bd(D.visOK?'ok':'bad',c.vision.mode==='none'?'не используется':VISION[c.vision.mode].name.split(':')[0]),
-   D.visNeed==='none'?'По базированию не требуется: направляющие выводят тару в допуск':`Требуется минимум ${VISION[D.visNeed].name.toLowerCase()}; ${D.visOK?'выбранное подходит':'выбранное не закрывает задачу'}`]);}
+   D.visNeed==='none'?'По базированию не требуется: направляющие выводят тару в допуск':`Требуется минимум ${VISION[D.visNeed].name}; ${D.visOK?'выбранное подходит':'выбранное не закрывает задачу'}`]);}
  {const fits=c.boxes.map(b=>({b,f:gripFit(b,c.grip.type)})),bad=fits.filter(x=>x.f.s==='bad'),wrn=fits.filter(x=>x.f.s==='warn');
   rows.push(['Захват под тару',bd(bad.length?'bad':wrn.length?'warn':'ok',bad.length?`не годится для ${bad.length}`:wrn.length?`с оговорками для ${wrn.length}`:'подходит для всей тары'),
    fits.map(x=>`${x.b.name}: ${SHAPES[x.b.shape].name.toLowerCase()}, ${MATS[x.b.mat].name.toLowerCase()} — ${x.f.s==='ok'?'годится':x.f.s==='warn'?'с оговоркой':'не годится'}`).join('; ')]);}
@@ -2664,7 +2696,7 @@ function grafTable(steps,g){
 function renderGraf(){
  const c=normalize(CFG),P=grafProg(c),R=grafRef(c),user=c.plc.mode==='user';
  const cur1=S&&S.plc?S.plc.g1[0].cur:null,cur2=S&&S.plc?S.plc.g2[0].cur:null;
- $('gcMode').innerHTML=`<div class="field"><label>Чья логика исполняется</label>${sel('plc.mode',[['ref','Эталонная (зашита в тренажёр)'],['user','Моя программа']],c.plc.mode)}<small>${user?'Ячейка работает по вашей программе — ошибки в ней сразу видны на пульте':'Эталон можно скопировать к себе и править'}</small></div>
+ $('gcMode').innerHTML=`<div class="field"><label>Чья логика исполняется</label>${sel('plc.mode',[['ref','Эталонная'],['user','Моя программа']],c.plc.mode)}<small>${user?'Ячейка работает по вашей программе — ошибки в ней сразу видны на пульте':'Эталон можно скопировать к себе и править'}</small></div>
  <div class="btns"><button id="bGcCopy">Скопировать эталон в свою программу</button><button id="bGcReset" ${user?'':'disabled'}>Очистить свою программу</button></div>
  <p class="note">Интерпретатор за один такт проходит цепочку истинных переходов и останавливается на шаге, из которого выхода нет, — как ПЛК за один скан. Предел цепочки ${GC_MAX_FIRE} переходов, чтобы кольцо из безусловных переходов не подвесило ячейку.</p>`;
  const wr=grafCheck(P,c),df=user?grafDiff(P,R):[];

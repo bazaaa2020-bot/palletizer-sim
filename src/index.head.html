@@ -27,16 +27,18 @@ header p{margin:0;color:var(--muted);max-width:90ch}
 main{max-width:1400px;margin:0 auto;padding:14px 22px 40px}
 .tab{display:none}.tab.on{display:grid;gap:14px}
 #tab-sim{grid-template-columns:minmax(0,1.55fr) minmax(330px,1fr)}
-#tab-cfg{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}
+/* 450 px — чтобы колонка либо была шире 460 (подпись и поле в строку), либо её не было вовсе */
+#tab-cfg{grid-template-columns:repeat(auto-fit,minmax(450px,1fr));align-items:start}
+/* ниже 960 px колонка одна, и span 2 создал бы лишнюю неявную — отсюда порог */
+@media (min-width:960px){#tab-cfg .w2{grid-column:span 2}}
 #tab-arch,#tab-help,#tab-algo,#tab-3d,#tab-pl,#tab-risk,#tab-oee,#tab-plc,#tab-eco{grid-template-columns:1fr}
 #v3wrap{position:relative;width:100%;height:600px;background:linear-gradient(#dfe5ea,#f3f5f7);border-radius:6px;overflow:hidden;touch-action:none}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #v3wrap{background:linear-gradient(#1c2229,#2a313a)}}
 :root[data-theme="dark"] #v3wrap{background:linear-gradient(#1c2229,#2a313a)}
 #v3wrap canvas{display:block;width:100%!important;height:100%!important}
 #v3msg{position:absolute;left:12px;top:10px;font-size:13px;color:var(--muted);pointer-events:none}
-.row.box{grid-template-columns:1.2fr .7fr .7fr .7fr .6fr .8fr .6fr auto}
 @media (max-width:980px){#tab-sim{grid-template-columns:1fr}}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;min-width:0;container-type:inline-size}
 .panel h2{font-size:14px;font-weight:600;margin:0 0 8px;color:var(--muted)}
 .col{display:flex;flex-direction:column;gap:14px;min-width:0}
 svg{width:100%;height:auto;display:block}
@@ -46,6 +48,7 @@ button:hover:not(:disabled){filter:brightness(.96)}
 button:disabled{opacity:.45;cursor:not-allowed}
 button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center}
+.btns>select{flex:0 1 auto;width:auto;max-width:min(100%,360px)}
 .btns.group{padding-top:8px;border-top:1px dashed var(--line)}
 .b-start{background:var(--green);color:#fff;border-color:var(--green)}
 .b-stop{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -94,19 +97,42 @@ input[type=range]{flex:1}
 .note{font-size:13px;color:var(--muted);margin:6px 0 0}
 .legend{font-size:12.5px;color:var(--muted);margin-top:6px}
 .legend i{display:inline-block;width:10px;height:10px;margin:0 4px 0 10px;vertical-align:middle;border-radius:2px}
-.field.wide{grid-template-columns:1fr 230px}
-.field{display:grid;grid-template-columns:1fr 140px;gap:5px 10px;align-items:center;font-size:13.5px;margin-bottom:5px}
-.field label{color:var(--muted)}
-.field small{color:var(--muted);grid-column:1/-1;margin-top:-3px}
-input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);width:100%}
-.row{display:grid;gap:4px;align-items:center;margin-bottom:5px;font-size:13px}
-.row.box{grid-template-columns:1.3fr .8fr .8fr .8fr .8fr auto}
-.row.conv{grid-template-columns:1.6fr .7fr .7fr .9fr .9fr auto}
-.row.feed{grid-template-columns:1.2fr 1fr 1fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
-.row.tara{grid-template-columns:1.1fr 1fr 2.2fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
-.row.mix{grid-template-columns:.5fr 1.6fr .8fr 1fr auto}
-.row.base{grid-template-columns:1.3fr 1.5fr 2.4fr;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
-.fitn{font-size:11px;color:var(--muted)}.fitn.warn{color:var(--warnfg)}.fitn.bad{color:var(--badfg)}
+.field{display:grid;grid-template-columns:minmax(0,1fr);gap:3px 12px;align-items:center;font-size:13.5px;margin-bottom:9px}
+.field label{color:var(--muted);line-height:1.25;align-self:center}
+.field small{color:var(--muted);grid-column:1/-1;margin-top:1px;line-height:1.35}
+.field>input,.field>select{justify-self:stretch}
+/* Числовому полю хватает узкой колонки — остальное отдаём подписи, чтобы она была в одну строку */
+@container (min-width:320px){
+ .field:has(>input[type=number]){grid-template-columns:minmax(0,1fr) 104px}
+ .field:has(>input[type=text]){grid-template-columns:minmax(0,1fr) minmax(140px,40%)}
+}
+/* Выпадающий список встаёт в строку, только когда его текст туда влезет */
+@container (min-width:460px){.field:has(>select){grid-template-columns:minmax(0,1fr) minmax(210px,55%)}}
+@container (min-width:640px){.field:has(>select){grid-template-columns:minmax(0,1fr) minmax(260px,54%)}}
+/* На очень широкой панели поле не растягивается во всю ширину: подпись и значение рядом */
+@container (min-width:700px){.field{max-width:720px}.field:has(>select){grid-template-columns:minmax(0,1fr) 420px}}
+input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding:5px 7px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);width:100%;min-width:0}
+select{text-overflow:ellipsis}
+.row{display:grid;gap:4px 6px;align-items:center;margin-bottom:5px;font-size:13px}
+.row>*{min-width:0}
+.row.box{grid-template-columns:minmax(120px,1.7fr) .7fr .7fr .7fr .6fr .9fr .7fr auto}
+.row.conv{grid-template-columns:minmax(150px,2fr) .55fr .55fr .75fr minmax(110px,1.1fr) auto}
+.row.feed{grid-template-columns:minmax(150px,1.5fr) minmax(0,1.4fr) auto;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
+.row.feed>span{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.row.feed>span>select{flex:1}
+.row.feed input{width:76px;flex:0 0 auto}
+.row.tara{grid-template-columns:minmax(150px,1.3fr) minmax(145px,1.1fr) minmax(0,2fr);margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
+.row.mix{grid-template-columns:auto minmax(140px,1.9fr) .7fr .9fr auto}
+.row.base{grid-template-columns:minmax(175px,1.5fr) minmax(155px,1.3fr) minmax(0,2fr);margin-bottom:10px;padding-left:6px;border-left:2px solid var(--line)}
+/* Заголовок таблицы выравнивается по полям: у полей есть внутренний отступ 7px */
+.row.h{color:var(--muted);font-size:12px;margin-bottom:2px}
+.row.h>*{padding:0 7px}
+.fitn{font-size:11.5px;color:var(--muted);line-height:1.35}
+.fitn.warn,.fitn.bad{padding:4px 7px;border-radius:4px}
+/* Плотные таблицы на узкой панели прокручиваются вбок, а не сминаются в кашу */
+@container (max-width:560px){
+ #cfgBoxes,#cfgConv,#cfgMix{overflow-x:auto}
+ .row.box,.row.conv,.row.mix,.row.tara,.row.base,.row.feed{min-width:520px}}
 .gcact{display:block;font-size:11.5px;color:var(--muted);white-space:nowrap}
 .gcact input{margin-right:4px}
 .gctr{display:flex;gap:4px;align-items:center;margin-bottom:3px}
@@ -130,7 +156,9 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 .row .h{color:var(--muted);font-size:12px}
 .badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:12.5px;font-weight:500;white-space:nowrap}
 .ok{background:var(--okbg);color:var(--okfg)}.warn{background:var(--warnbg);color:var(--warnfg)}.bad{background:var(--badbg);color:var(--badfg)}
-.check{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px;align-items:baseline}
+.check{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 14px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px;align-items:baseline}
+.check>div{min-width:min(100%,220px);flex:1 1 220px}
+.check>.badge{flex:0 0 auto}
 .check small{display:block;color:var(--muted)}
 .warnings li{font-size:13px;margin-bottom:4px}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:12.5px;color:var(--muted)}
@@ -217,9 +245,9 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
 <section id="tab-cfg" class="tab">
  <div class="panel"><h2>Роботы</h2><div id="cfgRobot"></div></div>
  <div class="panel"><h2>Захват</h2><div id="cfgGrip"></div></div>
- <div class="panel"><h2>Коробки, паллеты, схема укладки</h2><div id="cfgBoxes"></div></div>
- <div class="panel"><h2>Смешанная паллета: рецепт укладки</h2><div id="cfgMix"></div></div>
- <div class="panel"><h2>Конвейеры и подача</h2><div id="cfgConv"></div></div>
+ <div class="panel w2"><h2>Коробки, паллеты, схема укладки</h2><div id="cfgBoxes"></div></div>
+ <div class="panel w2"><h2>Смешанная паллета: рецепт укладки</h2><div id="cfgMix"></div></div>
+ <div class="panel w2"><h2>Конвейеры и подача</h2><div id="cfgConv"></div></div>
  <div class="panel"><h2>Безопасность, сеть, компоновка</h2><div id="cfgSafety"></div></div>
  <div class="panel"><h2>Прокладочные листы</h2><div id="cfgSheet"></div></div>
  <div class="panel"><h2>Обмен паллет и пополнение</h2><div id="cfgExch"></div></div>
@@ -328,7 +356,7 @@ input[type=number],input[type=text],select{font:inherit;font-size:13.5px;padding
  </div>
  </div>
  <div class="panel"><h2>Таблицы в CSV — для ТКП, Excel и проекта</h2>
-  <div class="field wide"><label>Формат файла</label><select id="csvSep"></select><small>Файл идёт с BOM, поэтому кириллица открывается в Excel без «кракозябр»; числа — без разделителя разрядов, чтобы Excel принял их за числа</small></div>
+  <div class="field"><label>Формат файла</label><select id="csvSep"></select><small>Файл идёт с BOM, поэтому кириллица открывается в Excel без «кракозябр»; числа — без разделителя разрядов, чтобы Excel принял их за числа</small></div>
   <div class="btns" id="csvBtns"></div>
   <div class="btns"><button id="bCsvAll" class="b-apply">Все таблицы одним файлом</button><button id="bCsvShow">Показать и скопировать</button></div>
   <p class="note" id="csvMsg">Каждая кнопка скачивает свою таблицу отдельным файлом. «Все таблицы» — один файл, где таблицы идут блоками с заголовками. Если скачивание в этом окне запрещено, текст появится ниже — его можно вставить в Excel как есть.</p>

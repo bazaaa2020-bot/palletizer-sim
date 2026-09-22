@@ -16,7 +16,7 @@ const ROBOTS=[
  {id:'cb30',name:'Кобот 30 кг · 1300 мм',cls:'cobot',payload:30,reach:1300,v:1.0,cpm:7,cost:2.3,kW:0.7,ex:'класс UR30'},
  {id:'ir50',name:'Промышленный 50 кг · 2050 мм',cls:'industrial',payload:50,reach:2050,v:2.0,cpm:12,cost:3.2,kW:2.0,ex:'класс FANUC M-710iC/50, KUKA KR 50 R2100'},
  {id:'pl110',name:'Паллетайзер 110 кг · 2400 мм',cls:'industrial',payload:110,reach:2403,v:2.0,cpm:15,cost:4.2,kW:3.5,ex:'класс FANUC M-410iC/110'},
- {id:'pl130',name:'Паллетайзер 130 кг · 2400 мм, 6 циклов/мин',cls:'industrial',payload:130,reach:2400,v:2.0,cpm:6,cost:4.4,kW:3.5,ex:'по методике оценки REDCARGO PRO130 — 6 циклов укладки в минуту; досягаемость уточнить по паспорту'},
+ {id:'pl130',name:'Паллетайзер 130 кг · 2400 мм',cls:'industrial',payload:130,reach:2400,v:2.0,cpm:6,cost:4.4,kW:3.5,ex:'по методике оценки REDCARGO PRO130 — 6 циклов укладки в минуту; досягаемость уточнить по паспорту'},
  {id:'pl185',name:'Паллетайзер 185 кг · 3140 мм',cls:'industrial',payload:185,reach:3143,v:2.0,cpm:15,cost:5.0,kW:4.5,ex:'класс FANUC M-410iC/185, KUKA KR 180 R3200 PA'},
  {id:'custom',name:'Свой робот — ввести параметры',cls:'custom',payload:10,reach:1300,v:1.0,cpm:8,cost:2.0,kW:1.0,ex:''}];
 // Форма тары: чем она отличается для захвата. seal — доля площади, которая реально
@@ -82,7 +82,7 @@ const ALIGN={none:{name:'Без направляющих',dx:1e9,da:1e9},
 // Техническое зрение: точность позы и время кадра.
 const VISION={none:{name:'Без технического зрения',dx:1e9,da:1e9,t:0},
  '2d':{name:'2D-камера: положение и угол в плоскости',dx:1.5,da:0.5,t:0.15},
- '3d':{name:'3D: стереопара, ToF или лазерный профилометр',dx:3,da:1,t:0.35},
+ '3d':{name:'3D-камера: стереопара, ToF или профилометр',dx:3,da:1,t:0.35},
  struct:{name:'3D со структурированным светом (прозрачная и блестящая тара)',dx:2,da:0.7,t:0.5}};
 const VIS_ORDER=['none','2d','3d','struct'];
 // Допуск захвата на промах по положению и углу.
@@ -110,9 +110,9 @@ function baseCalc(c,G){const V=VISION[c.vision.mode]||VISION.none;
 function visionOK(mode,need){return VIS_ORDER.indexOf(mode)>=VIS_ORDER.indexOf(need);}
 const FEEDS={manual:'Ручная (оператор кладёт)',interval:'Автомат: коробка каждые N секунд',rate:'Автомат: N коробок в минуту'};
 const SHEET_MODES={none:'Без листов',bottom:'Один лист на поддоне (снизу)',between:'Лист между каждым слоем',everyN:'Лист через каждые N слоёв'};
-const EXCH_OUT={jack:'Человек с рохлей (ручная гидравлическая тележка)',forklift:'Погрузчик (кар)',amr:'Роботизированная тележка (AMR/AGV)',conveyor:'Цепной конвейер паллет + диспенсер'};
-const EXCH_IN={vehicle:'Та же тележка привозит пустую паллету',robot:'Робот берёт пустую паллету из стопки (магазин паллет)',dispenser:'Диспенсер на конвейере паллет'};
-const SHEETS_BY={person:'Человек докладывает листы в магазин',amr:'AMR привозит паллету с листами (замена магазина целиком)'};
+const EXCH_OUT={jack:'Человек с рохлей (гидротележка)',forklift:'Погрузчик (кар)',amr:'Роботизированная тележка (AMR/AGV)',conveyor:'Цепной конвейер паллет + диспенсер'};
+const EXCH_IN={vehicle:'Та же тележка, с пустой паллетой',robot:'Робот берёт из стопки паллет',dispenser:'Диспенсер на конвейере паллет'};
+const SHEETS_BY={person:'Человек кладёт листы в магазин',amr:'AMR привозит паллету с листами'};
 const AGENT={person:{v:1.0,lift:2,name:'человек'},jack:{v:0.8,lift:4,name:'человек с рохлей'},forklift:{v:1.5,lift:3,name:'погрузчик'},amr:{v:1.0,lift:5,name:'AMR'}};
 const CUP_D=[30,40,50,60,80,100,125];
 // Транспорт обмена: габарит по ширине и вылет площадки ожидания за ограждением.
